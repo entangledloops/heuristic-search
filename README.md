@@ -8,6 +8,8 @@ It refers to a broad class of algorithms that can be adapted to a variety of pro
 
 You may be familiar with its application in games, as it is often used to solve pathfinding problems. For example, when a player clicks on a location for his character to move to, a heuristic search algorithm is often working behind the scenes to find a path.
 
+![A-star search](http://www.entangledloops.com/img/greedy-solution-1.png)
+
 ## Where can I learn more? ##
 
 You can read more on [this project's wiki page](https://github.com/entangledloops/heuristicSearch/wiki), artifical intelligence related websites, and in the few books dedicated to the topic. 
