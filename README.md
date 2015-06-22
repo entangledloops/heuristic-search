@@ -2,7 +2,7 @@
 
 Heuristic search is a problem solving technique that uses [heuristic functions](https://en.wikipedia.org/wiki/Heuristic_function) to guide a search through a [state space](https://en.wikipedia.org/wiki/State_space).
 
-It refers to a broad class of algorithms that can be adapted to a variety of problem domains. The most famous, general-purpose, heuristic search technique is [A*](https://github.com/entangledloops/heuristicSearch/wiki/A*) (pronounced "A star").
+It refers to a broad class of algorithms that can be adapted to a variety of problem domains. The most well-known heuristic search technique is probably [A*](https://github.com/entangledloops/heuristicSearch/wiki/A*) (pronounced "A star").
 
 ## What is it used for? ##
 
