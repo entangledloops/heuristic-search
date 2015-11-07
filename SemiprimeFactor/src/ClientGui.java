@@ -20,6 +20,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final String DEFAULT_TITLE      = "Semiprime Factorization Client - v"+VERSION;
   private static final String ABOUT_URL          = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
   private static final String LIKE_IM_FIVE_URL   = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization---%22I-don't-math%22-edition";
+  private static final String SOURCE_URL         = "https://github.com/entangledloops/heuristicSearch/tree/master";
   private static final String HOMEPAGE_URL       = "http://www.entangledloops.com";
   private static final String BTN_CONNECT_STRING = "Connect Now";
   private static final int    DEFAULT_WIDTH      = 800, DEFAULT_HEIGHT = 600;
@@ -271,6 +272,17 @@ public class ClientGui extends JFrame implements DocumentListener
         catch (Throwable t) { Log.e(t); }
       });
       mnuAbout.add(mnuLikeImFive);
+
+      mnuAbout.addSeparator();
+
+      final URI sourceURI = new URI(SOURCE_URL);
+      final JMenuItem mnuSource = new JMenuItem("Source Code");
+      mnuSource.addActionListener((l) ->
+      {
+        try { java.awt.Desktop.getDesktop().browse(sourceURI); }
+        catch (Throwable t) { Log.e(t); }
+      });
+      mnuAbout.add(mnuSource);
 
       mnuAbout.addSeparator();
 
