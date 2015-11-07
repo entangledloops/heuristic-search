@@ -158,7 +158,7 @@ public class ClientGui extends JFrame implements DocumentListener
     txtPort.setColumns(5);
     txtPort.setText(Server.DEFAULT_PORT+"");
 
-    final JLabel lblConnectNow = new JLabel("Click update if you change your username or email:");
+    final JLabel lblConnectNow = new JLabel("Click update if you change your username or email after connecting:");
     lblConnectNow.setHorizontalAlignment(SwingConstants.CENTER);
 
     btnConnect = new JButton(BTN_CONNECT_STRING);
