@@ -109,6 +109,8 @@ public class Client
   private Socket socket() { return socket.get(); }
   private BufferedReader in() { return in.get(); }
   private PrintWriter out() { return out.get(); }
+  private String readln() throws IOException { return in().readLine(); }
+  private void println(String s) throws IOException { out().println(s); out().flush(); }
 
   public boolean connected() { return isConnected.get(); }
   public String ip() { return ip.get(); }
@@ -161,9 +163,6 @@ public class Client
 
   @Override
   public String toString() { return username + " (" + email() + " / " + ip() + ")"; }
-
-  private String readln() throws IOException { return in.get().readLine(); }
-  private void println(String s) throws IOException { out.get().println(s); out.get().flush(); }
 
   private void recvTarget()
   {
