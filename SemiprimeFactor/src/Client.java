@@ -163,7 +163,7 @@ public class Client
   public String toString() { return username + " (" + email() + " / " + ip() + ")"; }
 
   private String readln() throws IOException { return in.get().readLine(); }
-  private void println(String s) throws IOException { out.get().println(s); }
+  private void println(String s) throws IOException { out.get().println(s); out.get().flush(); }
 
   private void recvTarget()
   {

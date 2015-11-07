@@ -516,9 +516,9 @@ public class ClientGui extends JFrame implements DocumentListener
       }
       catch (NullPointerException e)
       {
-        JOptionPane.showMessageDialog(this, "Couldn't locate Stephen's desktop at the moment.\n" +
+        JOptionPane.showMessageDialog(this, "Couldn't locate the semiprime server.\n" +
             "Will keep retrying every few minutes, and the prime search will begin independently in the meantime.\n\n" +
-            "If you're feeling lucky or want to try a different server, you can retry connecting anytime by hitting the big button.");
+            "If you're feeling lucky or want to try a different server, you can retry connecting anytime.");
       }
       finally
       {
