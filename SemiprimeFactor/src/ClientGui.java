@@ -216,9 +216,9 @@ public class ClientGui extends JFrame implements DocumentListener
     // setup the icons and menus
     try
     {
-      icnNode = new ImageIcon("res/icon32x32.png");
-      icnCpu = new ImageIcon("res/cpu32x32.png");
-      icnNet = new ImageIcon("res/net32x32.png");
+      icnNode = new ImageIcon(getClass().getResource("res/icon32x32.png"));
+      icnCpu = new ImageIcon(getClass().getResource("res/cpu32x32.png"));
+      icnNet = new ImageIcon(getClass().getResource("res/net32x32.png"));
       setIconImage(icnNode.getImage());
     }
     catch (Throwable t) { Log.e(t); }

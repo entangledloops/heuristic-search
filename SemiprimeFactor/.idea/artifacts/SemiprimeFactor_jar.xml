@@ -1,5 +1,5 @@
 <component name="ArtifactManager">
-  <artifact type="jar" name="SemiprimeFactor:jar">
+  <artifact type="jar" build-on-make="true" name="SemiprimeFactor:jar">
     <output-path>$PROJECT_DIR$/out/artifacts/SemiprimeFactor_jar</output-path>
     <root id="archive" name="SemiprimeFactor.jar">
       <element id="module-output" name="SemiprimeFactor" />

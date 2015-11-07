@@ -32,8 +32,8 @@
           <file leaf-file-name="Log.java" pinned="false" current-in-tab="true">
             <entry file="file://$PROJECT_DIR$/src/Log.java">
               <provider selected="true" editor-type-id="text-editor">
-                <state vertical-scroll-proportion="0.55172414">
-                  <caret line="45" column="0" selection-start-line="45" selection-start-column="0" selection-end-line="45" selection-end-column="0" />
+                <state vertical-scroll-proportion="0.41379312">
+                  <caret line="41" column="3" selection-start-line="41" selection-start-column="3" selection-end-line="41" selection-end-column="3" />
                   <folding>
                     <element signature="imports" expanded="true" />
                   </folding>
@@ -129,8 +129,8 @@
           <file leaf-file-name="ClientGui.java" pinned="false" current-in-tab="true">
             <entry file="file://$PROJECT_DIR$/src/ClientGui.java">
               <provider selected="true" editor-type-id="text-editor">
-                <state vertical-scroll-proportion="0.72805136">
-                  <caret line="20" column="101" selection-start-line="20" selection-start-column="101" selection-end-line="20" selection-end-column="101" />
+                <state vertical-scroll-proportion="0.254818">
+                  <caret line="220" column="73" selection-start-line="220" selection-start-column="73" selection-end-line="220" selection-end-column="73" />
                   <folding>
                     <element signature="imports" expanded="true" />
                   </folding>
@@ -525,9 +525,10 @@
     <configuration default="false" name="Client" type="JarApplication" factoryName="JAR Application">
       <extension name="coverage" enabled="false" merge="false" sample_coverage="true" runner="idea" />
       <option name="JAR_PATH" value="$PROJECT_DIR$/out/artifacts/SemiprimeFactor_jar/SemiprimeFactor.jar" />
-      <option name="WORKING_DIRECTORY" value="C:\code\SemiprimeFactor" />
+      <option name="WORKING_DIRECTORY" value="C:\" />
       <option name="ALTERNATIVE_JRE_PATH" />
       <envs />
+      <module name="SemiprimeFactor" />
       <method>
         <option name="BuildArtifacts" enabled="true">
           <artifact name="SemiprimeFactor:jar" />
@@ -536,8 +537,8 @@
     </configuration>
     <list size="3">
       <item index="0" class="java.lang.String" itemvalue="Application.Client" />
-      <item index="1" class="java.lang.String" itemvalue="JAR Application.Client" />
-      <item index="2" class="java.lang.String" itemvalue="Application.Server" />
+      <item index="1" class="java.lang.String" itemvalue="Application.Server" />
+      <item index="2" class="java.lang.String" itemvalue="JAR Application.Client" />
     </list>
     <recent_temporary>
       <list size="1">
@@ -1160,8 +1161,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/Log.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.55172414">
-          <caret line="45" column="0" selection-start-line="45" selection-start-column="0" selection-end-line="45" selection-end-column="0" />
+        <state vertical-scroll-proportion="0.41379312">
+          <caret line="41" column="3" selection-start-line="41" selection-start-column="3" selection-end-line="41" selection-end-column="3" />
           <folding>
             <element signature="imports" expanded="true" />
           </folding>
@@ -1170,8 +1171,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/ClientGui.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.72805136">
-          <caret line="20" column="101" selection-start-line="20" selection-start-column="101" selection-end-line="20" selection-end-column="101" />
+        <state vertical-scroll-proportion="0.254818">
+          <caret line="220" column="73" selection-start-line="220" selection-start-column="73" selection-end-line="220" selection-end-column="73" />
           <folding>
             <element signature="imports" expanded="true" />
           </folding>
@@ -1209,6 +1210,7 @@
       </state>
       <state key="GlobalLibrariesConfigurable.UI">
         <settings>
+          <last-edited>gdx-1.7.0</last-edited>
           <splitter-proportions>
             <option name="proportions">
               <list>
