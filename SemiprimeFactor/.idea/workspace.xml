@@ -129,8 +129,8 @@
           <file leaf-file-name="ClientGui.java" pinned="false" current-in-tab="true">
             <entry file="file://$PROJECT_DIR$/src/ClientGui.java">
               <provider selected="true" editor-type-id="text-editor">
-                <state vertical-scroll-proportion="0.254818">
-                  <caret line="220" column="73" selection-start-line="220" selection-start-column="73" selection-end-line="220" selection-end-column="73" />
+                <state vertical-scroll-proportion="0.43683085">
+                  <caret line="225" column="24" selection-start-line="225" selection-start-column="24" selection-end-line="225" selection-end-column="24" />
                   <folding>
                     <element signature="imports" expanded="true" />
                   </folding>
@@ -1171,8 +1171,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/ClientGui.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.254818">
-          <caret line="220" column="73" selection-start-line="220" selection-start-column="73" selection-end-line="220" selection-end-column="73" />
+        <state vertical-scroll-proportion="0.43683085">
+          <caret line="225" column="24" selection-start-line="225" selection-start-column="24" selection-end-line="225" selection-end-column="24" />
           <folding>
             <element signature="imports" expanded="true" />
           </folding>
