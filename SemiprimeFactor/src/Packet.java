@@ -4,6 +4,8 @@
 public enum Packet
 {
   NEW_TARGET,
+  USERNAME_UPDATE,
+  EMAIL_UPDATE,
   OPEN_UPDATE,
   OPEN_CHECK,
   OPEN_MERGE,

@@ -14,7 +14,7 @@ public class Client
   private final BufferedReader in;
   private final PrintWriter    out;
 
-  private String username;
+  private String username, email;
   private boolean isExiting   = false;
   private boolean isConnected = false;
 
@@ -43,13 +43,12 @@ public class Client
    * @param host
    * @param port
    */
-  public Client(String username, String host, int port) throws NullPointerException
+  public Client(String host, int port) throws NullPointerException
   {
-    Log.d("connecting user \"" + username + "\" to " + host + ":" + port + "...");
+    Log.d("connecting to " + host + ":" + port + "...");
 
     try
     {
-      this.username = username;
       this.socket = new Socket(host, port);
       this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
       this.out = new PrintWriter(socket.getOutputStream());

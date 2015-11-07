@@ -20,7 +20,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final String DEFAULT_TITLE      = "Semiprime Factorization Client - v"+VERSION;
   private static final String DOWNLOAD_URL       = "https://github.com/entangledloops/heuristicSearch";
   private static final String ABOUT_URL          = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
-  private static final String LIKE_IM_FIVE_URL   = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization---%22I-don't-math%22-edition";
+  private static final String NO_MATH_URL        = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization---%22I-don't-math%22-edition";
   private static final String SOURCE_URL         = "https://github.com/entangledloops/heuristicSearch/tree/master";
   private static final String HOMEPAGE_URL       = "http://www.entangledloops.com";
   private static final String BTN_CONNECT_STRING = "Connect Now";
@@ -163,15 +163,17 @@ public class ClientGui extends JFrame implements DocumentListener
 
     btnConnect = new JButton(BTN_CONNECT_STRING);
     btnConnect.setHorizontalAlignment(SwingConstants.CENTER);
-    btnConnect.addActionListener((event) ->
+    btnConnect.setFocusPainted(false);
+    btnConnect.addActionListener(e ->
     {
       if (isConnecting.compareAndSet(false, true)) connect();
     });
 
     btnUpdate = new JButton("Update");
     btnUpdate.setHorizontalAlignment(SwingConstants.CENTER);
+    btnUpdate.setFocusPainted(false);
     btnUpdate.setEnabled(false);
-    btnUpdate.addActionListener((event) ->
+    btnUpdate.addActionListener(e ->
     {
       update();
     });
@@ -211,27 +213,27 @@ public class ClientGui extends JFrame implements DocumentListener
     mnuBar.add(mnuFile);
 
     final JMenuItem mnuSaveSettings = new JMenuItem("Save Settings");
-    mnuSaveSettings.addActionListener((l) -> saveSettings());
+    mnuSaveSettings.addActionListener(l -> saveSettings());
     mnuFile.add(mnuSaveSettings);
 
     final JMenuItem mnuLoadSettings = new JMenuItem("Load Settings");
-    mnuLoadSettings.addActionListener((l) -> loadSettings());
+    mnuLoadSettings.addActionListener(l -> loadSettings());
     mnuFile.add(mnuLoadSettings);
 
     mnuFile.addSeparator();
 
     final JMenuItem mnuSendWork = new JMenuItem("Send All Completed Work");
-    mnuSendWork.addActionListener((l) -> sendWork());
+    mnuSendWork.addActionListener(l -> sendWork());
     mnuFile.add(mnuSendWork);
 
     final JMenuItem mnuRecvWork = new JMenuItem("Request a New Node");
-    mnuRecvWork.addActionListener((l) -> recvWork());
+    mnuRecvWork.addActionListener(l -> recvWork());
     mnuFile.add(mnuRecvWork);
 
     mnuFile.addSeparator();
 
     final JMenuItem mnuQuit = new JMenuItem("Save & Quit");
-    mnuQuit.addActionListener((l) -> exit());
+    mnuQuit.addActionListener(l -> exit());
     mnuFile.add(mnuQuit);
 
     try
@@ -240,27 +242,27 @@ public class ClientGui extends JFrame implements DocumentListener
 
       final URI aboutURI = new URI(ABOUT_URL);
       final JMenuItem mnuSPF = new JMenuItem("What is Semiprime Factorization?");
-      mnuSPF.addActionListener((l) ->
+      mnuSPF.addActionListener(l ->
       {
         try { java.awt.Desktop.getDesktop().browse(aboutURI); }
         catch (Throwable t) { Log.e(t); }
       });
       mnuAbout.add(mnuSPF);
 
-      final URI likeImFiveURI = new URI(LIKE_IM_FIVE_URL);
-      final JMenuItem mnuLikeImFive = new JMenuItem("Explain it again, but like I don't know any math.");
-      mnuLikeImFive.addActionListener((l) ->
+      final URI noMathURI = new URI(NO_MATH_URL);
+      final JMenuItem mnuNoMath = new JMenuItem("Explain it again, but like I don't know any math.");
+      mnuNoMath.addActionListener(l ->
       {
-        try { java.awt.Desktop.getDesktop().browse(likeImFiveURI); }
+        try { java.awt.Desktop.getDesktop().browse(noMathURI); }
         catch (Throwable t) { Log.e(t); }
       });
-      mnuAbout.add(mnuLikeImFive);
+      mnuAbout.add(mnuNoMath);
 
       mnuAbout.addSeparator();
 
       final URI downloadURI = new URI(SOURCE_URL);
       final JMenuItem mnuDownload = new JMenuItem("Download Latest Client");
-      mnuDownload.addActionListener((l) ->
+      mnuDownload.addActionListener(l ->
       {
         try { java.awt.Desktop.getDesktop().browse(downloadURI); }
         catch (Throwable t) { Log.e(t); }
@@ -269,7 +271,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
       final URI sourceURI = new URI(SOURCE_URL);
       final JMenuItem mnuSource = new JMenuItem("Source Code");
-      mnuSource.addActionListener((l) ->
+      mnuSource.addActionListener(l ->
       {
         try { java.awt.Desktop.getDesktop().browse(sourceURI); }
         catch (Throwable t) { Log.e(t); }
@@ -280,7 +282,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
       final URI homepageURI = new URI(HOMEPAGE_URL);
       final JMenuItem mnuHomepage = new JMenuItem("My Homepage");
-      mnuHomepage.addActionListener((l) ->
+      mnuHomepage.addActionListener(l ->
       {
         try { java.awt.Desktop.getDesktop().browse(homepageURI); }
         catch (Throwable t) { Log.e(t); }
@@ -311,7 +313,7 @@ public class ClientGui extends JFrame implements DocumentListener
     sldProcessors.setSnapToTicks(true);
     sldProcessors.setPaintTicks(true);
     sldProcessors.setPaintLabels(true);
-    sldProcessors.addChangeListener((c) ->
+    sldProcessors.addChangeListener(c ->
     {
       if (sldProcessors.getValueIsAdjusting()) return;
       int val = sldProcessors.getValue();
@@ -327,7 +329,7 @@ public class ClientGui extends JFrame implements DocumentListener
     sldCap.setSnapToTicks(true);
     sldCap.setPaintLabels(true);
     sldCap.setPaintTicks(true);
-    sldCap.addChangeListener((c) ->
+    sldCap.addChangeListener(c ->
     {
       if (sldCap.getValueIsAdjusting()) return;
       int val = sldCap.getValue();
@@ -343,7 +345,7 @@ public class ClientGui extends JFrame implements DocumentListener
     sldMemory.setSnapToTicks(true);
     sldMemory.setPaintLabels(true);
     sldMemory.setPaintTicks(true);
-    sldMemory.addChangeListener((c) ->
+    sldMemory.addChangeListener(c ->
     {
       if (sldMemory.getValueIsAdjusting()) return;
       int val = sldMemory.getValue();
@@ -358,7 +360,7 @@ public class ClientGui extends JFrame implements DocumentListener
     sldIdle.setSnapToTicks(true);
     sldIdle.setPaintLabels(true);
     sldIdle.setPaintTicks(true);
-    sldIdle.addChangeListener((c) ->
+    sldIdle.addChangeListener(c ->
     {
       if (sldIdle.getValueIsAdjusting()) return;
       int val = sldIdle.getValue();
@@ -383,7 +385,7 @@ public class ClientGui extends JFrame implements DocumentListener
     chkWorkAlways = new JCheckBox("Always work, even when I'm not idle.", false);
     chkWorkAlways.setHorizontalAlignment(SwingConstants.CENTER);
     chkWorkAlways.setFocusPainted(false);
-    chkWorkAlways.addActionListener((l) ->
+    chkWorkAlways.addActionListener(l ->
     {
       final boolean work = chkWorkAlways.isSelected();
       Log.d("always work: " + (work ? "yes" : "no"));
@@ -490,9 +492,10 @@ public class ClientGui extends JFrame implements DocumentListener
           throw new NumberFormatException("invalid port");
         }
 
-        client.set(new Client(username, address, port));
-
+        client.set(new Client(address, port));
         isConnecting.set(false);
+        update();
+
         btnConnect.setText("Disconnect");
         btnUpdate.setEnabled(true);
       }
@@ -524,11 +527,11 @@ public class ClientGui extends JFrame implements DocumentListener
     if (isConnecting.get()) { Log.e("try updating again after you're connected"); return; }
     if (!isUpdatePending.compareAndSet(false, true)) { Log.e("already working on an update, hang tight..."); return; }
     btnUpdate.setEnabled(false);
-    Log.d("sending updated settings to server...");
+    Log.d("sending user settings to server...");
 
 
 
-    Log.d("server has acknowledged your updated settings");
+    Log.d("server has acknowledged your settings");
     isUpdatePending.set(false);
     btnUpdate.setEnabled(true);
   }
