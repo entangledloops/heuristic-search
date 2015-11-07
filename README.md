@@ -1,3 +1,5 @@
+[Download](https://github.com/entangledloops/heuristicSearch/blob/master/SemiprimeFactor/out/artifacts/SemiprimeFactor_jar/SemiprimeFactor.jar?raw=true) the latest [Semiprime Factorization Client](https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization) (currently v0.3a).
+
 ## What is Heuristic Search? ##
 
 Heuristic search is a problem solving technique that uses [heuristic functions](https://en.wikipedia.org/wiki/Heuristic_function) to guide a search through a [state space](https://en.wikipedia.org/wiki/State_space).
