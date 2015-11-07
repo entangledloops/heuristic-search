@@ -13,4 +13,5 @@ public enum Packet
   CLOSED_CHECK,
   CLOSED_MERGE,
   SOLVED,
+  ERROR
 }

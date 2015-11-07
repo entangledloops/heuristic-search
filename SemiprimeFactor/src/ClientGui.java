@@ -19,12 +19,11 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final String VERSION            = "0.3a";
   private static final String DEFAULT_TITLE      = "Semiprime Factorization Client - v"+VERSION;
   private static final String DOWNLOAD_URL       = "https://github.com/entangledloops/heuristicSearch";
-  private static final String ABOUT_URL          = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
-  private static final String NO_MATH_URL        = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization---%22I-don't-math%22-edition";
-  private static final String SOURCE_URL         = "https://github.com/entangledloops/heuristicSearch/tree/master";
-  private static final String HOMEPAGE_URL       = "http://www.entangledloops.com";
-  private static final String BTN_CONNECT_STRING = "Connect Now";
-  private static final int    DEFAULT_WIDTH      = 800, DEFAULT_HEIGHT = 600;
+  private static final String ABOUT_URL      = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
+  private static final String NO_MATH_URL    = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization---%22I-don't-math%22-edition";
+  private static final String SOURCE_URL     = "https://github.com/entangledloops/heuristicSearch/tree/master";
+  private static final String HOMEPAGE_URL   = "http://www.entangledloops.com";
+  private static final int    DEFAULT_WIDTH  = 800, DEFAULT_HEIGHT = 600;
   private static final int    HISTORY_ROWS       = 5,    HISTORY_COLS   = 20;
 
   private ImageIcon icnNode, icnCpu, icnNet;
@@ -161,22 +160,19 @@ public class ClientGui extends JFrame implements DocumentListener
     final JLabel lblConnectNow = new JLabel("Click update if you change your username or email after connecting:");
     lblConnectNow.setHorizontalAlignment(SwingConstants.CENTER);
 
-    btnConnect = new JButton(BTN_CONNECT_STRING);
+    btnConnect = new JButton("Connect Now");
     btnConnect.setHorizontalAlignment(SwingConstants.CENTER);
     btnConnect.setFocusPainted(false);
     btnConnect.addActionListener(e ->
     {
-      if (isConnecting.compareAndSet(false, true)) connect();
+      if (isConnecting.compareAndSet(false, true)) connectEvent();
     });
 
     btnUpdate = new JButton("Update");
     btnUpdate.setHorizontalAlignment(SwingConstants.CENTER);
     btnUpdate.setFocusPainted(false);
     btnUpdate.setEnabled(false);
-    btnUpdate.addActionListener(e ->
-    {
-      update();
-    });
+    btnUpdate.addActionListener(e -> sendSettings());
 
     final JPanel pnlConnectBtn = new JPanel(new GridLayout(1,2));
     pnlConnectBtn.add(btnConnect);
@@ -447,29 +443,45 @@ public class ClientGui extends JFrame implements DocumentListener
     return true;
   }
 
-  private void connect()
+  private void updateBtnConnect()
+  {
+    final Client c = client.get();
+    if (isConnecting.get())
+    {
+      btnUpdate.setEnabled(false);
+      btnConnect.setEnabled(false);
+      btnConnect.setText("Connecting...");
+    }
+    else if (null == c || !c.connected())
+    {
+      btnUpdate.setEnabled(false);
+      btnConnect.setEnabled(true);
+      btnConnect.setText("Connect Now");
+    }
+    else
+    {
+      btnUpdate.setEnabled(true);
+      btnConnect.setEnabled(true);
+      btnConnect.setText("Disconnect");
+    }
+  }
+
+  private void connectEvent()
   {
     new Thread(() ->
     {
       try
       {
-        btnConnect.setEnabled(false);
-        btnUpdate.setEnabled(false);
-
         // close any old connection
         final Client prev = client.getAndSet(null);
         if (null != prev && prev.connected())
         {
           prev.close();
-          isConnecting.set(false);
-          btnConnect.setText(BTN_CONNECT_STRING);
           return;
         }
-        btnConnect.setText("Connecting...");
 
-        // grab the info from the connect boxes
-        String username = txtUsername.getText().trim();
-        if ("".equals(username)) username = System.getProperty("user.name");
+        isConnecting.set(true);
+        updateBtnConnect();
 
         final String address = txtAddress.getText().trim();
         if ("".equals(address))
@@ -492,44 +504,46 @@ public class ClientGui extends JFrame implements DocumentListener
           throw new NumberFormatException("invalid port");
         }
 
-        client.set(new Client(address, port));
-        isConnecting.set(false);
-        update();
+        final Client c = new Client(address, port, this::updateBtnConnect);
+        client.set(c);
 
-        btnConnect.setText("Disconnect");
-        btnUpdate.setEnabled(true);
+        isConnecting.set(false);
+        sendSettings();
       }
       catch (NumberFormatException e)
       {
-        isConnecting.set(false);
-        btnConnect.setText(BTN_CONNECT_STRING);
-        btnUpdate.setEnabled(false);
         Log.e("connect failure: " + e.getMessage());
       }
       catch (NullPointerException e)
       {
-        isConnecting.set(false);
-        btnConnect.setText(BTN_CONNECT_STRING);
-        btnUpdate.setEnabled(false);
         JOptionPane.showMessageDialog(this, "Couldn't locate Stephen's desktop at the moment.\n" +
             "Will keep retrying every few minutes, and the prime search will begin independently in the meantime.\n\n" +
             "If you're feeling lucky or want to try a different server, you can retry connecting anytime by hitting the big button.");
       }
       finally
       {
-        btnConnect.setEnabled(true);
+        isConnecting.set(false);
+        updateBtnConnect();
       }
     }).start();
   }
 
-  private void update()
+  private void sendSettings()
   {
     if (isConnecting.get()) { Log.e("try updating again after you're connected"); return; }
     if (!isUpdatePending.compareAndSet(false, true)) { Log.e("already working on an update, hang tight..."); return; }
     btnUpdate.setEnabled(false);
     Log.d("sending user settings to server...");
 
+    // grab the info from the connect boxes
+    String username = txtUsername.getText().trim();
+    if ("".equals(username)) username = System.getProperty("user.name");
 
+    final Client c = client.get();
+    c.setUsername(username);
+    c.sendPacket(Packet.USERNAME_UPDATE);
+    c.setEmail(txtEmail.getText());
+    c.sendPacket(Packet.EMAIL_UPDATE);
 
     Log.d("server has acknowledged your settings");
     isUpdatePending.set(false);
