@@ -37,11 +37,12 @@ public class ClientGui extends JFrame implements DocumentListener
   private JFormattedTextField txtPort;
   private JSlider             sldProcessors, sldCap, sldMemory, sldIdle;
   private JCheckBox   chkWorkAlways;
-  private JButton     btnConnect;
+  private JButton     btnConnect, btnUpdate;
   private JScrollPane scrollPaneHistory;
 
   private final AtomicReference<Client> client = new AtomicReference<>(null);
   private final AtomicBoolean isConnecting = new AtomicBoolean(false);
+  private final AtomicBoolean isUpdatePending = new AtomicBoolean(false);
 
   public ClientGui()
   {
@@ -57,7 +58,7 @@ public class ClientGui extends JFrame implements DocumentListener
     setVisible(true);
     toFront();
 
-    connect();
+    //connect();
   }
 
   public void resetFrame()
@@ -68,34 +69,6 @@ public class ClientGui extends JFrame implements DocumentListener
     setResizable(true);
     setSize(DEFAULT_WIDTH, DEFAULT_HEIGHT);
     setLocationRelativeTo(getRootPane());
-  }
-
-  public void saveSettings()
-  {
-    Log.d("saving settings...");
-
-    Log.d("settings saved");
-  }
-
-  public void loadSettings()
-  {
-    Log.d("loading settings...");
-
-    Log.d("settings loaded");
-  }
-
-  public void sendWork()
-  {
-    Log.d("sending all completed work to server...");
-
-    Log.d("server successfully received all completed work");
-  }
-
-  public void recvWork()
-  {
-    Log.d("requesting a new primary node...");
-
-    Log.d("new workload received; restarting search...");
   }
 
   public void exit()
@@ -129,7 +102,6 @@ public class ClientGui extends JFrame implements DocumentListener
 
     // initialize all components to default settings
     txtHistory = new JTextArea();
-    btnConnect = new JButton();
 
     txtHistory.setRows(HISTORY_ROWS);
     txtHistory.setColumns(HISTORY_COLS);
@@ -146,7 +118,7 @@ public class ClientGui extends JFrame implements DocumentListener
     });
 
     Log.d("\"Thank you\" raised to the 101st power for helping my semiprime research!");
-    Log.d("If you're computer cracks a target number, you will be credited in the publication.");
+    Log.d("If you're computer cracks a target number, you will be credited in the publication (assuming you provided an email I can reach you at).");
     Log.d("If you're interested in learning exactly what this software does and why, checkout the \"About\" menu.\n");
 
     scrollPaneHistory = new JScrollPane(txtHistory);
@@ -155,12 +127,6 @@ public class ClientGui extends JFrame implements DocumentListener
 
     DefaultHighlighter highlighter = new DefaultHighlighter();
     txtHistory.setHighlighter(highlighter);
-
-    btnConnect.setText(BTN_CONNECT_STRING);
-    btnConnect.addActionListener((event) ->
-    {
-      if (isConnecting.compareAndSet(false, true)) connect();
-    });
 
     // username
     final JLabel lblUsername = new JLabel("Optional username:");
@@ -192,11 +158,27 @@ public class ClientGui extends JFrame implements DocumentListener
     txtPort.setColumns(5);
     txtPort.setText(Server.DEFAULT_PORT+"");
 
-    final JLabel lblConnectNow = new JLabel("If there's a problem:");
+    final JLabel lblConnectNow = new JLabel("Click update if you change your username or email:");
     lblConnectNow.setHorizontalAlignment(SwingConstants.CENTER);
 
-    final JPanel pnlConnectBtn = new JPanel(new GridLayout(1,1));
+    btnConnect = new JButton(BTN_CONNECT_STRING);
+    btnConnect.setHorizontalAlignment(SwingConstants.CENTER);
+    btnConnect.addActionListener((event) ->
+    {
+      if (isConnecting.compareAndSet(false, true)) connect();
+    });
+
+    btnUpdate = new JButton("Update");
+    btnUpdate.setHorizontalAlignment(SwingConstants.CENTER);
+    btnUpdate.setEnabled(false);
+    btnUpdate.addActionListener((event) ->
+    {
+      update();
+    });
+
+    final JPanel pnlConnectBtn = new JPanel(new GridLayout(1,2));
     pnlConnectBtn.add(btnConnect);
+    pnlConnectBtn.add(btnUpdate);
 
     // add the components to the left-side connect region
     pnlConnect = new JPanel(new GridLayout(10,1));
@@ -266,7 +248,7 @@ public class ClientGui extends JFrame implements DocumentListener
       mnuAbout.add(mnuSPF);
 
       final URI likeImFiveURI = new URI(LIKE_IM_FIVE_URL);
-      final JMenuItem mnuLikeImFive = new JMenuItem("Explain it again, but like I don't math.");
+      final JMenuItem mnuLikeImFive = new JMenuItem("Explain it again, but like I don't any math.");
       mnuLikeImFive.addActionListener((l) ->
       {
         try { java.awt.Desktop.getDesktop().browse(likeImFiveURI); }
@@ -470,6 +452,7 @@ public class ClientGui extends JFrame implements DocumentListener
       try
       {
         btnConnect.setEnabled(false);
+        btnUpdate.setEnabled(false);
 
         // close any old connection
         final Client prev = client.getAndSet(null);
@@ -478,7 +461,6 @@ public class ClientGui extends JFrame implements DocumentListener
           prev.close();
           isConnecting.set(false);
           btnConnect.setText(BTN_CONNECT_STRING);
-          btnConnect.setEnabled(true);
           return;
         }
         btnConnect.setText("Connecting...");
@@ -512,25 +494,71 @@ public class ClientGui extends JFrame implements DocumentListener
 
         isConnecting.set(false);
         btnConnect.setText("Disconnect");
-        btnConnect.setEnabled(true);
+        btnUpdate.setEnabled(true);
       }
       catch (NumberFormatException e)
       {
         isConnecting.set(false);
         btnConnect.setText(BTN_CONNECT_STRING);
-        btnConnect.setEnabled(true);
+        btnUpdate.setEnabled(false);
         Log.e("connect failure: " + e.getMessage());
       }
       catch (NullPointerException e)
       {
         isConnecting.set(false);
         btnConnect.setText(BTN_CONNECT_STRING);
-        btnConnect.setEnabled(true);
+        btnUpdate.setEnabled(false);
         JOptionPane.showMessageDialog(this, "Couldn't locate Stephen's desktop at the moment.\n" +
             "Will keep retrying every few minutes, and the prime search will begin independently in the meantime.\n\n" +
             "If you're feeling lucky or want to try a different server, you can retry connecting anytime by hitting the big button.");
       }
+      finally
+      {
+        btnConnect.setEnabled(true);
+      }
     }).start();
+  }
+
+  private void update()
+  {
+    if (isConnecting.get()) { Log.e("try updating again after you're connected"); return; }
+    if (!isUpdatePending.compareAndSet(false, true)) { Log.e("already working on an update, hang tight..."); return; }
+    btnUpdate.setEnabled(false);
+    Log.d("sending updated settings to server...");
+
+
+
+    Log.d("server has acknowledged your updated settings");
+    isUpdatePending.set(false);
+    btnUpdate.setEnabled(true);
+  }
+
+  public void saveSettings()
+  {
+    Log.d("saving settings...");
+
+    Log.d("settings saved");
+  }
+
+  public void loadSettings()
+  {
+    Log.d("loading settings...");
+
+    Log.d("settings loaded");
+  }
+
+  public void sendWork()
+  {
+    Log.d("sending all completed work to server...");
+
+    Log.d("server successfully received all completed work");
+  }
+
+  public void recvWork()
+  {
+    Log.d("requesting a new primary node...");
+
+    Log.d("new workload received; restarting search...");
   }
 
   @Override
