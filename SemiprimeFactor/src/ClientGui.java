@@ -18,6 +18,7 @@ public class ClientGui extends JFrame implements DocumentListener
 {
   private static final String VERSION            = "0.3a";
   private static final String DEFAULT_TITLE      = "Semiprime Factorization Client - v"+VERSION;
+  private static final String DEFAULT_EMAIL      = "nope@take-all-the-credit.com";
   private static final String DOWNLOAD_URL       = "https://github.com/entangledloops/heuristicSearch";
   private static final String ABOUT_URL      = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
   private static final String NO_MATH_URL    = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization---%22I-don't-math%22-edition";
@@ -136,7 +137,7 @@ public class ClientGui extends JFrame implements DocumentListener
     // email
     final JLabel lblEmail = new JLabel("Optional email (in case you crack a number\u2014will never share):");
     lblEmail.setHorizontalAlignment(SwingConstants.CENTER);
-    txtEmail = new JTextField("nope@take-all-the-credit.com");
+    txtEmail = new JTextField();
     txtEmail.setHorizontalAlignment(SwingConstants.CENTER);
 
     // host address label and text box
@@ -460,7 +461,7 @@ public class ClientGui extends JFrame implements DocumentListener
     }
     else
     {
-      btnUpdate.setEnabled(true);
+      btnUpdate.setEnabled( !isUpdatePending.get() );
       btnConnect.setEnabled(true);
       btnConnect.setText("Disconnect");
     }
@@ -507,7 +508,6 @@ public class ClientGui extends JFrame implements DocumentListener
         final Client c = new Client(address, port, this::updateBtnConnect);
         client.set(c);
 
-        isConnecting.set(false);
         sendSettings();
       }
       catch (NumberFormatException e)
@@ -530,23 +530,33 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private void sendSettings()
   {
-    if (isConnecting.get()) { Log.e("try updating again after you're connected"); return; }
+    final Client c = client.get();
+    if (null == c || !c.connected()) { Log.e("you need to be connected before updating"); return; }
     if (!isUpdatePending.compareAndSet(false, true)) { Log.e("already working on an update, hang tight..."); return; }
+
     btnUpdate.setEnabled(false);
-    Log.d("sending user settings to server...");
+    txtUsername.setEnabled(false);
+    txtEmail.setEnabled(false);
+    Log.d("sending user settings to the server...");
 
     // grab the info from the connect boxes
     String username = txtUsername.getText().trim();
     if ("".equals(username)) username = System.getProperty("user.name");
+    txtUsername.setText(username);
 
-    final Client c = client.get();
+    String email = txtEmail.getText().trim();
+    if ("".equals(email)) email = DEFAULT_EMAIL;
+    txtEmail.setText(email);
+
     c.setUsername(username);
-    c.sendPacket(Packet.USERNAME_UPDATE);
-    c.setEmail(txtEmail.getText());
-    c.sendPacket(Packet.EMAIL_UPDATE);
+    if (!c.sendPacket(Packet.USERNAME_UPDATE)) { Log.e("failed to send username, try reconnecting"); return; }
+    c.setEmail(email);
+    if (!c.sendPacket(Packet.EMAIL_UPDATE)) { Log.e("failed to send email, try reconnecting"); return; }
 
-    Log.d("server has acknowledged your settings");
+    Log.d("the server has acknowledged your settings");
     isUpdatePending.set(false);
+    txtEmail.setEnabled(true);
+    txtUsername.setEnabled(true);
     btnUpdate.setEnabled(true);
   }
 
