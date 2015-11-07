@@ -248,7 +248,7 @@ public class ClientGui extends JFrame implements DocumentListener
       mnuAbout.add(mnuSPF);
 
       final URI likeImFiveURI = new URI(LIKE_IM_FIVE_URL);
-      final JMenuItem mnuLikeImFive = new JMenuItem("Explain it again, but like I don't any math.");
+      final JMenuItem mnuLikeImFive = new JMenuItem("Explain it again, but like I don't know any math.");
       mnuLikeImFive.addActionListener((l) ->
       {
         try { java.awt.Desktop.getDesktop().browse(likeImFiveURI); }
