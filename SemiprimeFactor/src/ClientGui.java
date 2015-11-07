@@ -18,6 +18,7 @@ public class ClientGui extends JFrame implements DocumentListener
 {
   private static final String VERSION            = "0.3a";
   private static final String DEFAULT_TITLE      = "Semiprime Factorization Client - v"+VERSION;
+  private static final String DOWNLOAD_URL       = "https://github.com/entangledloops/heuristicSearch";
   private static final String ABOUT_URL          = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
   private static final String LIKE_IM_FIVE_URL   = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization---%22I-don't-math%22-edition";
   private static final String SOURCE_URL         = "https://github.com/entangledloops/heuristicSearch/tree/master";
@@ -168,20 +169,20 @@ public class ClientGui extends JFrame implements DocumentListener
     txtUsername.setHorizontalAlignment(SwingConstants.CENTER);
 
     // email
-    final JLabel lblEmail = new JLabel("Optional email (in case you crack a number, will never share):");
+    final JLabel lblEmail = new JLabel("Optional email (in case you crack a number\u2014will never share):");
     lblEmail.setHorizontalAlignment(SwingConstants.CENTER);
     txtEmail = new JTextField("nope@take-all-the-credit.com");
     txtEmail.setHorizontalAlignment(SwingConstants.CENTER);
 
     // host address label and text box
-    final JLabel lblAddress = new JLabel("Enter the server address:");
+    final JLabel lblAddress = new JLabel("Server address:");
     lblAddress.setHorizontalAlignment(SwingConstants.CENTER);
     txtAddress = new JTextField(Server.DEFAULT_HOST);
     txtAddress.setHorizontalAlignment(SwingConstants.CENTER);
     txtAddress.setColumns(Server.DEFAULT_HOST.length());
 
     // port box and restrict to numbers
-    final JLabel lblPort = new JLabel("Enter the server port:");
+    final JLabel lblPort = new JLabel("Server port:");
     lblPort.setHorizontalAlignment(SwingConstants.CENTER);
     final NumberFormat numberFormat = NumberFormat.getNumberInstance(Locale.getDefault());
     final DecimalFormat decimalFormat = (DecimalFormat) numberFormat;
@@ -191,7 +192,7 @@ public class ClientGui extends JFrame implements DocumentListener
     txtPort.setColumns(5);
     txtPort.setText(Server.DEFAULT_PORT+"");
 
-    final JLabel lblConnectNow = new JLabel("");
+    final JLabel lblConnectNow = new JLabel("If there's a problem:");
     lblConnectNow.setHorizontalAlignment(SwingConstants.CENTER);
 
     final JPanel pnlConnectBtn = new JPanel(new GridLayout(1,1));
@@ -265,7 +266,7 @@ public class ClientGui extends JFrame implements DocumentListener
       mnuAbout.add(mnuSPF);
 
       final URI likeImFiveURI = new URI(LIKE_IM_FIVE_URL);
-      final JMenuItem mnuLikeImFive = new JMenuItem("Explain it again, but like I don't know how to math.");
+      final JMenuItem mnuLikeImFive = new JMenuItem("Explain it again, but like I don't math.");
       mnuLikeImFive.addActionListener((l) ->
       {
         try { java.awt.Desktop.getDesktop().browse(likeImFiveURI); }
@@ -274,6 +275,15 @@ public class ClientGui extends JFrame implements DocumentListener
       mnuAbout.add(mnuLikeImFive);
 
       mnuAbout.addSeparator();
+
+      final URI downloadURI = new URI(SOURCE_URL);
+      final JMenuItem mnuDownload = new JMenuItem("Download Latest Client");
+      mnuDownload.addActionListener((l) ->
+      {
+        try { java.awt.Desktop.getDesktop().browse(downloadURI); }
+        catch (Throwable t) { Log.e(t); }
+      });
+      mnuAbout.add(mnuDownload);
 
       final URI sourceURI = new URI(SOURCE_URL);
       final JMenuItem mnuSource = new JMenuItem("Source Code");
@@ -449,12 +459,6 @@ public class ClientGui extends JFrame implements DocumentListener
     Log.d("free memory / total memory: " + formatter.format(100.0*(freeMemory/totalMemory)) + "%");
     Log.d("total memory / max memory: " + formatter.format(100.0*(totalMemory/maxMemory)) + "%");
     Log.d("available processors: " + processors);
-
-    /*if (!version.contains("1.8"))
-    {
-      JOptionPane.showMessageDialog(null, "You current Java version is reported as: " + version + "\n" +
-          "This app requires version 1.8 or greater to function properly.\n\nPlease consider updating by visiting:\nhttps://java.com/en/download/");
-    }*/
 
     return true;
   }
