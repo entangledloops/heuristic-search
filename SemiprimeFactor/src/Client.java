@@ -89,7 +89,7 @@ public class Client
   public void close()
   {
     if (!isConnected.compareAndSet(true, false)) return;
-    Log.d("closing connection with " + toString() + "...");
+    Log.d("closing connection: " + toString() + "...");
 
     try { socket().close(); }
     catch (Throwable t) { Log.e(t); }
