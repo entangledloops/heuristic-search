@@ -137,7 +137,7 @@ public class ClientGui extends JFrame implements DocumentListener
     // email
     final JLabel lblEmail = new JLabel("Optional email (in case you crack a number\u2014will never share):");
     lblEmail.setHorizontalAlignment(SwingConstants.CENTER);
-    txtEmail = new JTextField();
+    txtEmail = new JTextField(DEFAULT_EMAIL);
     txtEmail.setHorizontalAlignment(SwingConstants.CENTER);
 
     // host address label and text box
