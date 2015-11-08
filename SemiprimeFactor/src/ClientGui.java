@@ -19,16 +19,18 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class ClientGui extends JFrame implements DocumentListener
 {
-  private static final String VERSION            = "0.3a";
-  private static final String DEFAULT_TITLE      = "Semiprime Factorization Client - v"+VERSION;
-  private static final String DEFAULT_EMAIL      = "nope@take-all-the-credit.com";
-  private static final String DOWNLOAD_URL       = "https://github.com/entangledloops/heuristicSearch";
-  private static final String ABOUT_URL      = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
-  private static final String NO_MATH_URL    = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization---%22I-don't-math%22-edition";
-  private static final String SOURCE_URL     = "https://github.com/entangledloops/heuristicSearch/tree/master";
-  private static final String HOMEPAGE_URL   = "http://www.entangledloops.com";
-  private static final int    DEFAULT_WIDTH  = 800, DEFAULT_HEIGHT = 600;
-  private static final int    HISTORY_ROWS       = 5,    HISTORY_COLS   = 20;
+  private static final String VERSION       = "0.3a";
+  private static final String DEFAULT_TITLE = "Semiprime Factorization Client - v"+VERSION;
+  private static final String DEFAULT_EMAIL = "nope@take-all-the-credit.com";
+  private static final String DOWNLOAD_URL  = "https://github.com/entangledloops/heuristicSearch";
+  private static final String ABOUT_URL     = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
+  private static final String NO_MATH_URL   = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization---%22I-don't-math%22-edition";
+  private static final String SOURCE_URL    = "https://github.com/entangledloops/heuristicSearch/tree/master";
+  private static final String HOMEPAGE_URL  = "http://www.entangledloops.com";
+  private static final String OS            = System.getProperty("os.name");
+
+  private static final int DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600;
+  private static final int HISTORY_ROWS = 5, HISTORY_COLS = 20;
 
   private SystemTray systemTray;
   private TrayIcon trayIcon;
@@ -438,7 +440,12 @@ public class ClientGui extends JFrame implements DocumentListener
         public void mousePressed(MouseEvent e)
         {
           super.mousePressed(e);
-          if (e.getButton() == MouseEvent.BUTTON1) setVisible(!isVisible());
+
+          if ( (e.getButton() == MouseEvent.BUTTON1 && !OS.contains("OS X")) ||
+               (e.getButton() == MouseEvent.BUTTON2 && OS.contains("OS X")) )
+          {
+            setVisible(!isVisible());
+          }
         }
       });
 
@@ -493,6 +500,7 @@ public class ClientGui extends JFrame implements DocumentListener
     final double maxMemory =  (double)runtime.maxMemory() / toGb;
     final DecimalFormat formatter = new DecimalFormat("#.##");
 
+    Log.d("operating system: " + OS + ", version " + System.getProperty("os.version"));
     Log.d("current java version: " + version + ", required: 1.8+");
     Log.d("note: all memory values reported are relative to the JVM, and were reported immediately after invoking the GC");
     Log.d("free memory: ~" + formatter.format(freeMemory) + " (Gb)");
