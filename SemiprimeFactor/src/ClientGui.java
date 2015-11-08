@@ -442,7 +442,7 @@ public class ClientGui extends JFrame implements DocumentListener
           super.mousePressed(e);
 
           if ( (e.getButton() == MouseEvent.BUTTON1 && !OS.contains("OS X")) ||
-               (e.getButton() == MouseEvent.BUTTON2 && OS.contains("OS X")) )
+               (e.getButton() == MouseEvent.BUTTON2 || e.getButton() == MouseEvent.BUTTON3 && OS.contains("OS X")) )
           {
             setVisible(!isVisible());
           }
@@ -451,8 +451,13 @@ public class ClientGui extends JFrame implements DocumentListener
 
       final PopupMenu popup = new PopupMenu();
 
-      final MenuItem open = new MenuItem("Open App");
-      open.addActionListener(l -> setVisible(true));
+      final MenuItem show = new MenuItem("Hide App");
+      show.addActionListener(l ->
+      {
+        final boolean visible = !isVisible();
+        setVisible(visible);
+        show.setLabel(visible ? "Hide App" : "Show App");
+      });
 
       final MenuItem pause = new MenuItem("Pause");
       final MenuItem resume = new MenuItem("Resume");
@@ -471,7 +476,7 @@ public class ClientGui extends JFrame implements DocumentListener
       final MenuItem quit = new MenuItem("Quit");
       quit.addActionListener(l -> exit());
 
-      popup.add(open);
+      popup.add(show);
       popup.addSeparator();
       popup.add(pause);
       popup.add(resume);
