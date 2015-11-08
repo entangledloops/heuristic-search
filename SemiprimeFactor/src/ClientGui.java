@@ -35,21 +35,12 @@ public class ClientGui extends JFrame implements DocumentListener
   private SystemTray systemTray;
   private TrayIcon trayIcon;
   private ImageIcon icnNode, icnNodeSmall, icnCpu, icnNet, icnSettings;
-  private JMenuBar  mnuBar;
-  private JMenu     mnuFile, mnuAbout;
-  private JTabbedPane pneMain;
-  private JPanel      pnlNet;
-  private JPanel pnlConnect;
-  private JPanel pnlCpu;
-  private JPanel pnlCpuLeft;
-  private JPanel pnlCpuRight;
-  private JTextArea  txtHistory;
-  private JTextField txtUsername, txtEmail, txtAddress;
+  private JTextArea   txtHistory;
+  private JTextField  txtUsername, txtEmail, txtAddress;
   private JFormattedTextField txtPort;
   private JSlider             sldProcessors, sldCap, sldMemory, sldIdle;
   private JCheckBox   chkWorkAlways;
   private JButton     btnConnect, btnUpdate;
-  private JScrollPane scrollPaneHistory;
 
   private final AtomicReference<Client> client = new AtomicReference<>(null);
   private final AtomicBoolean isConnecting = new AtomicBoolean(false);
@@ -134,7 +125,7 @@ public class ClientGui extends JFrame implements DocumentListener
     Log.d("If you're computer cracks a target number, you will be credited in the publication (assuming you provided an email I can reach you at).");
     Log.d("If you're interested in learning exactly what this software does and why, checkout the \"About\" menu.\n");
 
-    scrollPaneHistory = new JScrollPane(txtHistory);
+    final JScrollPane scrollPaneHistory = new JScrollPane(txtHistory);
     scrollPaneHistory.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
     scrollPaneHistory.setVisible(true);
 
@@ -193,7 +184,7 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlConnectBtn.add(btnUpdate);
 
     // add the components to the left-side connect region
-    pnlConnect = new JPanel(new GridLayout(10,1));
+    final JPanel pnlConnect = new JPanel(new GridLayout(10, 1));
     pnlConnect.add(lblUsername);
     pnlConnect.add(txtUsername);
     pnlConnect.add(lblEmail);
@@ -206,7 +197,7 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlConnect.add(pnlConnectBtn);
 
     // organize them and add them to the panel
-    pnlNet = new JPanel(new GridLayout(2,1));
+    final JPanel pnlNet = new JPanel(new GridLayout(2, 1));
     pnlNet.add(scrollPaneHistory);
     pnlNet.add(pnlConnect);
 
@@ -224,9 +215,9 @@ public class ClientGui extends JFrame implements DocumentListener
     }
     catch (Throwable t) { Log.e(t); }
 
-    mnuBar = new JMenuBar();
+    final JMenuBar mnuBar = new JMenuBar();
 
-    mnuFile = new JMenu("File");
+    final JMenu mnuFile = new JMenu("File");
     mnuBar.add(mnuFile);
 
     final JMenuItem mnuSaveSettings = new JMenuItem("Save Settings");
@@ -255,7 +246,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
     try
     {
-      mnuAbout = new JMenu("About");
+      final JMenu mnuAbout = new JMenu("About");
 
       final URI aboutURI = new URI(ABOUT_URL);
       final JMenuItem mnuSPF = new JMenuItem("What is Semiprime Factorization?");
@@ -385,7 +376,7 @@ public class ClientGui extends JFrame implements DocumentListener
     });
 
     // setup the left-side:
-    pnlCpuLeft = new JPanel(new GridLayout(8,1));
+    final JPanel pnlCpuLeft = new JPanel(new GridLayout(8, 1));
     pnlCpuLeft.add(lblProcessors);
     pnlCpuLeft.add(sldProcessors);
     pnlCpuLeft.add(lblCap);
@@ -396,7 +387,7 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlCpuLeft.add(sldIdle);
 
     // setup the right-side:
-    pnlCpuRight = new JPanel(new GridLayout(1,1));
+    final JPanel pnlCpuRight = new JPanel(new GridLayout(1, 1));
 
     // setup connect button and "always work" checkbox
     chkWorkAlways = new JCheckBox("Always work, even when I'm not idle.", false);
@@ -411,7 +402,7 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlCpuRight.add(chkWorkAlways);
 
     // create the full CPU panel
-    pnlCpu = new JPanel(new GridLayout(1,2));
+    final JPanel pnlCpu = new JPanel(new GridLayout(1, 2));
     pnlCpu.add(pnlCpuLeft);
     pnlCpu.add(pnlCpuRight);
 
@@ -426,7 +417,7 @@ public class ClientGui extends JFrame implements DocumentListener
     // add tabs to frame
 
     // create the tabbed panes
-    pneMain = new JTabbedPane();
+    final JTabbedPane pneMain = new JTabbedPane();
     pneMain.addTab("", icnNet, pnlNet);
     pneMain.addTab("", icnNode, pnlNode);
     pneMain.addTab("", icnCpu, pnlCpu);

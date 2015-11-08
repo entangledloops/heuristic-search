@@ -68,7 +68,7 @@ public class ServerGui extends JFrame implements DocumentListener
     scrollPaneHistory = new JScrollPane(txtHistory);
     scrollPaneHistory.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
     scrollPaneHistory.setVisible(true);
-    
+
     DefaultHighlighter highlighter = new DefaultHighlighter();
     txtHistory.setHighlighter(highlighter);
 
