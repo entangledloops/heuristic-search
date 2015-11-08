@@ -7,27 +7,21 @@ import javax.swing.event.DocumentListener;
 import javax.swing.text.DefaultHighlighter;
 import java.awt.*;
 import java.awt.event.WindowEvent;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Created by Stephen on 11/1/2015.
  */
 public class ServerGui extends JFrame implements DocumentListener
 {
-  public static final String DEFAULT_TITLE = "Semiprime Factorization Server - v0.1a";
+  public static final String DEFAULT_TITLE = "Semiprime Factorization Server - " + ClientGui.VERSION;
   public static final int DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600;
-  public static final int DEFAULT_TXT_ROWS = 5, DEFAULT_TXT_COLS = 20;
-  private static final String BTN_CONNECT_STRING = "Connect to Stephen's server.";
+  public static final int HISTORY_ROWS = 10, HISTORY_COLS = 20;
 
   public JPanel mainPanel;
   public JTextArea  txtHistory;
-  public JButton btnWork;
   public JScrollPane scrollPaneHistory;
 
   private final Server server;
-  private final AtomicReference<Client> client = new AtomicReference<>();
-  private final AtomicBoolean isConnecting = new AtomicBoolean(false);
 
   public ServerGui()
   {
@@ -56,10 +50,9 @@ public class ServerGui extends JFrame implements DocumentListener
   {
     // initialize all components to default settings
     txtHistory = new JTextArea();
-    btnWork = new JButton();
 
-    txtHistory.setRows(DEFAULT_TXT_ROWS);
-    txtHistory.setColumns(DEFAULT_TXT_COLS);
+    txtHistory.setRows(HISTORY_ROWS);
+    txtHistory.setColumns(HISTORY_COLS);
     txtHistory.setLineWrap(true);
     txtHistory.setWrapStyleWord(true);
     txtHistory.setEditable(false);
@@ -75,24 +68,13 @@ public class ServerGui extends JFrame implements DocumentListener
     scrollPaneHistory = new JScrollPane(txtHistory);
     scrollPaneHistory.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
     scrollPaneHistory.setVisible(true);
-
-    JPanel btnPanel = new JPanel(new GridLayout(2,1));
-    btnPanel.add(btnWork);
-
+    
     DefaultHighlighter highlighter = new DefaultHighlighter();
     txtHistory.setHighlighter(highlighter);
 
-    btnWork.setVisible(false);
-    btnWork.setEnabled(false);
-    btnWork.addActionListener((event) ->
-    {
-
-    });
-
     // organize them and add them to the panel
-    mainPanel = new JPanel(new GridLayout(2,1));
+    mainPanel = new JPanel(new GridLayout(1,1));
     mainPanel.add(scrollPaneHistory);
-    mainPanel.add(btnPanel);
 
     // add the panel to the frame and show everything
     getContentPane().add(mainPanel);

@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class ClientGui extends JFrame implements DocumentListener
 {
-  private static final String VERSION       = "0.3a";
+  public static final  String VERSION       = "0.3a";
   private static final String DEFAULT_TITLE = "Semiprime Factorization Client - v"+VERSION;
   private static final String DEFAULT_EMAIL = "nope@take-all-the-credit.com";
   private static final String DOWNLOAD_URL  = "https://github.com/entangledloops/heuristicSearch";
