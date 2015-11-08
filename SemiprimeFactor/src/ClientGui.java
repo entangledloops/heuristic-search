@@ -3,6 +3,8 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.DefaultHighlighter;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.net.URI;
@@ -429,9 +431,18 @@ public class ClientGui extends JFrame implements DocumentListener
     {
       setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
 
-      final PopupMenu popup = new PopupMenu();
-      trayIcon = new TrayIcon(icnNodeSmall.getImage(), "Semiprime Factorization v" + VERSION);
       systemTray = SystemTray.getSystemTray();
+      trayIcon = new TrayIcon(icnNodeSmall.getImage(), "Semiprime Factorization v" + VERSION);
+      trayIcon.addMouseListener(new MouseAdapter() {
+        @Override
+        public void mousePressed(MouseEvent e)
+        {
+          super.mousePressed(e);
+          if (e.getButton() == MouseEvent.BUTTON1) setVisible(!isVisible());
+        }
+      });
+
+      final PopupMenu popup = new PopupMenu();
 
       final MenuItem open = new MenuItem("Open App");
       open.addActionListener(l -> setVisible(true));
