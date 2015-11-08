@@ -34,11 +34,15 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private SystemTray systemTray;
   private TrayIcon trayIcon;
-  private ImageIcon icnNode, icnNodeSmall, icnCpu, icnNet;
+  private ImageIcon icnNode, icnNodeSmall, icnCpu, icnNet, icnSettings;
   private JMenuBar  mnuBar;
   private JMenu     mnuFile, mnuAbout;
   private JTabbedPane pneMain;
-  private JPanel      pnlNet, pnlConnect, pnlCpu, pnlCpuLeft, pnlCpuRight, pnlNode;
+  private JPanel      pnlNet;
+  private JPanel pnlConnect;
+  private JPanel pnlCpu;
+  private JPanel pnlCpuLeft;
+  private JPanel pnlCpuRight;
   private JTextArea  txtHistory;
   private JTextField txtUsername, txtEmail, txtAddress;
   private JFormattedTextField txtPort;
@@ -201,6 +205,11 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlConnect.add(lblConnectNow);
     pnlConnect.add(pnlConnectBtn);
 
+    // organize them and add them to the panel
+    pnlNet = new JPanel(new GridLayout(2,1));
+    pnlNet.add(scrollPaneHistory);
+    pnlNet.add(pnlConnect);
+
     ////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////
     // setup the icons and menus
@@ -210,6 +219,7 @@ public class ClientGui extends JFrame implements DocumentListener
       icnNode = new ImageIcon(getClass().getResource("res/node32x32.png"));
       icnCpu = new ImageIcon(getClass().getResource("res/cpu32x32.png"));
       icnNet = new ImageIcon(getClass().getResource("res/net32x32.png"));
+      icnSettings = new ImageIcon(getClass().getResource("res/settings32x32.png"));
       setIconImage(icnNode.getImage());
     }
     catch (Throwable t) { Log.e(t); }
@@ -305,7 +315,7 @@ public class ClientGui extends JFrame implements DocumentListener
     ////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////
     // Node tab
-    pnlNode = new JPanel(new GridLayout(1,1));
+    final JPanel pnlNode = new JPanel(new GridLayout(1, 1));
 
 
     ////////////////////////////////////////////////////////////////////////////
@@ -407,18 +417,20 @@ public class ClientGui extends JFrame implements DocumentListener
 
     ////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////
-    // add tabs to frame
+    // settings tab
 
-    // organize them and add them to the panel
-    pnlNet = new JPanel(new GridLayout(2,1));
-    pnlNet.add(scrollPaneHistory);
-    pnlNet.add(pnlConnect);
+    final JPanel pnlSettings = new JPanel();
+
+    ////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+    // add tabs to frame
 
     // create the tabbed panes
     pneMain = new JTabbedPane();
     pneMain.addTab("", icnNet, pnlNet);
     pneMain.addTab("", icnNode, pnlNode);
     pneMain.addTab("", icnCpu, pnlCpu);
+    pneMain.addTab("", icnSettings, pnlSettings);
 
     // add the panel to the frame and show everything
     getContentPane().add(pneMain);
@@ -475,7 +487,6 @@ public class ClientGui extends JFrame implements DocumentListener
         }
       });
 
-
       popup.add(show);
       popup.addSeparator();
       popup.add(pause);
@@ -518,7 +529,7 @@ public class ClientGui extends JFrame implements DocumentListener
     return true;
   }
 
-  private void updateBtnConnect()
+  private void updateNetworkGuiComponents()
   {
     final Client c = client.get();
     if (isConnecting.get())
@@ -556,7 +567,7 @@ public class ClientGui extends JFrame implements DocumentListener
         }
 
         isConnecting.set(true);
-        updateBtnConnect();
+        updateNetworkGuiComponents();
 
         final String address = txtAddress.getText().trim();
         if ("".equals(address))
@@ -579,7 +590,7 @@ public class ClientGui extends JFrame implements DocumentListener
           throw new NumberFormatException("invalid port");
         }
 
-        final Client c = new Client(address, port, this::updateBtnConnect);
+        final Client c = new Client(address, port, this::updateNetworkGuiComponents);
         client.set(c);
 
         sendSettings();
@@ -597,7 +608,7 @@ public class ClientGui extends JFrame implements DocumentListener
       finally
       {
         isConnecting.set(false);
-        updateBtnConnect();
+        updateNetworkGuiComponents();
       }
     }).start();
   }
