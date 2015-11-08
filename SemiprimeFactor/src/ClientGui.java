@@ -467,10 +467,8 @@ public class ClientGui extends JFrame implements DocumentListener
         @Override
         public void mousePressed(MouseEvent e)
         {
-          super.mousePressed(e);
-
-          if ((e.getButton() == MouseEvent.BUTTON1 && !OS.contains("OS X")) ||
-              (e.getButton() != MouseEvent.BUTTON1 && OS.contains("OS X")) )
+          if ( (e.getButton() == MouseEvent.BUTTON1 && !OS.contains("OS X")) ||
+               (e.getButton() != MouseEvent.BUTTON1 && OS.contains("OS X")) )
           {
             trayVisibleToggle.run();
           }
