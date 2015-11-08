@@ -3,6 +3,7 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.DefaultHighlighter;
 import java.awt.*;
+import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.net.URI;
 import java.text.DecimalFormat;
@@ -27,7 +28,9 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final int    DEFAULT_WIDTH  = 800, DEFAULT_HEIGHT = 600;
   private static final int    HISTORY_ROWS       = 5,    HISTORY_COLS   = 20;
 
-  private ImageIcon icnNode, icnCpu, icnNet;
+  private SystemTray systemTray;
+  private TrayIcon trayIcon;
+  private ImageIcon icnNode, icnNodeSmall, icnCpu, icnNet;
   private JMenuBar  mnuBar;
   private JMenu     mnuFile, mnuAbout;
   private JTabbedPane pneMain;
@@ -83,6 +86,8 @@ public class ClientGui extends JFrame implements DocumentListener
 
     final Client connection = client.getAndSet(null);
     if (null != connection && connection.connected()) connection.close();
+
+    if (null != systemTray && null != trayIcon) systemTray.remove(trayIcon);
 
     System.exit(0);
   }
@@ -197,7 +202,8 @@ public class ClientGui extends JFrame implements DocumentListener
     // setup the icons and menus
     try
     {
-      icnNode = new ImageIcon(getClass().getResource("res/icon32x32.png"));
+      icnNodeSmall = new ImageIcon(getClass().getResource("res/node16x16.png"));
+      icnNode = new ImageIcon(getClass().getResource("res/node32x32.png"));
       icnCpu = new ImageIcon(getClass().getResource("res/cpu32x32.png"));
       icnNet = new ImageIcon(getClass().getResource("res/net32x32.png"));
       setIconImage(icnNode.getImage());
@@ -414,16 +420,60 @@ public class ClientGui extends JFrame implements DocumentListener
     getContentPane().add(pneMain);
     resetFrame();
 
-    // on close, kill the server connection
-    addWindowListener(new java.awt.event.WindowAdapter()
+    ////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+    // setup the system tray, if supported
+
+    boolean useTray = SystemTray.isSupported();
+    if (useTray)
     {
-      @Override
-      public void windowClosing(final WindowEvent winEvt)
+      setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+
+      final PopupMenu popup = new PopupMenu();
+      trayIcon = new TrayIcon(icnNodeSmall.getImage(), "Semiprime Factorization v" + VERSION);
+      systemTray = SystemTray.getSystemTray();
+
+      final MenuItem open = new MenuItem("Open App");
+      open.addActionListener(l -> setVisible(true));
+
+      final MenuItem pause = new MenuItem("Pause");
+      final MenuItem resume = new MenuItem("Resume");
+      resume.setEnabled(false);
+      pause.addActionListener(l ->
       {
-        if (null != client.get()) { try { client.get().close(); } catch (Throwable t) { Log.e(t); } }
-        System.exit(0);
-      }
-    });
+        pause.setEnabled(false);
+        resume.setEnabled(true);
+      });
+      resume.addActionListener(l ->
+      {
+        resume.setEnabled(false);
+        pause.setEnabled(true);
+      });
+
+      final MenuItem quit = new MenuItem("Quit");
+      quit.addActionListener(l -> exit());
+
+      popup.add(open);
+      popup.addSeparator();
+      popup.add(pause);
+      popup.add(resume);
+      popup.addSeparator();
+      popup.add(quit);
+
+      trayIcon.setPopupMenu(popup);
+
+      try { systemTray.add(trayIcon); }
+      catch (Throwable t) { Log.e("couldn't create a tray icon, will exit on window close instead"); useTray = false; }
+    }
+    if (!useTray)
+    {
+      // on close, kill the server connection
+      addWindowListener(new WindowAdapter()
+      {
+        @Override
+        public void windowClosing(WindowEvent e) { exit(); }
+      });
+    }
 
     // collect garbage and report memory info
     runtime.gc();
