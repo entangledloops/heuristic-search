@@ -13,6 +13,7 @@ import java.text.NumberFormat;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.prefs.Preferences;
 
 /**
  * Created by Stephen on 11/1/2015.
@@ -29,18 +30,29 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final String HOMEPAGE_URL  = "http://www.entangledloops.com";
   private static final String OS            = System.getProperty("os.name");
 
-  private static final int DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600;
   private static final int HISTORY_ROWS = 5, HISTORY_COLS = 20;
 
+  private Preferences prefs;
+  private static final String WIDTH_NAME = "width", HEIGHT_NAME = "height";
+  private static final int DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600;
+  private static final String PROCESSORS_NAME = "processors";
+  private static final int DEFAULT_PROCESSORS = Runtime.getRuntime().availableProcessors();
+  private static final String CAP_NAME = "name";
+  private static final int DEFAULT_CAP        = 100;
+  private static final String MEMORY_NAME = "memory";
+  private static final int DEFAULT_MEMORY     = 100;
+  private static final String IDLE_NAME = "idle";
+  private static final int DEFAULT_IDLE       = 5;
+
   private SystemTray systemTray;
-  private TrayIcon trayIcon;
-  private ImageIcon icnNode, icnNodeSmall, icnCpu, icnNet, icnSettings;
-  private JTextArea   txtHistory;
-  private JTextField  txtUsername, txtEmail, txtAddress;
+  private TrayIcon   trayIcon;
+  private ImageIcon  icnNode, icnNodeSmall, icnCpu, icnNet, icnSettings;
+  private JTextArea  txtHistory;
+  private JTextField txtUsername, txtEmail, txtAddress;
   private JFormattedTextField txtPort;
   private JSlider             sldProcessors, sldCap, sldMemory, sldIdle;
-  private JCheckBox   chkWorkAlways;
-  private JButton     btnConnect, btnUpdate;
+  private JCheckBox chkWorkAlways;
+  private JButton   btnConnect, btnUpdate;
 
   private final AtomicReference<Client> client = new AtomicReference<>(null);
   private final AtomicBoolean isConnecting = new AtomicBoolean(false);
@@ -85,7 +97,6 @@ public class ClientGui extends JFrame implements DocumentListener
 
     final Client connection = client.getAndSet(null);
     if (null != connection && connection.connected()) connection.close();
-
     if (null != systemTray && null != trayIcon) systemTray.remove(trayIcon);
 
     System.exit(0);
@@ -308,6 +319,10 @@ public class ClientGui extends JFrame implements DocumentListener
     // Node tab
     final JPanel pnlNode = new JPanel(new GridLayout(1, 1));
 
+    ////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+    // load user settings
+    prefs = Preferences.userNodeForPackage(getClass());
 
     ////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////
@@ -316,7 +331,7 @@ public class ClientGui extends JFrame implements DocumentListener
     // setup the memory/ processing limit sliders:
     final JLabel lblProcessors = new JLabel("Processors to use:");
     lblProcessors.setHorizontalAlignment(SwingConstants.CENTER);
-    sldProcessors = new JSlider(1, processors, processors);
+    sldProcessors = new JSlider(1, processors, prefs.getInt(PROCESSORS_NAME, DEFAULT_PROCESSORS));
     sldProcessors.setMajorTickSpacing(1);
     sldProcessors.setSnapToTicks(true);
     sldProcessors.setPaintTicks(true);
@@ -331,7 +346,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
     final JLabel lblCap = new JLabel("Per-processor usage (%):");
     lblCap.setHorizontalAlignment(SwingConstants.CENTER);
-    sldCap = new JSlider(0, 100, 100);
+    sldCap = new JSlider(0, 100, prefs.getInt(CAP_NAME, DEFAULT_CAP));
     sldCap.setMajorTickSpacing(25);
     sldCap.setMinorTickSpacing(5);
     sldCap.setSnapToTicks(true);
@@ -344,10 +359,9 @@ public class ClientGui extends JFrame implements DocumentListener
       Log.d("CPU cap adjusted: " + val + "%");
     });
 
-
     final JLabel lblMemory = new JLabel("Memory usage (%):");
     lblMemory.setHorizontalAlignment(SwingConstants.CENTER);
-    sldMemory = new JSlider(0, 100, 100);
+    sldMemory = new JSlider(0, 100, prefs.getInt(MEMORY_NAME, DEFAULT_MEMORY));
     sldMemory.setMajorTickSpacing(25);
     sldMemory.setMinorTickSpacing(5);
     sldMemory.setSnapToTicks(true);
@@ -362,7 +376,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
     final JLabel lblIdle = new JLabel("Idle time until work begins (min):");
     lblIdle.setHorizontalAlignment(SwingConstants.CENTER);
-    sldIdle = new JSlider(0, 30, 5);
+    sldIdle = new JSlider(0, 30, prefs.getInt(IDLE_NAME, DEFAULT_IDLE));
     sldIdle.setMajorTickSpacing(5);
     sldIdle.setMinorTickSpacing(1);
     sldIdle.setSnapToTicks(true);
@@ -629,16 +643,27 @@ public class ClientGui extends JFrame implements DocumentListener
     c.setEmail(email);
     if (!c.sendPacket(Packet.EMAIL_UPDATE)) { Log.e("failed to send email, try reconnecting"); return; }
 
-    Log.d("the server has acknowledged your settings");
-    isUpdatePending.set(false);
     txtEmail.setEnabled(true);
     txtUsername.setEnabled(true);
     btnUpdate.setEnabled(true);
+    Log.d("the server has acknowledged your settings");
+
+    isUpdatePending.set(false);
   }
 
   public void saveSettings()
   {
     Log.d("saving settings...");
+
+    try
+    {
+      prefs.put(PROCESSORS_NAME, sldProcessors.getValue()+"");
+      prefs.put(CAP_NAME, sldCap.getValue()+"");
+      prefs.put(MEMORY_NAME, sldMemory.getValue()+"");
+      prefs.put(IDLE_NAME, sldIdle.getValue()+"");
+      prefs.flush();
+    }
+    catch (Throwable t) { Log.e("failed to store preferences. make sure the app has write permissions"); return; }
 
     Log.d("settings saved");
   }
@@ -646,6 +671,16 @@ public class ClientGui extends JFrame implements DocumentListener
   public void loadSettings()
   {
     Log.d("loading settings...");
+
+    try
+    {
+      prefs = Preferences.userNodeForPackage(getClass());
+      sldProcessors.setValue(prefs.getInt(PROCESSORS_NAME, DEFAULT_PROCESSORS));
+      sldCap.setValue(prefs.getInt(CAP_NAME, DEFAULT_CAP));
+      sldMemory.setValue(prefs.getInt(MEMORY_NAME, DEFAULT_MEMORY));
+      sldIdle.setValue(prefs.getInt(IDLE_NAME, DEFAULT_IDLE));
+    }
+    catch (Throwable t) { Log.e("failed to load settings. make sure app has read permissions"); return; }
 
     Log.d("settings loaded");
   }
