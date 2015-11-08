@@ -435,29 +435,16 @@ public class ClientGui extends JFrame implements DocumentListener
 
       systemTray = SystemTray.getSystemTray();
       trayIcon = new TrayIcon(icnNodeSmall.getImage(), "Semiprime Factorization v" + VERSION);
-      trayIcon.addMouseListener(new MouseAdapter() {
-        @Override
-        public void mousePressed(MouseEvent e)
-        {
-          super.mousePressed(e);
-
-          if ( (e.getButton() == MouseEvent.BUTTON1 && !OS.contains("OS X")) ||
-               (e.getButton() == MouseEvent.BUTTON2 || e.getButton() == MouseEvent.BUTTON3 && OS.contains("OS X")) )
-          {
-            setVisible(!isVisible());
-          }
-        }
-      });
-
       final PopupMenu popup = new PopupMenu();
 
       final MenuItem show = new MenuItem("Hide App");
-      show.addActionListener(l ->
+      final Runnable trayVisibleToggle = () ->
       {
         final boolean visible = !isVisible();
         setVisible(visible);
         show.setLabel(visible ? "Hide App" : "Show App");
-      });
+      };
+      show.addActionListener(l -> trayVisibleToggle.run());
 
       final MenuItem pause = new MenuItem("Pause");
       final MenuItem resume = new MenuItem("Resume");
@@ -475,6 +462,21 @@ public class ClientGui extends JFrame implements DocumentListener
 
       final MenuItem quit = new MenuItem("Quit");
       quit.addActionListener(l -> exit());
+
+      trayIcon.addMouseListener(new MouseAdapter() {
+        @Override
+        public void mousePressed(MouseEvent e)
+        {
+          super.mousePressed(e);
+
+          if ( (e.getButton() == MouseEvent.BUTTON1 && !OS.contains("OS X")) ||
+              (e.getButton() == MouseEvent.BUTTON2 || e.getButton() == MouseEvent.BUTTON3 && OS.contains("OS X")) )
+          {
+            trayVisibleToggle.run();
+          }
+        }
+      });
+
 
       popup.add(show);
       popup.addSeparator();
