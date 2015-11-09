@@ -21,7 +21,7 @@ public class Log
       outputLock.lock();
       try
       {
-        if (outputLock.getHoldCount() > 1) return;
+        if (outputLock.getHoldCount() > 1) { Log.e("multiple threads locked log:" + outputLock.getHoldCount()); return; }
         outputFunction.accept(msg);
       }
       catch (Throwable t) { Log.e(t); }

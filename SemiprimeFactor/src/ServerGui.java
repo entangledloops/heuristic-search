@@ -61,8 +61,18 @@ public class ServerGui extends JFrame implements DocumentListener
 
     Log.init(s ->
     {
-      txtHistory.append(s + "\n");
-      txtHistory.setCaretPosition(txtHistory.getText().length()-1);
+      final Runnable append = () ->
+      {
+        txtHistory.append(s + "\n");
+        txtHistory.setCaretPosition(txtHistory.getText().length()-1);
+      };
+      //noinspection EmptyCatchBlock
+      try
+      {
+        if (SwingUtilities.isEventDispatchThread()) SwingUtilities.invokeLater(append);
+        else append.run();
+      }
+      catch (Throwable t) {} // don't care what went wrong with gui update, it's been logged anyway
     });
 
     scrollPaneHistory = new JScrollPane(txtHistory);
