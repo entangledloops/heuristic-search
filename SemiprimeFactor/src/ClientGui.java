@@ -432,6 +432,8 @@ public class ClientGui extends JFrame implements DocumentListener
 
     // create the tabbed panes
     final JTabbedPane pneMain = new JTabbedPane();
+    pneMain.setFocusable(false);
+    pneMain.setBorder(null);
     pneMain.addTab("", icnNet, pnlNet);
     pneMain.addTab("", icnNode, pnlNode);
     pneMain.addTab("", icnCpu, pnlCpu);
@@ -469,11 +471,15 @@ public class ClientGui extends JFrame implements DocumentListener
       pause.addActionListener(l ->
       {
         pause.setEnabled(false);
+        pause();
+        trayIcon.displayMessage("Pause", "All work has been paused.", TrayIcon.MessageType.INFO);
         resume.setEnabled(true);
       });
       resume.addActionListener(l ->
       {
         resume.setEnabled(false);
+        resume();
+        trayIcon.displayMessage("Resume", "All work has been resumed.", TrayIcon.MessageType.INFO);
         pause.setEnabled(true);
       });
 
@@ -555,6 +561,20 @@ public class ClientGui extends JFrame implements DocumentListener
       btnConnect.setEnabled(true);
       btnConnect.setText("Disconnect");
     }
+  }
+
+  private void pause()
+  {
+    Log.d("pausing all work...");
+
+    Log.d("all work paused");
+  }
+
+  private void resume()
+  {
+    Log.d("resuming all work...");
+
+    Log.d("all work resumed");
   }
 
   private void connectEvent()
