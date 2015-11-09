@@ -87,12 +87,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
   public void exit()
   {
-    Log.d("saving settings and progress...");
-
     saveSettings();
-
-    Log.d("all settings and progress saved");
-
     sendWork();
 
     final Client connection = client.getAndSet(null);
