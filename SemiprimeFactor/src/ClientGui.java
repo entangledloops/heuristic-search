@@ -387,19 +387,27 @@ public class ClientGui extends JFrame implements DocumentListener
       Log.d("time until work begins adjusted: " + val + " minutes");
     });
 
+    final JButton btnResetCpu = new JButton("Reset CPU Settings to Defaults");
+    btnResetCpu.setHorizontalAlignment(SwingConstants.CENTER);
+    btnResetCpu.setFocusPainted(false);
+    btnResetCpu.addActionListener(l ->
+    {
+      int result = JOptionPane.showConfirmDialog(null, "Are you sure you want to reset all CPU settings to defaults?", "Confirm Reset", JOptionPane.YES_NO_OPTION);
+      if (JOptionPane.YES_OPTION == result) resetCpuSettings();
+    });
+
     // setup the left-side:
-    final JPanel pnlCpuLeft = new JPanel(new GridLayout(8, 1));
+    final JPanel pnlCpuLeft = new JPanel(new GridLayout(7, 1));
     pnlCpuLeft.add(lblProcessors);
     pnlCpuLeft.add(sldProcessors);
     pnlCpuLeft.add(lblCap);
     pnlCpuLeft.add(sldCap);
-    pnlCpuLeft.add(lblMemory);
-    pnlCpuLeft.add(sldMemory);
-    pnlCpuLeft.add(lblIdle);
-    pnlCpuLeft.add(sldIdle);
+    pnlCpuLeft.add(new JLabel(""));
+    pnlCpuLeft.add(new JLabel(""));
+    pnlCpuLeft.add(btnResetCpu);
 
     // setup the right-side:
-    final JPanel pnlCpuRight = new JPanel(new GridLayout(8, 1));
+    final JPanel pnlCpuRight = new JPanel(new GridLayout(7, 1));
 
     // setup connect button and "always work" checkbox
     chkWorkAlways = new JCheckBox("Always work, even when I'm not idle.", prefs.getBoolean(WORK_ALWAYS_NAME, DEFAULT_WORK_ALWAYS));
@@ -411,23 +419,13 @@ public class ClientGui extends JFrame implements DocumentListener
       Log.d("always work: " + (work ? "yes" : "no"));
     });
 
-    final JButton btnResetCpu = new JButton("Reset CPU Settings to Defaults");
-    btnResetCpu.setHorizontalAlignment(SwingConstants.CENTER);
-    btnResetCpu.setFocusPainted(false);
-    btnResetCpu.addActionListener(l ->
-    {
-      int result = JOptionPane.showConfirmDialog(null, "Are you sure you want to reset all CPU settings to defaults?", "Confirm Reset", JOptionPane.YES_NO_OPTION);
-      if (JOptionPane.YES_OPTION == result) resetCpuSettings();
-    });
-
+    pnlCpuRight.add(lblMemory);
+    pnlCpuRight.add(sldMemory);
+    pnlCpuRight.add(lblIdle);
+    pnlCpuRight.add(sldIdle);
+    pnlCpuRight.add(new JLabel(""));
     pnlCpuRight.add(new JLabel(""));
     pnlCpuRight.add(chkWorkAlways);
-    pnlCpuRight.add(new JLabel(""));
-    pnlCpuRight.add(new JLabel(""));
-    pnlCpuRight.add(new JLabel(""));
-    pnlCpuRight.add(new JLabel(""));
-    pnlCpuRight.add(new JLabel(""));
-    pnlCpuRight.add(btnResetCpu);
 
     // create the full CPU panel
     final JPanel pnlCpu = new JPanel(new GridLayout(1, 2, H_GAP, V_GAP));
