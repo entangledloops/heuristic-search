@@ -31,6 +31,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final String OS            = System.getProperty("os.name");
 
   private static final int HISTORY_ROWS = 5, HISTORY_COLS = 20;
+  private static final int H_GAP = 10, V_GAP = 10;
 
   private Preferences prefs;
   private static final String WIDTH_NAME = "width", HEIGHT_NAME = "height";
@@ -43,6 +44,8 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final int DEFAULT_MEMORY     = 100;
   private static final String IDLE_NAME = "idle";
   private static final int DEFAULT_IDLE       = 5;
+  private static final String WORK_ALWAYS_NAME = "workAlways";
+  private static final boolean DEFAULT_WORK_ALWAYS = false;
 
   private SystemTray systemTray;
   private TrayIcon   trayIcon;
@@ -396,10 +399,10 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlCpuLeft.add(sldIdle);
 
     // setup the right-side:
-    final JPanel pnlCpuRight = new JPanel(new GridLayout(1, 1));
+    final JPanel pnlCpuRight = new JPanel(new GridLayout(8, 1));
 
     // setup connect button and "always work" checkbox
-    chkWorkAlways = new JCheckBox("Always work, even when I'm not idle.", false);
+    chkWorkAlways = new JCheckBox("Always work, even when I'm not idle.", prefs.getBoolean(WORK_ALWAYS_NAME, DEFAULT_WORK_ALWAYS));
     chkWorkAlways.setHorizontalAlignment(SwingConstants.CENTER);
     chkWorkAlways.setFocusPainted(false);
     chkWorkAlways.addActionListener(l ->
@@ -408,10 +411,26 @@ public class ClientGui extends JFrame implements DocumentListener
       Log.d("always work: " + (work ? "yes" : "no"));
     });
 
+    final JButton btnResetCpu = new JButton("Reset CPU Settings to Defaults");
+    btnResetCpu.setHorizontalAlignment(SwingConstants.CENTER);
+    btnResetCpu.setFocusPainted(false);
+    btnResetCpu.addActionListener(l ->
+    {
+      int result = JOptionPane.showConfirmDialog(null, "Are you sure you want to reset all CPU settings to defaults?", "Confirm Reset", JOptionPane.YES_NO_OPTION);
+      if (JOptionPane.YES_OPTION == result) resetCpuSettings();
+    });
+
+    pnlCpuRight.add(new JLabel(""));
     pnlCpuRight.add(chkWorkAlways);
+    pnlCpuRight.add(new JLabel(""));
+    pnlCpuRight.add(new JLabel(""));
+    pnlCpuRight.add(new JLabel(""));
+    pnlCpuRight.add(new JLabel(""));
+    pnlCpuRight.add(new JLabel(""));
+    pnlCpuRight.add(btnResetCpu);
 
     // create the full CPU panel
-    final JPanel pnlCpu = new JPanel(new GridLayout(1, 2));
+    final JPanel pnlCpu = new JPanel(new GridLayout(1, 2, H_GAP, V_GAP));
     pnlCpu.add(pnlCpuLeft);
     pnlCpu.add(pnlCpuRight);
 
@@ -666,21 +685,36 @@ public class ClientGui extends JFrame implements DocumentListener
     isUpdatePending.set(false);
   }
 
+  public void saveCpuSettings()
+  {
+    prefs.putInt(PROCESSORS_NAME, sldProcessors.getValue());
+    prefs.putInt(CAP_NAME, sldCap.getValue());
+    prefs.putInt(MEMORY_NAME, sldMemory.getValue());
+    prefs.putInt(IDLE_NAME, sldIdle.getValue());
+    prefs.putBoolean(WORK_ALWAYS_NAME, chkWorkAlways.isSelected());
+  }
+
   public void saveSettings()
   {
     Log.d("saving settings...");
 
     try
     {
-      prefs.put(PROCESSORS_NAME, sldProcessors.getValue()+"");
-      prefs.put(CAP_NAME, sldCap.getValue()+"");
-      prefs.put(MEMORY_NAME, sldMemory.getValue()+"");
-      prefs.put(IDLE_NAME, sldIdle.getValue()+"");
+      saveCpuSettings();
       prefs.flush();
     }
     catch (Throwable t) { Log.e("failed to store preferences. make sure the app has write permissions"); return; }
 
     Log.d("settings saved");
+  }
+
+  public void loadCpuSettings()
+  {
+    sldProcessors.setValue(prefs.getInt(PROCESSORS_NAME, DEFAULT_PROCESSORS));
+    sldCap.setValue(prefs.getInt(CAP_NAME, DEFAULT_CAP));
+    sldMemory.setValue(prefs.getInt(MEMORY_NAME, DEFAULT_MEMORY));
+    sldIdle.setValue(prefs.getInt(IDLE_NAME, DEFAULT_IDLE));
+    chkWorkAlways.setSelected(prefs.getBoolean(WORK_ALWAYS_NAME, DEFAULT_WORK_ALWAYS));
   }
 
   public void loadSettings()
@@ -690,14 +724,30 @@ public class ClientGui extends JFrame implements DocumentListener
     try
     {
       prefs = Preferences.userNodeForPackage(getClass());
-      sldProcessors.setValue(prefs.getInt(PROCESSORS_NAME, DEFAULT_PROCESSORS));
-      sldCap.setValue(prefs.getInt(CAP_NAME, DEFAULT_CAP));
-      sldMemory.setValue(prefs.getInt(MEMORY_NAME, DEFAULT_MEMORY));
-      sldIdle.setValue(prefs.getInt(IDLE_NAME, DEFAULT_IDLE));
+      loadCpuSettings();
     }
     catch (Throwable t) { Log.e("failed to load settings. make sure app has read permissions"); return; }
 
     Log.d("settings loaded");
+  }
+
+  public void resetCpuSettings()
+  {
+    sldProcessors.setValue(DEFAULT_PROCESSORS);
+    sldCap.setValue(DEFAULT_CAP);
+    sldMemory.setValue(DEFAULT_MEMORY);
+    sldIdle.setValue(DEFAULT_IDLE);
+    chkWorkAlways.setSelected(DEFAULT_WORK_ALWAYS);
+    Log.d("CPU settings reset");
+  }
+
+  public void resetSettings()
+  {
+    Log.d("resetting all settings to defaults...");
+
+    resetCpuSettings();
+
+    Log.d("settings reset");
   }
 
   public void sendWork()
