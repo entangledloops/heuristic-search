@@ -706,7 +706,7 @@ public class ClientGui extends JFrame implements DocumentListener
     }
     catch (Throwable t) { Log.e("failed to store preferences. make sure the app has write permissions"); return; }
 
-    Log.d("settings saved");
+    Log.d("all settings saved");
   }
 
   public void loadCpuSettings()
@@ -730,7 +730,7 @@ public class ClientGui extends JFrame implements DocumentListener
     }
     catch (Throwable t) { Log.e("failed to load settings. make sure app has read permissions"); return; }
 
-    Log.d("settings loaded");
+    Log.d("all settings loaded");
   }
 
   public void resetCpuSettings()
