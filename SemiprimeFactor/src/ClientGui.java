@@ -327,7 +327,7 @@ public class ClientGui extends JFrame implements DocumentListener
     // CPU tab
 
     // setup the memory/ processing limit sliders:
-    final JLabel lblProcessors = new JLabel("Processors to use:");
+    final JLabel lblProcessors = new JLabel("Processors to use");
     lblProcessors.setHorizontalAlignment(SwingConstants.CENTER);
     sldProcessors = new JSlider(1, processors, prefs.getInt(PROCESSORS_NAME, DEFAULT_PROCESSORS));
     sldProcessors.setMajorTickSpacing(1);
@@ -342,7 +342,7 @@ public class ClientGui extends JFrame implements DocumentListener
     });
 
 
-    final JLabel lblCap = new JLabel("Per-processor usage (%):");
+    final JLabel lblCap = new JLabel("Per-processor usage (%)");
     lblCap.setHorizontalAlignment(SwingConstants.CENTER);
     sldCap = new JSlider(0, 100, prefs.getInt(CAP_NAME, DEFAULT_CAP));
     sldCap.setMajorTickSpacing(25);
@@ -357,7 +357,7 @@ public class ClientGui extends JFrame implements DocumentListener
       Log.d("CPU cap adjusted: " + val + "%");
     });
 
-    final JLabel lblMemory = new JLabel("Memory usage (%):");
+    final JLabel lblMemory = new JLabel("Memory usage (%)");
     lblMemory.setHorizontalAlignment(SwingConstants.CENTER);
     sldMemory = new JSlider(0, 100, prefs.getInt(MEMORY_NAME, DEFAULT_MEMORY));
     sldMemory.setMajorTickSpacing(25);
@@ -372,7 +372,7 @@ public class ClientGui extends JFrame implements DocumentListener
       Log.d("memory cap adjusted: " + val + "%");
     });
 
-    final JLabel lblIdle = new JLabel("Idle time until work begins (min):");
+    final JLabel lblIdle = new JLabel("Idle time until work begins (min)");
     lblIdle.setHorizontalAlignment(SwingConstants.CENTER);
     sldIdle = new JSlider(0, 30, prefs.getInt(IDLE_NAME, DEFAULT_IDLE));
     sldIdle.setMajorTickSpacing(5);
@@ -397,7 +397,7 @@ public class ClientGui extends JFrame implements DocumentListener
     });
 
     // setup the left-side:
-    final JPanel pnlCpuLeft = new JPanel(new GridLayout(7, 1));
+    final JPanel pnlCpuLeft = new JPanel(new GridLayout(7, 1, H_GAP, V_GAP));
     pnlCpuLeft.add(lblProcessors);
     pnlCpuLeft.add(sldProcessors);
     pnlCpuLeft.add(lblCap);
@@ -407,7 +407,7 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlCpuLeft.add(btnResetCpu);
 
     // setup the right-side:
-    final JPanel pnlCpuRight = new JPanel(new GridLayout(7, 1));
+    final JPanel pnlCpuRight = new JPanel(new GridLayout(7, 1, H_GAP, V_GAP));
 
     // setup connect button and "always work" checkbox
     chkWorkAlways = new JCheckBox("Always work, even when I'm not idle.", prefs.getBoolean(WORK_ALWAYS_NAME, DEFAULT_WORK_ALWAYS));
