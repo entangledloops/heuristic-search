@@ -483,7 +483,7 @@ public class ClientGui extends JFrame implements DocumentListener
         pause.setEnabled(true);
       });
 
-      final MenuItem quit = new MenuItem("Quit");
+      final MenuItem quit = new MenuItem("Save & Quit");
       quit.addActionListener(l -> exit());
 
       trayIcon.addMouseListener(new MouseAdapter() {
