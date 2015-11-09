@@ -25,7 +25,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final String DEFAULT_EMAIL = "nope@take-all-the-credit.com";
   private static final String DOWNLOAD_URL  = "https://github.com/entangledloops/heuristicSearch";
   private static final String ABOUT_URL     = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
-  private static final String NO_MATH_URL   = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization---%22I-don't-math%22-edition";
+  private static final String NO_MATH_URL   = ABOUT_URL + "---%22I-don't-math%22-edition";
   private static final String SOURCE_URL    = "https://github.com/entangledloops/heuristicSearch/tree/master";
   private static final String HOMEPAGE_URL  = "http://www.entangledloops.com";
   private static final String OS            = System.getProperty("os.name");
