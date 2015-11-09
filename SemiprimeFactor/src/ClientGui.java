@@ -472,14 +472,14 @@ public class ClientGui extends JFrame implements DocumentListener
       {
         pause.setEnabled(false);
         pause();
-        trayIcon.displayMessage("Pause", "All work has been paused.", TrayIcon.MessageType.INFO);
+        trayIcon.displayMessage("Paused", "All work has been paused.", TrayIcon.MessageType.INFO);
         resume.setEnabled(true);
       });
       resume.addActionListener(l ->
       {
         resume.setEnabled(false);
         resume();
-        trayIcon.displayMessage("Resume", "All work has been resumed.", TrayIcon.MessageType.INFO);
+        trayIcon.displayMessage("Resumed", "All work has been resumed.", TrayIcon.MessageType.INFO);
         pause.setEnabled(true);
       });
 
