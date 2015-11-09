@@ -692,6 +692,7 @@ public class ClientGui extends JFrame implements DocumentListener
     prefs.putInt(MEMORY_NAME, sldMemory.getValue());
     prefs.putInt(IDLE_NAME, sldIdle.getValue());
     prefs.putBoolean(WORK_ALWAYS_NAME, chkWorkAlways.isSelected());
+    Log.d("CPU settings saved");
   }
 
   public void saveSettings()
@@ -715,6 +716,7 @@ public class ClientGui extends JFrame implements DocumentListener
     sldMemory.setValue(prefs.getInt(MEMORY_NAME, DEFAULT_MEMORY));
     sldIdle.setValue(prefs.getInt(IDLE_NAME, DEFAULT_IDLE));
     chkWorkAlways.setSelected(prefs.getBoolean(WORK_ALWAYS_NAME, DEFAULT_WORK_ALWAYS));
+    Log.d("CPU settings loaded");
   }
 
   public void loadSettings()
