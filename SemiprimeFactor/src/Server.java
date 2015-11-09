@@ -31,7 +31,7 @@ public class Server
     Log.d("launching new socket server...");
     try
     {
-      serverSocket = new ServerSocket(12288, Integer.MAX_VALUE);
+      serverSocket = new ServerSocket(port, Integer.MAX_VALUE);
       serverThread.start();
     }
     catch (Throwable t) { Log.e(t); throw new NullPointerException(t.getMessage()); }
@@ -98,14 +98,14 @@ public class Server
   {
     new ServerGui();
     new BinaryFactor("8605230192532870349").factor();
+    /*
     try
     {
-
       //while (!server.isReady) { try { Thread.sleep(250); } catch (Throwable t) { Log.e(t); } }
       //try { new Client(); } catch (Throwable t) { Log.e(t); }
-      try { Thread.sleep(250); } catch (Throwable t) { Log.e(t); }
-
+      //try { Thread.sleep(250); } catch (Throwable t) { Log.e(t); }
     }
     catch (Throwable t) { Log.e(t); }
+    */
   }
 }

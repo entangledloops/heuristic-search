@@ -3,6 +3,9 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.DefaultHighlighter;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.net.URI;
 import java.text.DecimalFormat;
@@ -10,35 +13,49 @@ import java.text.NumberFormat;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.prefs.Preferences;
 
 /**
  * Created by Stephen on 11/1/2015.
  */
 public class ClientGui extends JFrame implements DocumentListener
 {
-  private static final String VERSION            = "0.3a";
-  private static final String DEFAULT_TITLE      = "Semiprime Factorization Client - v"+VERSION;
-  private static final String DOWNLOAD_URL       = "https://github.com/entangledloops/heuristicSearch";
-  private static final String ABOUT_URL          = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
-  private static final String LIKE_IM_FIVE_URL   = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization---%22I-don't-math%22-edition";
-  private static final String SOURCE_URL         = "https://github.com/entangledloops/heuristicSearch/tree/master";
-  private static final String HOMEPAGE_URL       = "http://www.entangledloops.com";
-  private static final String BTN_CONNECT_STRING = "Connect Now";
-  private static final int    DEFAULT_WIDTH      = 800, DEFAULT_HEIGHT = 600;
-  private static final int    HISTORY_ROWS       = 5,    HISTORY_COLS   = 20;
+  public static final  String VERSION       = "0.3a";
+  private static final String DEFAULT_TITLE = "Semiprime Factorization Client - v"+VERSION;
+  private static final String DEFAULT_EMAIL = "nope@take-all-the-credit.com";
+  private static final String DOWNLOAD_URL  = "https://github.com/entangledloops/heuristicSearch";
+  private static final String ABOUT_URL     = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
+  private static final String NO_MATH_URL   = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization---%22I-don't-math%22-edition";
+  private static final String SOURCE_URL    = "https://github.com/entangledloops/heuristicSearch/tree/master";
+  private static final String HOMEPAGE_URL  = "http://www.entangledloops.com";
+  private static final String OS            = System.getProperty("os.name");
 
-  private ImageIcon icnNode, icnCpu, icnNet;
-  private JMenuBar  mnuBar;
-  private JMenu     mnuFile, mnuAbout;
-  private JTabbedPane pneMain;
-  private JPanel      pnlNet, pnlConnect, pnlCpu, pnlCpuLeft, pnlCpuRight, pnlNode;
+  private static final int HISTORY_ROWS = 5, HISTORY_COLS = 20;
+  private static final int H_GAP = 10, V_GAP = 10;
+
+  private Preferences prefs;
+  private static final String WIDTH_NAME = "width", HEIGHT_NAME = "height";
+  private static final int DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600;
+  private static final String PROCESSORS_NAME = "processors";
+  private static final int DEFAULT_PROCESSORS = Runtime.getRuntime().availableProcessors();
+  private static final String CAP_NAME = "name";
+  private static final int DEFAULT_CAP        = 100;
+  private static final String MEMORY_NAME = "memory";
+  private static final int DEFAULT_MEMORY     = 100;
+  private static final String IDLE_NAME = "idle";
+  private static final int DEFAULT_IDLE       = 5;
+  private static final String WORK_ALWAYS_NAME = "workAlways";
+  private static final boolean DEFAULT_WORK_ALWAYS = false;
+
+  private SystemTray systemTray;
+  private TrayIcon   trayIcon;
+  private ImageIcon  icnNode, icnNodeSmall, icnCpu, icnNet, icnSettings;
   private JTextArea  txtHistory;
   private JTextField txtUsername, txtEmail, txtAddress;
   private JFormattedTextField txtPort;
   private JSlider             sldProcessors, sldCap, sldMemory, sldIdle;
-  private JCheckBox   chkWorkAlways;
-  private JButton     btnConnect, btnUpdate;
-  private JScrollPane scrollPaneHistory;
+  private JCheckBox chkWorkAlways;
+  private JButton   btnConnect, btnUpdate;
 
   private final AtomicReference<Client> client = new AtomicReference<>(null);
   private final AtomicBoolean isConnecting = new AtomicBoolean(false);
@@ -73,16 +90,12 @@ public class ClientGui extends JFrame implements DocumentListener
 
   public void exit()
   {
-    Log.d("saving settings and progress...");
-
     saveSettings();
-
-    Log.d("all settings and progress saved");
-
     sendWork();
 
     final Client connection = client.getAndSet(null);
     if (null != connection && connection.connected()) connection.close();
+    if (null != systemTray && null != trayIcon) systemTray.remove(trayIcon);
 
     System.exit(0);
   }
@@ -121,7 +134,7 @@ public class ClientGui extends JFrame implements DocumentListener
     Log.d("If you're computer cracks a target number, you will be credited in the publication (assuming you provided an email I can reach you at).");
     Log.d("If you're interested in learning exactly what this software does and why, checkout the \"About\" menu.\n");
 
-    scrollPaneHistory = new JScrollPane(txtHistory);
+    final JScrollPane scrollPaneHistory = new JScrollPane(txtHistory);
     scrollPaneHistory.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
     scrollPaneHistory.setVisible(true);
 
@@ -137,7 +150,7 @@ public class ClientGui extends JFrame implements DocumentListener
     // email
     final JLabel lblEmail = new JLabel("Optional email (in case you crack a number\u2014will never share):");
     lblEmail.setHorizontalAlignment(SwingConstants.CENTER);
-    txtEmail = new JTextField("nope@take-all-the-credit.com");
+    txtEmail = new JTextField(DEFAULT_EMAIL);
     txtEmail.setHorizontalAlignment(SwingConstants.CENTER);
 
     // host address label and text box
@@ -161,27 +174,26 @@ public class ClientGui extends JFrame implements DocumentListener
     final JLabel lblConnectNow = new JLabel("Click update if you change your username or email after connecting:");
     lblConnectNow.setHorizontalAlignment(SwingConstants.CENTER);
 
-    btnConnect = new JButton(BTN_CONNECT_STRING);
+    btnConnect = new JButton("Connect Now");
     btnConnect.setHorizontalAlignment(SwingConstants.CENTER);
-    btnConnect.addActionListener((event) ->
+    btnConnect.setFocusPainted(false);
+    btnConnect.addActionListener(e ->
     {
-      if (isConnecting.compareAndSet(false, true)) connect();
+      if (isConnecting.compareAndSet(false, true)) connectEvent();
     });
 
     btnUpdate = new JButton("Update");
     btnUpdate.setHorizontalAlignment(SwingConstants.CENTER);
+    btnUpdate.setFocusPainted(false);
     btnUpdate.setEnabled(false);
-    btnUpdate.addActionListener((event) ->
-    {
-      update();
-    });
+    btnUpdate.addActionListener(e -> sendSettings());
 
     final JPanel pnlConnectBtn = new JPanel(new GridLayout(1,2));
     pnlConnectBtn.add(btnConnect);
     pnlConnectBtn.add(btnUpdate);
 
     // add the components to the left-side connect region
-    pnlConnect = new JPanel(new GridLayout(10,1));
+    final JPanel pnlConnect = new JPanel(new GridLayout(10, 1));
     pnlConnect.add(lblUsername);
     pnlConnect.add(txtUsername);
     pnlConnect.add(lblEmail);
@@ -193,74 +205,81 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlConnect.add(lblConnectNow);
     pnlConnect.add(pnlConnectBtn);
 
+    // organize them and add them to the panel
+    final JPanel pnlNet = new JPanel(new GridLayout(2, 1));
+    pnlNet.add(scrollPaneHistory);
+    pnlNet.add(pnlConnect);
+
     ////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////
     // setup the icons and menus
     try
     {
-      icnNode = new ImageIcon(getClass().getResource("res/icon32x32.png"));
+      icnNodeSmall = new ImageIcon(getClass().getResource("res/node16x16.png"));
+      icnNode = new ImageIcon(getClass().getResource("res/node32x32.png"));
       icnCpu = new ImageIcon(getClass().getResource("res/cpu32x32.png"));
       icnNet = new ImageIcon(getClass().getResource("res/net32x32.png"));
+      icnSettings = new ImageIcon(getClass().getResource("res/settings32x32.png"));
       setIconImage(icnNode.getImage());
     }
     catch (Throwable t) { Log.e(t); }
 
-    mnuBar = new JMenuBar();
+    final JMenuBar mnuBar = new JMenuBar();
 
-    mnuFile = new JMenu("File");
+    final JMenu mnuFile = new JMenu("File");
     mnuBar.add(mnuFile);
 
     final JMenuItem mnuSaveSettings = new JMenuItem("Save Settings");
-    mnuSaveSettings.addActionListener((l) -> saveSettings());
+    mnuSaveSettings.addActionListener(l -> saveSettings());
     mnuFile.add(mnuSaveSettings);
 
     final JMenuItem mnuLoadSettings = new JMenuItem("Load Settings");
-    mnuLoadSettings.addActionListener((l) -> loadSettings());
+    mnuLoadSettings.addActionListener(l -> loadSettings());
     mnuFile.add(mnuLoadSettings);
 
     mnuFile.addSeparator();
 
     final JMenuItem mnuSendWork = new JMenuItem("Send All Completed Work");
-    mnuSendWork.addActionListener((l) -> sendWork());
+    mnuSendWork.addActionListener(l -> sendWork());
     mnuFile.add(mnuSendWork);
 
     final JMenuItem mnuRecvWork = new JMenuItem("Request a New Node");
-    mnuRecvWork.addActionListener((l) -> recvWork());
+    mnuRecvWork.addActionListener(l -> recvWork());
     mnuFile.add(mnuRecvWork);
 
     mnuFile.addSeparator();
 
     final JMenuItem mnuQuit = new JMenuItem("Save & Quit");
-    mnuQuit.addActionListener((l) -> exit());
+    mnuQuit.addActionListener(l -> exit());
     mnuFile.add(mnuQuit);
 
     try
     {
-      mnuAbout = new JMenu("About");
+      final JMenu mnuAbout = new JMenu("About");
 
       final URI aboutURI = new URI(ABOUT_URL);
       final JMenuItem mnuSPF = new JMenuItem("What is Semiprime Factorization?");
-      mnuSPF.addActionListener((l) ->
+      mnuSPF.addActionListener(l ->
       {
         try { java.awt.Desktop.getDesktop().browse(aboutURI); }
         catch (Throwable t) { Log.e(t); }
       });
       mnuAbout.add(mnuSPF);
 
-      final URI likeImFiveURI = new URI(LIKE_IM_FIVE_URL);
-      final JMenuItem mnuLikeImFive = new JMenuItem("Explain it again, but like I don't know any math.");
-      mnuLikeImFive.addActionListener((l) ->
+      final URI noMathURI = new URI(NO_MATH_URL);
+      final JMenuItem mnuNoMath = new JMenuItem("Explain it again, but like I don't know any math.");
+      mnuNoMath.addActionListener(l ->
       {
-        try { java.awt.Desktop.getDesktop().browse(likeImFiveURI); }
+        try { java.awt.Desktop.getDesktop().browse(noMathURI); }
         catch (Throwable t) { Log.e(t); }
       });
-      mnuAbout.add(mnuLikeImFive);
+      mnuAbout.add(mnuNoMath);
 
       mnuAbout.addSeparator();
 
       final URI downloadURI = new URI(SOURCE_URL);
       final JMenuItem mnuDownload = new JMenuItem("Download Latest Client");
-      mnuDownload.addActionListener((l) ->
+      mnuDownload.addActionListener(l ->
       {
         try { java.awt.Desktop.getDesktop().browse(downloadURI); }
         catch (Throwable t) { Log.e(t); }
@@ -269,7 +288,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
       final URI sourceURI = new URI(SOURCE_URL);
       final JMenuItem mnuSource = new JMenuItem("Source Code");
-      mnuSource.addActionListener((l) ->
+      mnuSource.addActionListener(l ->
       {
         try { java.awt.Desktop.getDesktop().browse(sourceURI); }
         catch (Throwable t) { Log.e(t); }
@@ -280,7 +299,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
       final URI homepageURI = new URI(HOMEPAGE_URL);
       final JMenuItem mnuHomepage = new JMenuItem("My Homepage");
-      mnuHomepage.addActionListener((l) ->
+      mnuHomepage.addActionListener(l ->
       {
         try { java.awt.Desktop.getDesktop().browse(homepageURI); }
         catch (Throwable t) { Log.e(t); }
@@ -296,22 +315,26 @@ public class ClientGui extends JFrame implements DocumentListener
     ////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////
     // Node tab
-    pnlNode = new JPanel(new GridLayout(1,1));
+    final JPanel pnlNode = new JPanel(new GridLayout(1, 1));
 
+    ////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+    // load user settings
+    prefs = Preferences.userNodeForPackage(getClass());
 
     ////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////
     // CPU tab
 
     // setup the memory/ processing limit sliders:
-    final JLabel lblProcessors = new JLabel("Processors to use:");
+    final JLabel lblProcessors = new JLabel("Processors to use");
     lblProcessors.setHorizontalAlignment(SwingConstants.CENTER);
-    sldProcessors = new JSlider(1, processors, processors);
+    sldProcessors = new JSlider(1, processors, prefs.getInt(PROCESSORS_NAME, DEFAULT_PROCESSORS));
     sldProcessors.setMajorTickSpacing(1);
     sldProcessors.setSnapToTicks(true);
     sldProcessors.setPaintTicks(true);
     sldProcessors.setPaintLabels(true);
-    sldProcessors.addChangeListener((c) ->
+    sldProcessors.addChangeListener(c ->
     {
       if (sldProcessors.getValueIsAdjusting()) return;
       int val = sldProcessors.getValue();
@@ -319,112 +342,195 @@ public class ClientGui extends JFrame implements DocumentListener
     });
 
 
-    final JLabel lblCap = new JLabel("Per-processor usage (%):");
+    final JLabel lblCap = new JLabel("Per-processor usage (%)");
     lblCap.setHorizontalAlignment(SwingConstants.CENTER);
-    sldCap = new JSlider(0, 100, 100);
+    sldCap = new JSlider(0, 100, prefs.getInt(CAP_NAME, DEFAULT_CAP));
     sldCap.setMajorTickSpacing(25);
     sldCap.setMinorTickSpacing(5);
     sldCap.setSnapToTicks(true);
     sldCap.setPaintLabels(true);
     sldCap.setPaintTicks(true);
-    sldCap.addChangeListener((c) ->
+    sldCap.addChangeListener(c ->
     {
       if (sldCap.getValueIsAdjusting()) return;
       int val = sldCap.getValue();
       Log.d("CPU cap adjusted: " + val + "%");
     });
 
-
-    final JLabel lblMemory = new JLabel("Memory usage (%):");
+    final JLabel lblMemory = new JLabel("Memory usage (%)");
     lblMemory.setHorizontalAlignment(SwingConstants.CENTER);
-    sldMemory = new JSlider(0, 100, 100);
+    sldMemory = new JSlider(0, 100, prefs.getInt(MEMORY_NAME, DEFAULT_MEMORY));
     sldMemory.setMajorTickSpacing(25);
     sldMemory.setMinorTickSpacing(5);
     sldMemory.setSnapToTicks(true);
     sldMemory.setPaintLabels(true);
     sldMemory.setPaintTicks(true);
-    sldMemory.addChangeListener((c) ->
+    sldMemory.addChangeListener(c ->
     {
       if (sldMemory.getValueIsAdjusting()) return;
       int val = sldMemory.getValue();
       Log.d("memory cap adjusted: " + val + "%");
     });
 
-    final JLabel lblIdle = new JLabel("Idle time until work begins (min):");
+    final JLabel lblIdle = new JLabel("Idle time until work begins (min)");
     lblIdle.setHorizontalAlignment(SwingConstants.CENTER);
-    sldIdle = new JSlider(0, 30, 5);
+    sldIdle = new JSlider(0, 30, prefs.getInt(IDLE_NAME, DEFAULT_IDLE));
     sldIdle.setMajorTickSpacing(5);
     sldIdle.setMinorTickSpacing(1);
     sldIdle.setSnapToTicks(true);
     sldIdle.setPaintLabels(true);
     sldIdle.setPaintTicks(true);
-    sldIdle.addChangeListener((c) ->
+    sldIdle.addChangeListener(c ->
     {
       if (sldIdle.getValueIsAdjusting()) return;
       int val = sldIdle.getValue();
       Log.d("time until work begins adjusted: " + val + " minutes");
     });
 
+    final JButton btnResetCpu = new JButton("Reset CPU Settings to Defaults");
+    btnResetCpu.setHorizontalAlignment(SwingConstants.CENTER);
+    btnResetCpu.setFocusPainted(false);
+    btnResetCpu.addActionListener(l ->
+    {
+      int result = JOptionPane.showConfirmDialog(null, "Are you sure you want to reset all CPU settings to defaults?", "Confirm Reset", JOptionPane.YES_NO_OPTION);
+      if (JOptionPane.YES_OPTION == result) resetCpuSettings();
+    });
+
     // setup the left-side:
-    pnlCpuLeft = new JPanel(new GridLayout(8,1));
+    final JPanel pnlCpuLeft = new JPanel(new GridLayout(7, 1, H_GAP, V_GAP));
     pnlCpuLeft.add(lblProcessors);
     pnlCpuLeft.add(sldProcessors);
     pnlCpuLeft.add(lblCap);
     pnlCpuLeft.add(sldCap);
-    pnlCpuLeft.add(lblMemory);
-    pnlCpuLeft.add(sldMemory);
-    pnlCpuLeft.add(lblIdle);
-    pnlCpuLeft.add(sldIdle);
+    pnlCpuLeft.add(new JLabel(""));
+    pnlCpuLeft.add(new JLabel(""));
+    pnlCpuLeft.add(btnResetCpu);
 
     // setup the right-side:
-    pnlCpuRight = new JPanel(new GridLayout(1,1));
+    final JPanel pnlCpuRight = new JPanel(new GridLayout(7, 1, H_GAP, V_GAP));
 
     // setup connect button and "always work" checkbox
-    chkWorkAlways = new JCheckBox("Always work, even when I'm not idle.", false);
+    chkWorkAlways = new JCheckBox("Always work, even when I'm not idle.", prefs.getBoolean(WORK_ALWAYS_NAME, DEFAULT_WORK_ALWAYS));
     chkWorkAlways.setHorizontalAlignment(SwingConstants.CENTER);
     chkWorkAlways.setFocusPainted(false);
-    chkWorkAlways.addActionListener((l) ->
+    chkWorkAlways.addActionListener(l ->
     {
       final boolean work = chkWorkAlways.isSelected();
       Log.d("always work: " + (work ? "yes" : "no"));
     });
 
+    pnlCpuRight.add(lblMemory);
+    pnlCpuRight.add(sldMemory);
+    pnlCpuRight.add(lblIdle);
+    pnlCpuRight.add(sldIdle);
+    pnlCpuRight.add(new JLabel(""));
+    pnlCpuRight.add(new JLabel(""));
     pnlCpuRight.add(chkWorkAlways);
 
     // create the full CPU panel
-    pnlCpu = new JPanel(new GridLayout(1,2));
+    final JPanel pnlCpu = new JPanel(new GridLayout(1, 2, H_GAP, V_GAP));
     pnlCpu.add(pnlCpuLeft);
     pnlCpu.add(pnlCpuRight);
 
     ////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////
+    // settings tab
+
+    final JPanel pnlSettings = new JPanel();
+
+    ////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
     // add tabs to frame
 
-    // organize them and add them to the panel
-    pnlNet = new JPanel(new GridLayout(2,1));
-    pnlNet.add(scrollPaneHistory);
-    pnlNet.add(pnlConnect);
-
     // create the tabbed panes
-    pneMain = new JTabbedPane();
+    final JTabbedPane pneMain = new JTabbedPane();
+    pneMain.setFocusable(false);
+    pneMain.setBorder(null);
     pneMain.addTab("", icnNet, pnlNet);
     pneMain.addTab("", icnNode, pnlNode);
     pneMain.addTab("", icnCpu, pnlCpu);
+    pneMain.addTab("", icnSettings, pnlSettings);
 
     // add the panel to the frame and show everything
     getContentPane().add(pneMain);
     resetFrame();
 
-    // on close, kill the server connection
-    addWindowListener(new java.awt.event.WindowAdapter()
+    ////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+    // setup the system tray, if supported
+
+    boolean useTray = SystemTray.isSupported();
+    if (useTray)
     {
-      @Override
-      public void windowClosing(final WindowEvent winEvt)
+      setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+
+      systemTray = SystemTray.getSystemTray();
+      trayIcon = new TrayIcon(icnNodeSmall.getImage(), "Semiprime Factorization v" + VERSION);
+      final PopupMenu popup = new PopupMenu();
+
+      final MenuItem show = new MenuItem("Hide App");
+      final Runnable trayVisibleToggle = () ->
       {
-        if (null != client.get()) { try { client.get().close(); } catch (Throwable t) { Log.e(t); } }
-        System.exit(0);
-      }
-    });
+        final boolean visible = !isVisible();
+        setVisible(visible);
+        show.setLabel(visible ? "Hide App" : "Show App");
+      };
+      show.addActionListener(l -> trayVisibleToggle.run());
+
+      final MenuItem pause = new MenuItem("Pause");
+      final MenuItem resume = new MenuItem("Resume");
+      resume.setEnabled(false);
+      pause.addActionListener(l ->
+      {
+        pause.setEnabled(false);
+        pause();
+        trayIcon.displayMessage("Paused", "All work has been paused.", TrayIcon.MessageType.INFO);
+        resume.setEnabled(true);
+      });
+      resume.addActionListener(l ->
+      {
+        resume.setEnabled(false);
+        resume();
+        trayIcon.displayMessage("Resumed", "All work has been resumed.", TrayIcon.MessageType.INFO);
+        pause.setEnabled(true);
+      });
+
+      final MenuItem quit = new MenuItem("Save & Quit");
+      quit.addActionListener(l -> exit());
+
+      trayIcon.addMouseListener(new MouseAdapter() {
+        @Override
+        public void mousePressed(MouseEvent e)
+        {
+          if ( (e.getButton() == MouseEvent.BUTTON1 && !OS.contains("OS X")) ||
+               (e.getButton() != MouseEvent.BUTTON1 && OS.contains("OS X")) )
+          {
+            trayVisibleToggle.run();
+          }
+        }
+      });
+
+      popup.add(show);
+      popup.addSeparator();
+      popup.add(pause);
+      popup.add(resume);
+      popup.addSeparator();
+      popup.add(quit);
+
+      trayIcon.setPopupMenu(popup);
+
+      try { systemTray.add(trayIcon); }
+      catch (Throwable t) { Log.e("couldn't create a tray icon, will exit on window close instead"); useTray = false; }
+    }
+    if (!useTray)
+    {
+      // on close, kill the server connection
+      addWindowListener(new WindowAdapter()
+      {
+        @Override
+        public void windowClosing(WindowEvent e) { exit(); }
+      });
+    }
 
     // collect garbage and report memory info
     runtime.gc();
@@ -433,6 +539,7 @@ public class ClientGui extends JFrame implements DocumentListener
     final double maxMemory =  (double)runtime.maxMemory() / toGb;
     final DecimalFormat formatter = new DecimalFormat("#.##");
 
+    Log.d("operating system: " + OS + ", version " + System.getProperty("os.version"));
     Log.d("current java version: " + version + ", required: 1.8+");
     Log.d("note: all memory values reported are relative to the JVM, and were reported immediately after invoking the GC");
     Log.d("free memory: ~" + formatter.format(freeMemory) + " (Gb)");
@@ -445,29 +552,59 @@ public class ClientGui extends JFrame implements DocumentListener
     return true;
   }
 
-  private void connect()
+  private void updateNetworkGuiComponents()
+  {
+    final Client c = client.get();
+    if (isConnecting.get())
+    {
+      btnUpdate.setEnabled(false);
+      btnConnect.setEnabled(false);
+      btnConnect.setText("Connecting...");
+    }
+    else if (null == c || !c.connected())
+    {
+      btnUpdate.setEnabled(false);
+      btnConnect.setEnabled(true);
+      btnConnect.setText("Connect Now");
+    }
+    else
+    {
+      btnUpdate.setEnabled( !isUpdatePending.get() );
+      btnConnect.setEnabled(true);
+      btnConnect.setText("Disconnect");
+    }
+  }
+
+  private void pause()
+  {
+    Log.d("pausing all work...");
+
+    Log.d("all work paused");
+  }
+
+  private void resume()
+  {
+    Log.d("resuming all work...");
+
+    Log.d("all work resumed");
+  }
+
+  private void connectEvent()
   {
     new Thread(() ->
     {
       try
       {
-        btnConnect.setEnabled(false);
-        btnUpdate.setEnabled(false);
-
         // close any old connection
         final Client prev = client.getAndSet(null);
         if (null != prev && prev.connected())
         {
           prev.close();
-          isConnecting.set(false);
-          btnConnect.setText(BTN_CONNECT_STRING);
           return;
         }
-        btnConnect.setText("Connecting...");
 
-        // grab the info from the connect boxes
-        String username = txtUsername.getText().trim();
-        if ("".equals(username)) username = System.getProperty("user.name");
+        isConnecting.set(true);
+        updateNetworkGuiComponents();
 
         final String address = txtAddress.getText().trim();
         if ("".equals(address))
@@ -490,61 +627,127 @@ public class ClientGui extends JFrame implements DocumentListener
           throw new NumberFormatException("invalid port");
         }
 
-        client.set(new Client(username, address, port));
+        final Client c = new Client(address, port, this::updateNetworkGuiComponents);
+        client.set(c);
 
-        isConnecting.set(false);
-        btnConnect.setText("Disconnect");
-        btnUpdate.setEnabled(true);
+        sendSettings();
       }
       catch (NumberFormatException e)
       {
-        isConnecting.set(false);
-        btnConnect.setText(BTN_CONNECT_STRING);
-        btnUpdate.setEnabled(false);
         Log.e("connect failure: " + e.getMessage());
       }
       catch (NullPointerException e)
       {
-        isConnecting.set(false);
-        btnConnect.setText(BTN_CONNECT_STRING);
-        btnUpdate.setEnabled(false);
-        JOptionPane.showMessageDialog(this, "Couldn't locate Stephen's desktop at the moment.\n" +
+        JOptionPane.showMessageDialog(this, "Couldn't locate the semiprime server.\n" +
             "Will keep retrying every few minutes, and the prime search will begin independently in the meantime.\n\n" +
-            "If you're feeling lucky or want to try a different server, you can retry connecting anytime by hitting the big button.");
+            "If you're feeling lucky or want to try a different server, you can retry connecting anytime.");
       }
       finally
       {
-        btnConnect.setEnabled(true);
+        isConnecting.set(false);
+        updateNetworkGuiComponents();
       }
     }).start();
   }
 
-  private void update()
+  private void sendSettings()
   {
-    if (isConnecting.get()) { Log.e("try updating again after you're connected"); return; }
+    final Client c = client.get();
+    if (null == c || !c.connected()) { Log.e("you need to be connected before updating"); return; }
     if (!isUpdatePending.compareAndSet(false, true)) { Log.e("already working on an update, hang tight..."); return; }
+
     btnUpdate.setEnabled(false);
-    Log.d("sending updated settings to server...");
+    txtUsername.setEnabled(false);
+    txtEmail.setEnabled(false);
+    Log.d("sending user settings to the server...");
 
+    // grab the info from the connect boxes
+    String username = txtUsername.getText().trim();
+    if ("".equals(username)) username = System.getProperty("user.name");
+    txtUsername.setText(username);
 
+    String email = txtEmail.getText().trim();
+    if ("".equals(email)) email = DEFAULT_EMAIL;
+    txtEmail.setText(email);
 
-    Log.d("server has acknowledged your updated settings");
-    isUpdatePending.set(false);
+    c.setUsername(username);
+    if (!c.sendPacket(Packet.USERNAME_UPDATE)) { Log.e("failed to send username, try reconnecting"); return; }
+    c.setEmail(email);
+    if (!c.sendPacket(Packet.EMAIL_UPDATE)) { Log.e("failed to send email, try reconnecting"); return; }
+
+    txtEmail.setEnabled(true);
+    txtUsername.setEnabled(true);
     btnUpdate.setEnabled(true);
+    Log.d("the server has acknowledged your settings");
+
+    isUpdatePending.set(false);
+  }
+
+  public void saveCpuSettings()
+  {
+    prefs.putInt(PROCESSORS_NAME, sldProcessors.getValue());
+    prefs.putInt(CAP_NAME, sldCap.getValue());
+    prefs.putInt(MEMORY_NAME, sldMemory.getValue());
+    prefs.putInt(IDLE_NAME, sldIdle.getValue());
+    prefs.putBoolean(WORK_ALWAYS_NAME, chkWorkAlways.isSelected());
+    Log.d("CPU settings saved");
   }
 
   public void saveSettings()
   {
     Log.d("saving settings...");
 
-    Log.d("settings saved");
+    try
+    {
+      saveCpuSettings();
+      prefs.flush();
+    }
+    catch (Throwable t) { Log.e("failed to store preferences. make sure the app has write permissions"); return; }
+
+    Log.d("all settings saved");
+  }
+
+  public void loadCpuSettings()
+  {
+    sldProcessors.setValue(prefs.getInt(PROCESSORS_NAME, DEFAULT_PROCESSORS));
+    sldCap.setValue(prefs.getInt(CAP_NAME, DEFAULT_CAP));
+    sldMemory.setValue(prefs.getInt(MEMORY_NAME, DEFAULT_MEMORY));
+    sldIdle.setValue(prefs.getInt(IDLE_NAME, DEFAULT_IDLE));
+    chkWorkAlways.setSelected(prefs.getBoolean(WORK_ALWAYS_NAME, DEFAULT_WORK_ALWAYS));
+    Log.d("CPU settings loaded");
   }
 
   public void loadSettings()
   {
     Log.d("loading settings...");
 
-    Log.d("settings loaded");
+    try
+    {
+      prefs = Preferences.userNodeForPackage(getClass());
+      loadCpuSettings();
+    }
+    catch (Throwable t) { Log.e("failed to load settings. make sure app has read permissions"); return; }
+
+    Log.d("all settings loaded");
+  }
+
+  public void resetCpuSettings()
+  {
+    sldProcessors.setValue(DEFAULT_PROCESSORS);
+    sldCap.setValue(DEFAULT_CAP);
+    sldMemory.setValue(DEFAULT_MEMORY);
+    sldIdle.setValue(DEFAULT_IDLE);
+    chkWorkAlways.setSelected(DEFAULT_WORK_ALWAYS);
+    Log.d("CPU settings reset");
+  }
+
+  public void resetSettings()
+  {
+    Log.d("resetting all settings to defaults...");
+
+    resetCpuSettings();
+
+    Log.d("settings reset");
   }
 
   public void sendWork()
