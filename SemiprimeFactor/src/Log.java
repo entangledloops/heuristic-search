@@ -11,34 +11,19 @@ public class Log
 
   public static void init(Consumer<String> outputFunction)
   {
-    Log.outputFunction = outputFunction;
-  }
-
-  private static void writeToLog(final String msg)
-  {
-    if (null != outputFunction)
-    {
-      outputLock.lock();
-      try
-      {
-        if (outputLock.getHoldCount() > 1) { Log.e("multiple threads locked log:" + outputLock.getHoldCount()); return; }
-        outputFunction.accept(msg);
-      }
-      catch (Throwable t) { Log.e(t); }
-      finally { outputLock.unlock(); }
-    }
+    Utils.lockAndRun(outputLock, () -> Log.outputFunction = outputFunction);
   }
 
   public static void d(final String msg)
   {
     System.out.println(msg);
-    writeToLog(msg);
+    Utils.lockAndRun(outputLock, () -> outputFunction.accept(msg));
   }
 
   public static void e(final String msg, final Throwable t)
   {
-    if (null != msg) { System.err.println(msg); writeToLog(msg); }
-    if (null != t) { System.err.println(t.getMessage()); t.printStackTrace(); writeToLog(t.getMessage()); }
+    if (null != msg) { System.err.println(msg); Utils.lockAndRun(outputLock, () -> outputFunction.accept(msg)); }
+    if (null != t) { System.err.println(t.getMessage()); t.printStackTrace(); }
   }
   public static void e(final String msg) { e(msg, null); }
   public static void e(final Throwable t) { e(null, t); }
