@@ -1,3 +1,10 @@
+package com.entangledloops.heuristicsearch.semiprime.client;
+
+import com.entangledloops.heuristicsearch.semiprime.Log;
+import com.entangledloops.heuristicsearch.semiprime.Packet;
+import com.entangledloops.heuristicsearch.semiprime.Utils;
+
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -27,20 +34,25 @@ public class ClientGui extends JFrame implements DocumentListener
   //
   //////////////////////////////////////////////////////////////////////////////
 
-  private static final String VERSION       = "0.3a";
-  private static final String DEFAULT_TITLE = "Semiprime Factorization Client - v" + VERSION;
-  private static final String DEFAULT_EMAIL = "nope@take-all-the-credit.com";
-  private static final String ABOUT_URL     = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
-  private static final String NO_MATH_URL   = ABOUT_URL + "---%22I-don't-math%22-edition";
-  private static final String SOURCE_URL    = "https://github.com/entangledloops/heuristicSearch/tree/master";
-  private static final String HOMEPAGE_URL  = "http://www.entangledloops.com";
-  private static final String OS            = System.getProperty("os.name");
-  private static final String DEFAULT_HOST  = "semiprime.servebeer.com";
-  private static final int    DEFAULT_PORT  = 12288;
-  private static final int    HISTORY_ROWS  = 5;
-  private static final int    HISTORY_COLS  = 20;
-  private static final int    H_GAP         = 10;
-  private static final int    V_GAP         = 10;
+  private static final String VERSION         = "0.3a";
+  private static final String ICON_NODE_SMALL = "node16x16.png";
+  private static final String ICON_NODE       = "node32x32.png";
+  private static final String ICON_CPU        = "cpu32x32.png";
+  private static final String ICON_NET        = "net32x32.png";
+  private static final String ICON_SETTINGS   = "settings32x32.png";
+  private static final String DEFAULT_TITLE   = "Semiprime Factorization Client - v" + VERSION;
+  private static final String DEFAULT_EMAIL   = "nope@take-all-the-credit.com";
+  private static final String ABOUT_URL       = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
+  private static final String NO_MATH_URL     = ABOUT_URL + "---%22I-don't-math%22-edition";
+  private static final String SOURCE_URL      = "https://github.com/entangledloops/heuristicSearch/tree/master";
+  private static final String HOMEPAGE_URL    = "http://www.entangledloops.com";
+  private static final String OS              = System.getProperty("os.name");
+  private static final String DEFAULT_HOST    = "semiprime.servebeer.com";
+  private static final int    DEFAULT_PORT    = 12288;
+  private static final int    HISTORY_ROWS    = 5;
+  private static final int    HISTORY_COLS    = 20;
+  private static final int    H_GAP           = 10;
+  private static final int    V_GAP           = 10;
 
   //////////////////////////////////////////////////////////////////////////////
   //
@@ -264,11 +276,12 @@ public class ClientGui extends JFrame implements DocumentListener
     // setup the icons and menus
     try
     {
-      icnNodeSmall = new ImageIcon(getClass().getResource("res/node16x16.png"));
-      icnNode = new ImageIcon(getClass().getResource("res/node32x32.png"));
-      icnCpu = new ImageIcon(getClass().getResource("res/cpu32x32.png"));
-      icnNet = new ImageIcon(getClass().getResource("res/net32x32.png"));
-      icnSettings = new ImageIcon(getClass().getResource("res/settings32x32.png"));
+      final boolean jar = Utils.jar();
+      icnNodeSmall = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NODE_SMALL))) : new ImageIcon(Utils.getResource(ICON_NODE_SMALL));
+      icnNode = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NODE))) : new ImageIcon(Utils.getResource(ICON_NODE));
+      icnCpu = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_CPU))) : new ImageIcon(Utils.getResource(ICON_CPU));
+      icnNet = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NET))) : new ImageIcon(Utils.getResource(ICON_NET));
+      icnSettings = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_SETTINGS))) : new ImageIcon(Utils.getResource(ICON_SETTINGS));
       setIconImage(icnNode.getImage());
     }
     catch (Throwable t) { Log.e(t); }

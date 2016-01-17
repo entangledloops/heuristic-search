@@ -1,3 +1,5 @@
+package com.entangledloops.heuristicsearch.semiprime;
+
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 

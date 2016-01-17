@@ -1,0 +1,52 @@
+apply plugin: 'java'
+
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
+sourceSets.main.java.srcDirs = [ 'src' ]
+sourceSets.main.resources.srcDirs = [ 'res' ]
+
+project.ext.clientClass = 'com.entangledloops.heuristicsearch.semiprime.client.Client'
+project.ext.serverClass = 'com.entangledloops.heuristicsearch.semiprime.server.Server'
+
+task run(dependsOn:classes, type:JavaExec) {
+    main = project.clientClass
+    classpath = sourceSets.main.runtimeClasspath
+    standardInput = System.in
+    workingDir = sourceSets.main.output.resourcesDir
+    ignoreExitValue = false
+}
+
+task dist(dependsOn:classes, type:Jar) {
+    from files(sourceSets.main.output.classesDir)
+    from files(sourceSets.main.output.resourcesDir)
+    from { configurations.compile.collect { zipTree(it) } }
+
+    manifest {
+        attributes 'Main-Class': project.clientClass
+    }
+
+    destinationDir file('.')
+    archiveName 'SemiprimeFactor.jar'
+}
+
+task runServer(dependsOn:classes, type:JavaExec) {
+    main = project.serverClass
+    classpath = sourceSets.main.runtimeClasspath
+    standardInput = System.in
+    workingDir = sourceSets.main.output.resourcesDir
+    ignoreExitValue = false
+}
+
+task distServer(dependsOn:classes, type:Jar) {
+    from files(sourceSets.main.output.classesDir)
+    from files(sourceSets.main.output.resourcesDir)
+    from { configurations.compile.collect { zipTree(it) } }
+
+    manifest {
+        attributes 'Main-Class': project.serverClass
+    }
+
+    destinationDir file('.')
+    archiveName 'SemiprimeServer.jar'
+}

@@ -1,6 +1,7 @@
-/**
- * Created by Stephen on 11/2/2015.
- */
+package com.entangledloops.heuristicsearch.semiprime.server;
+
+import com.entangledloops.heuristicsearch.semiprime.Log;
+
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;

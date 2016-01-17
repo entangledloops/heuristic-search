@@ -1,3 +1,5 @@
+package com.entangledloops.heuristicsearch.semiprime;
+
 import java.math.BigInteger;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;

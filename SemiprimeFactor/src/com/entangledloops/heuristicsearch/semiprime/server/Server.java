@@ -1,3 +1,9 @@
+package com.entangledloops.heuristicsearch.semiprime.server;
+
+import com.entangledloops.heuristicsearch.semiprime.BinaryFactor;
+import com.entangledloops.heuristicsearch.semiprime.Log;
+import com.entangledloops.heuristicsearch.semiprime.client.Client;
+
 import java.net.ServerSocket;
 import java.util.Iterator;
 import java.util.Queue;
@@ -24,7 +30,7 @@ public class Server
 
   private final ServerSocket serverSocket;
   private final Queue<Client> clientSockets = new ConcurrentLinkedQueue<>();
-  private final Thread serverThread = new Thread(new ServerThread());
+  private final Thread        serverThread  = new Thread(new ServerThread());
 
   private final AtomicBoolean isReady   = new AtomicBoolean(false);
   private final AtomicBoolean isExiting = new AtomicBoolean(false);

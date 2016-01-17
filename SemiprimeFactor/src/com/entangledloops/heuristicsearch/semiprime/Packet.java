@@ -1,3 +1,5 @@
+package com.entangledloops.heuristicsearch.semiprime;
+
 /**
  * @author Stephen Dunn
  * @since November 4, 2015

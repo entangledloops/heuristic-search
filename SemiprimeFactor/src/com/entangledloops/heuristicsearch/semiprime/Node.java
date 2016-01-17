@@ -1,3 +1,5 @@
+package com.entangledloops.heuristicsearch.semiprime;
+
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.concurrent.atomic.AtomicBoolean;

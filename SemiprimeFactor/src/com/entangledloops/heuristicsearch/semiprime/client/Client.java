@@ -1,3 +1,8 @@
+package com.entangledloops.heuristicsearch.semiprime.client;
+
+import com.entangledloops.heuristicsearch.semiprime.Log;
+import com.entangledloops.heuristicsearch.semiprime.Packet;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -5,6 +10,9 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static com.entangledloops.heuristicsearch.semiprime.Packet.ERROR;
+import static com.entangledloops.heuristicsearch.semiprime.Packet.valueOf;
 
 /**
  * @author Stephen Dunn
@@ -127,9 +135,9 @@ public class Client
    */
   private Packet recvPacket()
   {
-    Packet packet = Packet.ERROR;
+    Packet packet = ERROR;
     if (!isConnected.get()) return packet;
-    try { packet = Packet.valueOf( readln() ); }
+    try { packet = valueOf( readln() ); }
     catch (Throwable t) {} // connection was closed
     return packet;
   }
