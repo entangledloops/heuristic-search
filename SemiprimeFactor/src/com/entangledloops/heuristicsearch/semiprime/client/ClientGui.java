@@ -65,19 +65,19 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final String WIDTH_NAME = "width", HEIGHT_NAME = "height";
   private static final int DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600;
 
-  private static final String PROCESSORS_NAME = "processors";
-  private static final int DEFAULT_PROCESSORS = Runtime.getRuntime().availableProcessors();
+  private static final String PROCESSORS_NAME    = "processors";
+  private static final int    DEFAULT_PROCESSORS = Runtime.getRuntime().availableProcessors();
 
-  private static final String CAP_NAME = "name";
-  private static final int DEFAULT_CAP        = 100;
+  private static final String CAP_NAME    = "name";
+  private static final int    DEFAULT_CAP = 100;
 
-  private static final String MEMORY_NAME = "memory";
-  private static final int DEFAULT_MEMORY     = 100;
+  private static final String MEMORY_NAME    = "memory";
+  private static final int    DEFAULT_MEMORY = 100;
 
-  private static final String IDLE_NAME = "idle";
-  private static final int DEFAULT_IDLE       = 5;
+  private static final String IDLE_NAME    = "idle";
+  private static final int    DEFAULT_IDLE = 5;
 
-  private static final String WORK_ALWAYS_NAME = "workAlways";
+  private static final String  WORK_ALWAYS_NAME    = "workAlways";
   private static final boolean DEFAULT_WORK_ALWAYS = false;
 
   //////////////////////////////////////////////////////////////////////////////
