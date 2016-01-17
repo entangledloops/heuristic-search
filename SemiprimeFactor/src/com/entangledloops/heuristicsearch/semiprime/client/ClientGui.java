@@ -34,25 +34,20 @@ public class ClientGui extends JFrame implements DocumentListener
   //
   //////////////////////////////////////////////////////////////////////////////
 
-  private static final String VERSION         = "0.3a";
-  private static final String ICON_NODE_SMALL = "node16x16.png";
-  private static final String ICON_NODE       = "node32x32.png";
-  private static final String ICON_CPU        = "cpu32x32.png";
-  private static final String ICON_NET        = "net32x32.png";
-  private static final String ICON_SETTINGS   = "settings32x32.png";
-  private static final String DEFAULT_TITLE   = "Semiprime Factorization Client - v" + VERSION;
-  private static final String DEFAULT_EMAIL   = "nope@take-all-the-credit.com";
-  private static final String ABOUT_URL       = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
-  private static final String NO_MATH_URL     = ABOUT_URL + "---%22I-don't-math%22-edition";
-  private static final String SOURCE_URL      = "https://github.com/entangledloops/heuristicSearch/tree/master";
-  private static final String HOMEPAGE_URL    = "http://www.entangledloops.com";
-  private static final String OS              = System.getProperty("os.name");
-  private static final String DEFAULT_HOST    = "semiprime.servebeer.com";
-  private static final int    DEFAULT_PORT    = 12288;
-  private static final int    HISTORY_ROWS    = 5;
-  private static final int    HISTORY_COLS    = 20;
-  private static final int    H_GAP           = 10;
-  private static final int    V_GAP           = 10;
+  private static final String VERSION          = "0.3a";
+  private static final String ICON_NODE_SMALL  = "node16x16.png";
+  private static final String ICON_NODE        = "node32x32.png";
+  private static final String ICON_CPU         = "cpu32x32.png";
+  private static final String ICON_NET         = "net32x32.png";
+  private static final String ICON_SETTINGS    = "settings32x32.png";
+  private static final String DEFAULT_TITLE    = "Semiprime Factorization Client v" + VERSION;
+  private static final String DEFAULT_EMAIL    = "nope@take-all-the-credit.com";
+  private static final String ABOUT_URL        = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
+  private static final String NO_MATH_URL      = ABOUT_URL + "---%22I-don't-math%22-edition";
+  private static final String SOURCE_URL       = "https://github.com/entangledloops/heuristicSearch/tree/master";
+  private static final String HOMEPAGE_URL     = "http://www.entangledloops.com";
+  private static final String DEFAULT_HOST     = "semiprime.servebeer.com";
+  private static final String OS               = System.getProperty("os.name");
 
   //////////////////////////////////////////////////////////////////////////////
   //
@@ -62,23 +57,27 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private Preferences prefs;
 
-  private static final String WIDTH_NAME = "width", HEIGHT_NAME = "height";
-  private static final int DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600;
+  private static final String WIDTH_NAME       = "width";
+  private static final String HEIGHT_NAME      = "height";
+  private static final String PROCESSORS_NAME  = "processors";
+  private static final String CAP_NAME         = "name";
+  private static final String MEMORY_NAME      = "memory";
+  private static final String IDLE_NAME        = "idle";
+  private static final String WORK_ALWAYS_NAME = "workAlways";
+  private static final String AUTOSTART_NAME   = "autostart";
 
-  private static final String PROCESSORS_NAME    = "processors";
-  private static final int    DEFAULT_PROCESSORS = Runtime.getRuntime().availableProcessors();
+  private static final int DEFAULT_PROCESSORS = Runtime.getRuntime().availableProcessors();
+  private static final int DEFAULT_WIDTH      = 800;
+  private static final int DEFAULT_HEIGHT     = 600;
+  private static final int DEFAULT_CAP        = 100;
+  private static final int DEFAULT_MEMORY     = 100;
+  private static final int DEFAULT_IDLE       = 5;
+  private static final int DEFAULT_PORT       = 12288;
+  private static final int HISTORY_ROWS       = 5;
+  private static final int HISTORY_COLS       = 20;
 
-  private static final String CAP_NAME    = "name";
-  private static final int    DEFAULT_CAP = 100;
-
-  private static final String MEMORY_NAME    = "memory";
-  private static final int    DEFAULT_MEMORY = 100;
-
-  private static final String IDLE_NAME    = "idle";
-  private static final int    DEFAULT_IDLE = 5;
-
-  private static final String  WORK_ALWAYS_NAME    = "workAlways";
   private static final boolean DEFAULT_WORK_ALWAYS = false;
+  private static final boolean DEFAULT_AUTOSTART   = false;
 
   //////////////////////////////////////////////////////////////////////////////
   //
@@ -86,15 +85,22 @@ public class ClientGui extends JFrame implements DocumentListener
   //
   //////////////////////////////////////////////////////////////////////////////
 
-  private SystemTray systemTray;
-  private TrayIcon   trayIcon;
-  private ImageIcon  icnNode, icnNodeSmall, icnCpu, icnNet, icnSettings;
-  private JTextArea  txtHistory;
-  private JTextField txtUsername, txtEmail, txtAddress;
+  private static final int H_GAP = 10;
+  private static final int V_GAP = 10;
+
+  private ImageIcon icnNode, icnNodeSmall, icnCpu, icnNet, icnSettings;
+  private JSlider sldProcessors, sldCap, sldMemory, sldIdle;
+  private JTextField          txtUsername;
+  private JTextField          txtEmail;
+  private JTextField          txtAddress;
+  private SystemTray          systemTray;
+  private TrayIcon            trayIcon;
+  private JTextArea           txtHistory;
   private JFormattedTextField txtPort;
-  private JSlider             sldProcessors, sldCap, sldMemory, sldIdle;
-  private JCheckBox chkWorkAlways;
-  private JButton   btnConnect, btnUpdate;
+  private JCheckBox           chkAlwaysWork;
+  private JCheckBox           chkAutoStart;
+  private JButton             btnConnect;
+  private JButton             btnUpdate;
 
   //////////////////////////////////////////////////////////////////////////////
   //
@@ -454,7 +460,7 @@ public class ClientGui extends JFrame implements DocumentListener
     btnResetCpu.setFocusPainted(false);
     btnResetCpu.addActionListener(l ->
     {
-      int result = JOptionPane.showConfirmDialog(null, "Are you sure you want to reset all CPU settings to defaults?", "Confirm Reset", JOptionPane.YES_NO_OPTION);
+      final int result = JOptionPane.showConfirmDialog(null, "Are you sure you want to reset all CPU settings to defaults?", "Confirm Reset", JOptionPane.YES_NO_OPTION);
       if (JOptionPane.YES_OPTION == result) resetCpuSettings();
     });
 
@@ -472,14 +478,20 @@ public class ClientGui extends JFrame implements DocumentListener
     final JPanel pnlCpuRight = new JPanel(new GridLayout(7, 1, H_GAP, V_GAP));
 
     // setup connect button and "always work" checkbox
-    chkWorkAlways = new JCheckBox("Always work, even when I'm not idle.", prefs.getBoolean(WORK_ALWAYS_NAME, DEFAULT_WORK_ALWAYS));
-    chkWorkAlways.setHorizontalAlignment(SwingConstants.CENTER);
-    chkWorkAlways.setFocusPainted(false);
-    chkWorkAlways.addActionListener(l ->
-    {
-      final boolean work = chkWorkAlways.isSelected();
-      Log.d("always work: " + (work ? "yes" : "no"));
-    });
+    chkAlwaysWork = new JCheckBox("Always work, even when I'm not idle.", prefs.getBoolean("workAlways", DEFAULT_WORK_ALWAYS));
+    chkAlwaysWork.setHorizontalAlignment(SwingConstants.CENTER);
+    chkAlwaysWork.setFocusPainted(false);
+    chkAlwaysWork.addActionListener(l -> Log.d("always work: " + (chkAlwaysWork.isSelected() ? "yes" : "no")));
+
+    // auto start with system?
+    chkAutoStart = new JCheckBox("Auto-start with system.", prefs.getBoolean("autostart", DEFAULT_AUTOSTART));
+    chkAutoStart.setHorizontalAlignment(SwingConstants.CENTER);
+    chkAutoStart.setFocusPainted(false);
+    chkAutoStart.addActionListener(l -> Log.d("autostart: " + (chkAutoStart.isSelected() ? "yes" : "no")));
+
+    final JPanel pnlChkBoxes = new JPanel(new GridLayout(2, 1, H_GAP, V_GAP));
+    pnlChkBoxes.add(chkAlwaysWork);
+    pnlChkBoxes.add(chkAutoStart);
 
     pnlCpuRight.add(lblMemory);
     pnlCpuRight.add(sldMemory);
@@ -487,7 +499,7 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlCpuRight.add(sldIdle);
     pnlCpuRight.add(new JLabel(""));
     pnlCpuRight.add(new JLabel(""));
-    pnlCpuRight.add(chkWorkAlways);
+    pnlCpuRight.add(pnlChkBoxes);
 
     // create the full CPU panel
     final JPanel pnlCpu = new JPanel(new GridLayout(1, 2, H_GAP, V_GAP));
@@ -602,6 +614,8 @@ public class ClientGui extends JFrame implements DocumentListener
         "max memory: ~" + formatter.format(maxMemory) + " (Gb)\n" +
         "free memory / total memory: " + formatter.format(100.0*(freeMemory/totalMemory)) + "%\n" +
         "total memory / max memory: " + formatter.format(100.0*(totalMemory/maxMemory)) + "%\n" +
+        "always work: " + chkAlwaysWork.isSelected() +
+        "autostart: " + chkAutoStart.isSelected() +
         "available processors: " + processors
     );
 
@@ -745,7 +759,8 @@ public class ClientGui extends JFrame implements DocumentListener
     prefs.putInt(CAP_NAME, sldCap.getValue());
     prefs.putInt(MEMORY_NAME, sldMemory.getValue());
     prefs.putInt(IDLE_NAME, sldIdle.getValue());
-    prefs.putBoolean(WORK_ALWAYS_NAME, chkWorkAlways.isSelected());
+    prefs.putBoolean(WORK_ALWAYS_NAME, chkAlwaysWork.isSelected());
+    prefs.putBoolean(AUTOSTART_NAME, chkAutoStart.isSelected());
     Log.d("CPU settings saved");
   }
 
@@ -769,7 +784,8 @@ public class ClientGui extends JFrame implements DocumentListener
     sldCap.setValue(prefs.getInt(CAP_NAME, DEFAULT_CAP));
     sldMemory.setValue(prefs.getInt(MEMORY_NAME, DEFAULT_MEMORY));
     sldIdle.setValue(prefs.getInt(IDLE_NAME, DEFAULT_IDLE));
-    chkWorkAlways.setSelected(prefs.getBoolean(WORK_ALWAYS_NAME, DEFAULT_WORK_ALWAYS));
+    chkAlwaysWork.setSelected(prefs.getBoolean(WORK_ALWAYS_NAME, DEFAULT_WORK_ALWAYS));
+    chkAutoStart.setSelected(prefs.getBoolean(AUTOSTART_NAME, DEFAULT_AUTOSTART));
     Log.d("CPU settings loaded");
   }
 
@@ -793,7 +809,8 @@ public class ClientGui extends JFrame implements DocumentListener
     sldCap.setValue(DEFAULT_CAP);
     sldMemory.setValue(DEFAULT_MEMORY);
     sldIdle.setValue(DEFAULT_IDLE);
-    chkWorkAlways.setSelected(DEFAULT_WORK_ALWAYS);
+    chkAlwaysWork.setSelected(DEFAULT_WORK_ALWAYS);
+    chkAutoStart.setSelected(DEFAULT_AUTOSTART);
     Log.d("CPU settings reset");
   }
 
