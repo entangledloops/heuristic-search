@@ -7,7 +7,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Created by Stephen on 10/31/2015.
+ * @author Stephen Dunn
+ * @since October 31, 2015
  */
 public class Client
 {

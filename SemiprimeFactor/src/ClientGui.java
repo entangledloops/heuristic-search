@@ -16,36 +16,63 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.prefs.Preferences;
 
 /**
- * Created by Stephen on 11/1/2015.
+ * @author Stephen Dunn
+ * @since November 1, 2015
  */
 public class ClientGui extends JFrame implements DocumentListener
 {
-  public static final  String VERSION       = "0.3a";
-  private static final String DEFAULT_TITLE = "Semiprime Factorization Client - v"+VERSION;
+  //////////////////////////////////////////////////////////////////////////////
+  //
+  // Constants
+  //
+  //////////////////////////////////////////////////////////////////////////////
+
+  private static final String VERSION       = "0.3a";
+  private static final String DEFAULT_TITLE = "Semiprime Factorization Client - v" + VERSION;
   private static final String DEFAULT_EMAIL = "nope@take-all-the-credit.com";
-  private static final String DOWNLOAD_URL  = "https://github.com/entangledloops/heuristicSearch";
   private static final String ABOUT_URL     = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
   private static final String NO_MATH_URL   = ABOUT_URL + "---%22I-don't-math%22-edition";
   private static final String SOURCE_URL    = "https://github.com/entangledloops/heuristicSearch/tree/master";
   private static final String HOMEPAGE_URL  = "http://www.entangledloops.com";
   private static final String OS            = System.getProperty("os.name");
+  private static final String DEFAULT_HOST  = "semiprime.servebeer.com";
+  private static final int    DEFAULT_PORT  = 12288;
+  private static final int    HISTORY_ROWS  = 5;
+  private static final int    HISTORY_COLS  = 20;
+  private static final int    H_GAP         = 10;
+  private static final int    V_GAP         = 10;
 
-  private static final int HISTORY_ROWS = 5, HISTORY_COLS = 20;
-  private static final int H_GAP = 10, V_GAP = 10;
+  //////////////////////////////////////////////////////////////////////////////
+  //
+  // User prefs
+  //
+  //////////////////////////////////////////////////////////////////////////////
 
   private Preferences prefs;
+
   private static final String WIDTH_NAME = "width", HEIGHT_NAME = "height";
   private static final int DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600;
+
   private static final String PROCESSORS_NAME = "processors";
   private static final int DEFAULT_PROCESSORS = Runtime.getRuntime().availableProcessors();
+
   private static final String CAP_NAME = "name";
   private static final int DEFAULT_CAP        = 100;
+
   private static final String MEMORY_NAME = "memory";
   private static final int DEFAULT_MEMORY     = 100;
+
   private static final String IDLE_NAME = "idle";
   private static final int DEFAULT_IDLE       = 5;
+
   private static final String WORK_ALWAYS_NAME = "workAlways";
   private static final boolean DEFAULT_WORK_ALWAYS = false;
+
+  //////////////////////////////////////////////////////////////////////////////
+  //
+  // Gui vars
+  //
+  //////////////////////////////////////////////////////////////////////////////
 
   private SystemTray systemTray;
   private TrayIcon   trayIcon;
@@ -57,9 +84,21 @@ public class ClientGui extends JFrame implements DocumentListener
   private JCheckBox chkWorkAlways;
   private JButton   btnConnect, btnUpdate;
 
-  private final AtomicReference<Client> client = new AtomicReference<>(null);
-  private final AtomicBoolean isConnecting = new AtomicBoolean(false);
-  private final AtomicBoolean isUpdatePending = new AtomicBoolean(false);
+  //////////////////////////////////////////////////////////////////////////////
+  //
+  // State vars
+  //
+  //////////////////////////////////////////////////////////////////////////////
+
+  private final AtomicReference<Client> client          = new AtomicReference<>(null);
+  private final AtomicBoolean           isConnecting    = new AtomicBoolean(false);
+  private final AtomicBoolean           isUpdatePending = new AtomicBoolean(false);
+
+  //////////////////////////////////////////////////////////////////////////////
+  //
+  // ClientGui
+  //
+  //////////////////////////////////////////////////////////////////////////////
 
   public ClientGui()
   {
@@ -78,7 +117,7 @@ public class ClientGui extends JFrame implements DocumentListener
     //connect();
   }
 
-  public void resetFrame()
+  private void resetFrame()
   {
     setTitle(DEFAULT_TITLE);
     setState(Frame.NORMAL);
@@ -88,7 +127,7 @@ public class ClientGui extends JFrame implements DocumentListener
     setLocationRelativeTo(getRootPane());
   }
 
-  public void exit()
+  private void exit()
   {
     saveSettings();
     sendWork();
@@ -101,7 +140,7 @@ public class ClientGui extends JFrame implements DocumentListener
   }
 
   // re-initializes the window's components
-  public boolean create()
+  private boolean create()
   {
     ////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////
@@ -166,9 +205,9 @@ public class ClientGui extends JFrame implements DocumentListener
     // host address label and text box
     final JLabel lblAddress = new JLabel("Server address:");
     lblAddress.setHorizontalAlignment(SwingConstants.CENTER);
-    txtAddress = new JTextField(Server.DEFAULT_HOST);
+    txtAddress = new JTextField(DEFAULT_HOST);
     txtAddress.setHorizontalAlignment(SwingConstants.CENTER);
-    txtAddress.setColumns(Server.DEFAULT_HOST.length());
+    txtAddress.setColumns(DEFAULT_HOST.length());
 
     // port box and restrict to numbers
     final JLabel lblPort = new JLabel("Server port:");
@@ -179,7 +218,7 @@ public class ClientGui extends JFrame implements DocumentListener
     txtPort = new JFormattedTextField(decimalFormat);
     txtPort.setHorizontalAlignment(SwingConstants.CENTER);
     txtPort.setColumns(5);
-    txtPort.setText(Server.DEFAULT_PORT+"");
+    txtPort.setText(DEFAULT_PORT+"");
 
     final JLabel lblConnectNow = new JLabel("Click update if you change your username or email after connecting:");
     lblConnectNow.setHorizontalAlignment(SwingConstants.CENTER);
@@ -512,11 +551,8 @@ public class ClientGui extends JFrame implements DocumentListener
         @Override
         public void mousePressed(MouseEvent e)
         {
-          if ( (e.getButton() == MouseEvent.BUTTON1 && !OS.contains("OS X")) ||
-               (e.getButton() != MouseEvent.BUTTON1 && OS.contains("OS X")) )
-          {
-            trayVisibleToggle.run();
-          }
+          final int btn = e.getButton(); final boolean osx = OS.contains("OS X");
+          if ( (btn == MouseEvent.BUTTON1 && !osx) || (btn != MouseEvent.BUTTON1 && osx) ) trayVisibleToggle.run();
         }
       });
 
@@ -532,15 +568,9 @@ public class ClientGui extends JFrame implements DocumentListener
       try { systemTray.add(trayIcon); }
       catch (Throwable t) { Log.e("couldn't create a tray icon, will exit on window close instead"); useTray = false; }
     }
-    if (!useTray)
-    {
-      // on close, kill the server connection
-      addWindowListener(new WindowAdapter()
-      {
-        @Override
-        public void windowClosing(WindowEvent e) { exit(); }
-      });
-    }
+
+    // on close, kill the server connection if there is no tray icon in use
+    if (!useTray) addWindowListener(new WindowAdapter() { @Override public void windowClosing(WindowEvent e) { exit(); } });
 
     // collect garbage and report memory info
     runtime.gc();
@@ -549,15 +579,18 @@ public class ClientGui extends JFrame implements DocumentListener
     final double maxMemory =  (double)runtime.maxMemory() / toGb;
     final DecimalFormat formatter = new DecimalFormat("#.##");
 
-    Log.d("operating system: " + OS + ", version " + System.getProperty("os.version"));
-    Log.d("current java version: " + version + ", required: 1.8+");
-    Log.d("note: all memory values reported are relative to the JVM, and were reported immediately after invoking the GC");
-    Log.d("free memory: ~" + formatter.format(freeMemory) + " (Gb)");
-    Log.d("total memory: ~" + formatter.format(totalMemory) + " (Gb)");
-    Log.d("max memory: ~" + formatter.format(maxMemory) + " (Gb)");
-    Log.d("free memory / total memory: " + formatter.format(100.0*(freeMemory/totalMemory)) + "%");
-    Log.d("total memory / max memory: " + formatter.format(100.0*(totalMemory/maxMemory)) + "%");
-    Log.d("available processors: " + processors);
+    // report discovered system stats
+    Log.d(
+        "operating system: " + OS + ", version " + System.getProperty("os.version") + "\n" +
+        "current java version: " + version + ", required: 1.8+\n" +
+        "note: all memory values reported are relative to the JVM, and were reported immediately after invoking the GC\n" +
+        "free memory: ~" + formatter.format(freeMemory) + " (Gb)\n" +
+        "total memory: ~" + formatter.format(totalMemory) + " (Gb)\n" +
+        "max memory: ~" + formatter.format(maxMemory) + " (Gb)\n" +
+        "free memory / total memory: " + formatter.format(100.0*(freeMemory/totalMemory)) + "%\n" +
+        "total memory / max memory: " + formatter.format(100.0*(totalMemory/maxMemory)) + "%\n" +
+        "available processors: " + processors
+    );
 
     return true;
   }
@@ -693,7 +726,7 @@ public class ClientGui extends JFrame implements DocumentListener
     isUpdatePending.set(false);
   }
 
-  public void saveCpuSettings()
+  private void saveCpuSettings()
   {
     prefs.putInt(PROCESSORS_NAME, sldProcessors.getValue());
     prefs.putInt(CAP_NAME, sldCap.getValue());
@@ -703,7 +736,7 @@ public class ClientGui extends JFrame implements DocumentListener
     Log.d("CPU settings saved");
   }
 
-  public void saveSettings()
+  private void saveSettings()
   {
     Log.d("saving settings...");
 
@@ -717,7 +750,7 @@ public class ClientGui extends JFrame implements DocumentListener
     Log.d("all settings saved");
   }
 
-  public void loadCpuSettings()
+  private void loadCpuSettings()
   {
     sldProcessors.setValue(prefs.getInt(PROCESSORS_NAME, DEFAULT_PROCESSORS));
     sldCap.setValue(prefs.getInt(CAP_NAME, DEFAULT_CAP));
@@ -727,7 +760,7 @@ public class ClientGui extends JFrame implements DocumentListener
     Log.d("CPU settings loaded");
   }
 
-  public void loadSettings()
+  private void loadSettings()
   {
     Log.d("loading settings...");
 
@@ -741,7 +774,7 @@ public class ClientGui extends JFrame implements DocumentListener
     Log.d("all settings loaded");
   }
 
-  public void resetCpuSettings()
+  private void resetCpuSettings()
   {
     sldProcessors.setValue(DEFAULT_PROCESSORS);
     sldCap.setValue(DEFAULT_CAP);
@@ -751,7 +784,7 @@ public class ClientGui extends JFrame implements DocumentListener
     Log.d("CPU settings reset");
   }
 
-  public void resetSettings()
+  private void resetSettings()
   {
     Log.d("resetting all settings to defaults...");
 
@@ -760,14 +793,14 @@ public class ClientGui extends JFrame implements DocumentListener
     Log.d("settings reset");
   }
 
-  public void sendWork()
+  private void sendWork()
   {
     Log.d("sending all completed work to server...");
 
     Log.d("server successfully received all completed work");
   }
 
-  public void recvWork()
+  private void recvWork()
   {
     Log.d("requesting a new primary node...");
 

@@ -9,19 +9,45 @@ import java.awt.*;
 import java.awt.event.WindowEvent;
 
 /**
- * Created by Stephen on 11/1/2015.
+ * @author Stephen Dunn
+ * @since November 1, 2015
  */
 public class ServerGui extends JFrame implements DocumentListener
 {
-  public static final String DEFAULT_TITLE = "Semiprime Factorization Server - " + ClientGui.VERSION;
-  public static final int DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600;
-  public static final int HISTORY_ROWS = 10, HISTORY_COLS = 20;
+  //////////////////////////////////////////////////////////////////////////////
+  //
+  // Constants
+  //
+  //////////////////////////////////////////////////////////////////////////////
 
-  public JPanel mainPanel;
-  public JTextArea  txtHistory;
-  public JScrollPane scrollPaneHistory;
+  private static final String VERSION        = "0.3a";
+  private static final String DEFAULT_TITLE  = "Semiprime Factorization Server - " + VERSION;
+  private static final int    DEFAULT_WIDTH  = 800;
+  private static final int    DEFAULT_HEIGHT = 600;
+  private static final int    HISTORY_ROWS   = 10;
+  private static final int    HISTORY_COLS   = 20;
+
+  //////////////////////////////////////////////////////////////////////////////
+  //
+  // Gui vars
+  //
+  //////////////////////////////////////////////////////////////////////////////
+
+  private JTextArea txtHistory;
+
+  //////////////////////////////////////////////////////////////////////////////
+  //
+  // State vars
+  //
+  //////////////////////////////////////////////////////////////////////////////
 
   private final Server server;
+
+  //////////////////////////////////////////////////////////////////////////////
+  //
+  // ServerGui
+  //
+  //////////////////////////////////////////////////////////////////////////////
 
   public ServerGui()
   {
@@ -75,7 +101,7 @@ public class ServerGui extends JFrame implements DocumentListener
       catch (Throwable t) {} // don't care what went wrong with gui update, it's been logged anyway
     });
 
-    scrollPaneHistory = new JScrollPane(txtHistory);
+    final JScrollPane scrollPaneHistory = new JScrollPane(txtHistory);
     scrollPaneHistory.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
     scrollPaneHistory.setVisible(true);
 
@@ -83,7 +109,7 @@ public class ServerGui extends JFrame implements DocumentListener
     txtHistory.setHighlighter(highlighter);
 
     // organize them and add them to the panel
-    mainPanel = new JPanel(new GridLayout(1,1));
+    final JPanel mainPanel = new JPanel(new GridLayout(1, 1));
     mainPanel.add(scrollPaneHistory);
 
     // add the panel to the frame and show everything

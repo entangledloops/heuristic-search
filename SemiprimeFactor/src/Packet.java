@@ -1,5 +1,6 @@
 /**
- * Created by Stephen on 11/4/2015.
+ * @author Stephen Dunn
+ * @since November 4, 2015
  */
 public enum Packet
 {

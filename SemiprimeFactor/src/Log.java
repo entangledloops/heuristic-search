@@ -2,7 +2,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 /**
- * Created by Stephen on 10/31/2015.
+ * @author Stephen Dunn
+ * @since October 31, 2015
  */
 public class Log
 {

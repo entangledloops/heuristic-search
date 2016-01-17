@@ -3,23 +3,31 @@ import java.util.Iterator;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Created by Stephen on 10/31/2015.
+ * @author Stephen Dunn
+ * @since October 31, 2015
  */
 public class Server
 {
-  public static final String DEFAULT_HOST = "semiprime.servebeer.com";
-  public static final int DEFAULT_PORT = 12288;
-  public static final long SHUTDOWN_TIMEOUT = 5000;
-  public static final TimeUnit SHUTDOWN_TIMEOUT_UNIT = TimeUnit.MILLISECONDS;
+  //////////////////////////////////////////////////////////////////////////////
+  //
+  // User prefs
+  //
+  //////////////////////////////////////////////////////////////////////////////
+
+  private static final String   DEFAULT_HOST          = "semiprime.servebeer.com";
+  private static final int      DEFAULT_PORT          = 12288;
+  private static final TimeUnit SHUTDOWN_TIMEOUT_UNIT = TimeUnit.MILLISECONDS;
+  private static final long     SHUTDOWN_TIMEOUT      = 5000;
 
   private final ServerSocket serverSocket;
   private final Queue<Client> clientSockets = new ConcurrentLinkedQueue<>();
   private final Thread serverThread = new Thread(new ServerThread());
 
-  private boolean isReady = false;
-  private boolean isExiting = false;
+  private final AtomicBoolean isReady   = new AtomicBoolean(false);
+  private final AtomicBoolean isExiting = new AtomicBoolean(false);
 
   /**
    * Initializes the socket server to receive incoming client connections.
@@ -43,9 +51,10 @@ public class Server
    */
   public void destroy()
   {
+    if (!isExiting.compareAndSet(false,true)) return;
+
     Log.d("shutting down the server socket...");
 
-    isExiting = true;
     try { serverSocket.close(); }
     catch (Throwable t) { Log.e(t); }
 
@@ -68,18 +77,17 @@ public class Server
     @Override
     public void run()
     {
+      if (!isReady.compareAndSet(false,true)) return;
       Log.d("server thread launched and waiting for connections");
 
-      isReady = true;
       try
       {
-        while (!isExiting && !Thread.interrupted())
+        while (!isExiting.get() && !Thread.interrupted())
         {
           clientSockets.add(new Client(serverSocket.accept()));
         }
       }
-      catch (Throwable t) { if (!isExiting) Log.e(t); }
-      isReady = false;
+      catch (Throwable t) { if (!isExiting.get()) Log.e(t); }
 
       try
       {
@@ -89,7 +97,7 @@ public class Server
       }
       catch (Throwable t) { Log.e(t); }
 
-
+      isReady.set(false);
       Log.d("server socket closed");
     }
   }

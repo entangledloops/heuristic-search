@@ -3,7 +3,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Created by Stephen on 11/2/2015.
+ * @author Stephen Dunn
+ * @since November 2, 2015
  */
 public class BinaryFactor
 {
