@@ -10,9 +10,9 @@ If you want to build from source, you'll need at least the [Java 1.8 JDK](http:/
 
 Pull this git repo:
 
-`git clone https://github.com/entangledloops/heuristicSearch.git --recursive`
+`git clone https://github.com/entangledloops/heuristicSearch/SemiprimeFactor.git`
 
-Open a command prompt/terminal in the root directory.
+Open a command prompt/terminal in the SemiprimeFactor subdirectory.
 To run the client:
 
 `gradlew run`
