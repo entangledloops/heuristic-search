@@ -9,6 +9,10 @@ sourceSets.main.resources.srcDirs = [ 'res' ]
 project.ext.clientClass = 'com.entangledloops.heuristicsearch.semiprime.client.Client'
 project.ext.serverClass = 'com.entangledloops.heuristicsearch.semiprime.server.Server'
 
+task createWrapper(type: Wrapper) {
+    gradleVersion = "2.11"
+}
+
 task run(dependsOn:classes, type:JavaExec) {
     main = project.clientClass
     classpath = sourceSets.main.runtimeClasspath
