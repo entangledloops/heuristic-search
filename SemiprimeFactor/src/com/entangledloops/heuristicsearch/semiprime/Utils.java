@@ -10,10 +10,11 @@ import java.util.concurrent.locks.Lock;
  */
 public class Utils
 {
-  public static boolean lockAndRun(Lock lock, Runnable run)
+  public static boolean lockAndRun(Lock lock, Runnable task)
   {
+    if (null == lock || null == task) return false;
     lock.lock();
-    try { run.run(); return true; }
+    try { task.run(); return true; }
     catch (Throwable t) { Log.e(t); return false; }
     finally { lock.unlock(); }
   }

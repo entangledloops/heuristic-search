@@ -1,7 +1,9 @@
 package com.entangledloops.heuristicsearch.semiprime.client;
 
+import com.entangledloops.heuristicsearch.semiprime.Solver;
 import com.entangledloops.heuristicsearch.semiprime.Log;
 import com.entangledloops.heuristicsearch.semiprime.Packet;
+import com.entangledloops.heuristicsearch.semiprime.server.Server;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -10,6 +12,7 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import static com.entangledloops.heuristicsearch.semiprime.Packet.ERROR;
 import static com.entangledloops.heuristicsearch.semiprime.Packet.valueOf;
@@ -20,9 +23,10 @@ import static com.entangledloops.heuristicsearch.semiprime.Packet.valueOf;
  */
 public class Client
 {
-  private final AtomicReference<Socket> socket = new AtomicReference<>();
-  private final AtomicReference<Thread> thread = new AtomicReference<>();
-  private final AtomicReference<Runnable> connectionEvent = new AtomicReference<>();
+  private final AtomicReference<Solver> factor = new AtomicReference<>();
+
+  private final AtomicReference<Socket>   socket       = new AtomicReference<>();
+  private final AtomicReference<Thread>   clientThread = new AtomicReference<>();
 
   private final AtomicReference<BufferedReader> in = new AtomicReference<>();
   private final AtomicReference<PrintWriter>    out = new AtomicReference<>();
@@ -32,19 +36,22 @@ public class Client
   private final AtomicReference<String> ip = new AtomicReference<>();
   private final AtomicReference<String> hostname = new AtomicReference<>();
 
-  private final boolean isRemote;
   private final AtomicBoolean isConnected = new AtomicBoolean(false);
+
+  private final Consumer<Packet> callback;
+  private final boolean          isRemote;
 
   /**
    * For accepting a new remote client connecting to the server.
    * @param socket
    */
-  public Client(Socket socket)
+  public Client(Socket socket, Consumer<Packet> socketEventCallback)
   {
     Log.d("accepting new client connection...");
 
     try
     {
+      this.callback = socketEventCallback;
       this.isRemote = true;
       this.socket.set(socket);
       init();
@@ -54,19 +61,21 @@ public class Client
 
     Log.d("connection with " + ip() + " established");
   }
+  public Client(Socket socket) { this(socket, null); }
+
 
   /**
    * Connects a new local client to a remote server.
    * @param host
    * @param port
    */
-  public Client(String host, int port, Runnable connectionEvent) throws NullPointerException
+  public Client(String host, int port, Consumer<Packet> socketEventCallback) throws NullPointerException
   {
     Log.d("connecting to " + host + ":" + port + "...");
 
     try
     {
-      this.connectionEvent.set(connectionEvent);
+      this.callback = socketEventCallback;
       this.isRemote = false;
       this.socket.set(new Socket(host, port));
       init();
@@ -75,6 +84,10 @@ public class Client
 
     Log.d("connection with " + ip() + " established");
   }
+  public Client() { this(Server.DEFAULT_HOST, Server.DEFAULT_PORT, null); }
+
+  public void factor(Solver solver) { this.factor.set(solver); }
+  public Solver factor() { return factor.get(); }
 
   private void init() throws IOException
   {
@@ -88,8 +101,8 @@ public class Client
     this.hostname.set( socket().getInetAddress().getCanonicalHostName() );
     this.in.set(new BufferedReader( new InputStreamReader(socket().getInputStream())) );
     this.out.set(new PrintWriter( socket().getOutputStream()) );
-    this.thread.set(new Thread( new ClientThread() ));
-    this.thread.get().start();
+    this.clientThread.set(new Thread( new ClientThread() ));
+    this.clientThread.get().start();
   }
 
   /**
@@ -103,16 +116,16 @@ public class Client
     try { socket().close(); }
     catch (Throwable t) { Log.e(t); }
 
-    if (Thread.currentThread() != thread.get())
+    if (Thread.currentThread() != clientThread.get())
     {
       try
       {
-        thread.get().interrupt();
-        thread.get().join();
+        clientThread.get().interrupt();
+        clientThread.get().join();
       }
       catch (Throwable t) { Log.e(t); }
     }
-    else if (!isRemote) connectionEvent.get().run();
+    else if (null != callback) callback.accept(null);
   }
 
   private Socket socket() { return socket.get(); }
@@ -346,6 +359,8 @@ public class Client
             case ERROR:
             default: close();
           }
+
+          if (null != callback) callback.accept(packet);
         }
       }
       catch (Throwable t) { if (!Thread.interrupted()) Log.e(t); }

@@ -35,6 +35,10 @@ task dist(dependsOn:classes, type:Jar) {
 }
 
 task runServer(dependsOn:classes, type:JavaExec) {
+    compileJava {
+        options.fork = true
+        options.forkOptions.setMemoryMaximumSize("30g")
+    }
     main = project.serverClass
     classpath = sourceSets.main.runtimeClasspath
     standardInput = System.in

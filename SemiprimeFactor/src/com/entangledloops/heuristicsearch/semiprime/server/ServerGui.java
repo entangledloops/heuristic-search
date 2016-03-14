@@ -8,6 +8,7 @@ import javax.swing.event.DocumentListener;
 import javax.swing.text.DefaultHighlighter;
 import java.awt.*;
 import java.awt.event.WindowEvent;
+import java.net.ServerSocket;
 
 /**
  * @author Stephen Dunn
@@ -50,17 +51,20 @@ public class ServerGui extends JFrame implements DocumentListener
   //
   //////////////////////////////////////////////////////////////////////////////
 
-  public ServerGui()
+  public ServerGui() { this(new Server()); }
+  public ServerGui(Server server)
   {
     super();
+    this.server = server;
+
     setVisible(false);
-
-    if (!create()) throw new NullPointerException();
-    server = new Server();
-
+    if (!create()) throw new NullPointerException("failed to create server gui");
     setVisible(true);
+
     toFront();
   }
+
+  public ServerSocket socket() { return server.socket(); }
 
   public void resetFrame()
   {

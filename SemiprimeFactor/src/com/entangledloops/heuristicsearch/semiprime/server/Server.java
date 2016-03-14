@@ -1,9 +1,10 @@
 package com.entangledloops.heuristicsearch.semiprime.server;
 
-import com.entangledloops.heuristicsearch.semiprime.BinaryFactor;
+import com.entangledloops.heuristicsearch.semiprime.Solver;
 import com.entangledloops.heuristicsearch.semiprime.Log;
 import com.entangledloops.heuristicsearch.semiprime.client.Client;
 
+import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.util.Iterator;
 import java.util.Queue;
@@ -17,109 +18,132 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class Server
 {
+  public static final String   DEFAULT_HOST          = "semiprime.servebeer.com";
+  public static final int      DEFAULT_PORT          = 12288;
+
+  private static final TimeUnit shutdownTimeUnit = TimeUnit.MILLISECONDS;
+  private static final long     shutdownTimeout  = 5000;
+
+  private final ServerSocket  socket;
+  private final Thread        serverThread = new Thread(new ServerThread());
+  private final Queue<Client> clients      = new ConcurrentLinkedQueue<>();
+
+  private final AtomicBoolean ready   = new AtomicBoolean(false);
+  private final AtomicBoolean exiting = new AtomicBoolean(false);
+
   //////////////////////////////////////////////////////////////////////////////
   //
-  // User prefs
+  // Server
   //
   //////////////////////////////////////////////////////////////////////////////
 
-  private static final String   DEFAULT_HOST          = "semiprime.servebeer.com";
-  private static final int      DEFAULT_PORT          = 12288;
-  private static final TimeUnit SHUTDOWN_TIMEOUT_UNIT = TimeUnit.MILLISECONDS;
-  private static final long     SHUTDOWN_TIMEOUT      = 5000;
-
-  private final ServerSocket serverSocket;
-  private final Queue<Client> clientSockets = new ConcurrentLinkedQueue<>();
-  private final Thread        serverThread  = new Thread(new ServerThread());
-
-  private final AtomicBoolean isReady   = new AtomicBoolean(false);
-  private final AtomicBoolean isExiting = new AtomicBoolean(false);
-
-  /**
-   * Initializes the socket server to receive incoming client connections.
-   * @param port
-   * @return
-   */
-  public Server(int port) throws NullPointerException
+  public Server() { this(DEFAULT_PORT); }
+  public Server(int port)
   {
     Log.d("launching new socket server...");
     try
     {
-      serverSocket = new ServerSocket(port, Integer.MAX_VALUE);
+      socket = new ServerSocket(port, Integer.MAX_VALUE);
       serverThread.start();
     }
     catch (Throwable t) { Log.e(t); throw new NullPointerException(t.getMessage()); }
   }
-  public Server() throws NullPointerException { this(DEFAULT_PORT); }
+
+  public ServerSocket socket() { return socket; }
+  public boolean ready() { return ready.get(); }
+  public boolean exiting() { return exiting.get(); }
 
   /**
    * Closes all client connections and exits the server.
    */
   public void destroy()
   {
-    if (!isExiting.compareAndSet(false,true)) return;
+    if (!exiting.compareAndSet(false,true)) return;
 
     Log.d("shutting down the server socket...");
 
-    try { serverSocket.close(); }
+    try { socket.close(); }
     catch (Throwable t) { Log.e(t); }
 
-    try { serverThread.join(SHUTDOWN_TIMEOUT_UNIT.toMillis(SHUTDOWN_TIMEOUT)); }
+    try { serverThread.join(shutdownTimeUnit.toMillis(shutdownTimeout)); }
     catch (Throwable t)
     {
       Log.e(t);
-      try { serverSocket.close(); }
+      try { socket.close(); }
       catch (Throwable t2) { Log.e(t2); }
     }
 
     Log.d("socket server shutdown");
   }
 
+  //////////////////////////////////////////////////////////////////////////////
+  //
+  // Helper classes
+  //
+  //////////////////////////////////////////////////////////////////////////////
+
+
   /**
    * Handles incoming client connections.
    */
   private class ServerThread implements Runnable
   {
-    @Override
-    public void run()
+    @Override public void run()
     {
-      if (!isReady.compareAndSet(false,true)) return;
+      if (!ready.compareAndSet(false,true)) return;
       Log.d("server thread launched and waiting for connections");
 
       try
       {
-        while (!isExiting.get() && !Thread.interrupted())
+        while (!exiting() && !Thread.interrupted())
         {
-          clientSockets.add(new Client(serverSocket.accept()));
+          clients.add(new Client(socket.accept()));
         }
       }
-      catch (Throwable t) { if (!isExiting.get()) Log.e(t); }
+      catch (Throwable t) { if (!exiting()) Log.e(t); }
 
       try
       {
-        final Iterator<Client> iterator = clientSockets.iterator();
+        final Iterator<Client> iterator = clients.iterator();
         if (iterator.hasNext()) Log.d("closing all client connections...");
         while (iterator.hasNext()) { iterator.next().close(); iterator.remove(); }
       }
       catch (Throwable t) { Log.e(t); }
 
-      isReady.set(false);
+      ready.set(false);
       Log.d("server socket closed");
     }
   }
 
   public static void main(String[] args)
   {
-    new ServerGui();
-    new BinaryFactor("8605230192532870349").factor();
-    /*
-    try
-    {
-      //while (!server.isReady) { try { Thread.sleep(250); } catch (Throwable t) { Log.e(t); } }
-      //try { new Client(); } catch (Throwable t) { Log.e(t); }
-      //try { Thread.sleep(250); } catch (Throwable t) { Log.e(t); }
-    }
-    catch (Throwable t) { Log.e(t); }
-    */
+    final String semiprime10 = (1103 * 1103) + ""; //"8605230192532870349";
+    final BigInteger semiprime = new BigInteger(semiprime10);
+    final Solver solver = Solver.newInstance(semiprime10);
+    if (null == solver) { Log.e("failed to create the solver task for semiprime:\n" + semiprime10); System.exit(1); }
+
+    solver.processors(4);
+    //solver.primeLen1(semiprime.toString(2).length()/2);
+    //solver.primeLen2(semiprime.toString(2).length()/2);
+    solver.callback(n -> {
+        if (null == n) { Log.d("no factors were found, are you sure the input is semiprime?"); return; }
+        Log.d("\nfactors found: " +
+            "\n\tsp10: " + semiprime.toString(10) + " / sp2: " + semiprime.toString(2) +
+            "\n\tp10: " + n.p(0, 10) + " / p2: " + n.p(0, 2) +
+            "\n\tq10: " + n.p(1, 10) + " / q2: " + n.p(1, 2));
+    });
+
+    solver.run();
+
+//    final Server server = new Server();
+//    final ServerGui serverGui = new ServerGui(server);
+//    try
+//    {
+//      while (!server.ready()) { try { Thread.sleep(250); } catch (Throwable t) { Log.e(t); } }
+//      try { new Client(); } catch (Throwable t) { Log.e(t); }
+//      try { Thread.sleep(250); } catch (Throwable t) { Log.e(t); }
+//    }
+//    catch (Throwable t) { Log.e(t); }
+
   }
 }

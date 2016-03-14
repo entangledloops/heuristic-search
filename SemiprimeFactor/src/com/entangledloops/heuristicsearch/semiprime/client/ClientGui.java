@@ -57,14 +57,14 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private Preferences prefs;
 
-  private static final String WIDTH_NAME       = "width";
-  private static final String HEIGHT_NAME      = "height";
-  private static final String PROCESSORS_NAME  = "processors";
-  private static final String CAP_NAME         = "name";
-  private static final String MEMORY_NAME      = "memory";
-  private static final String IDLE_NAME        = "idle";
-  private static final String WORK_ALWAYS_NAME = "workAlways";
-  private static final String AUTOSTART_NAME   = "autostart";
+  private static final String WIDTH_NAME      = "width";
+  private static final String HEIGHT_NAME     = "height";
+  private static final String PROCESSORS_NAME = "processors";
+  private static final String CAP_NAME        = "name";
+  private static final String MEMORY_NAME     = "memory";
+  private static final String IDLE_NAME       = "idle";
+  private static final String BACKGROUND_NAME = "background";
+  private static final String AUTOSTART_NAME  = "autostart";
 
   private static final int DEFAULT_PROCESSORS = Runtime.getRuntime().availableProcessors();
   private static final int DEFAULT_WIDTH      = 800;
@@ -97,7 +97,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private TrayIcon            trayIcon;
   private JTextArea           txtHistory;
   private JFormattedTextField txtPort;
-  private JCheckBox           chkAlwaysWork;
+  private JCheckBox           chkBackground;
   private JCheckBox           chkAutoStart;
   private JButton             btnConnect;
   private JButton             btnUpdate;
@@ -245,7 +245,7 @@ public class ClientGui extends JFrame implements DocumentListener
     btnConnect.setFocusPainted(false);
     btnConnect.addActionListener(e ->
     {
-      if (isConnecting.compareAndSet(false, true)) connectEvent();
+      if (isConnecting.compareAndSet(false, true)) connect();
     });
 
     btnUpdate = new JButton("Update");
@@ -405,6 +405,7 @@ public class ClientGui extends JFrame implements DocumentListener
     {
       if (sldProcessors.getValueIsAdjusting()) return;
       int val = sldProcessors.getValue();
+
       Log.d("processor cap adjusted: " + val);
     });
 
@@ -477,19 +478,19 @@ public class ClientGui extends JFrame implements DocumentListener
     final JPanel pnlCpuRight = new JPanel(new GridLayout(7, 1, H_GAP, V_GAP));
 
     // setup connect button and "always work" checkbox
-    chkAlwaysWork = new JCheckBox("Always work, even when I'm not idle.", prefs.getBoolean("workAlways", DEFAULT_WORK_ALWAYS));
-    chkAlwaysWork.setHorizontalAlignment(SwingConstants.CENTER);
-    chkAlwaysWork.setFocusPainted(false);
-    chkAlwaysWork.addActionListener(l -> Log.d("always work: " + (chkAlwaysWork.isSelected() ? "yes" : "no")));
+    chkBackground = new JCheckBox("Work in background", prefs.getBoolean(BACKGROUND_NAME, DEFAULT_WORK_ALWAYS));
+    chkBackground.setHorizontalAlignment(SwingConstants.CENTER);
+    chkBackground.setFocusPainted(false);
+    chkBackground.addActionListener(l -> { client().factor().background(chkBackground.isSelected()); Log.d("background: " + (client().factor().background() ? "yes" : "no")); });
 
     // auto start with system?
-    chkAutoStart = new JCheckBox("Auto-start with system.", prefs.getBoolean("autostart", DEFAULT_AUTOSTART));
+    chkAutoStart = new JCheckBox("Auto-start with system.", prefs.getBoolean(AUTOSTART_NAME, DEFAULT_AUTOSTART));
     chkAutoStart.setHorizontalAlignment(SwingConstants.CENTER);
     chkAutoStart.setFocusPainted(false);
     chkAutoStart.addActionListener(l -> Log.d("autostart: " + (chkAutoStart.isSelected() ? "yes" : "no")));
 
     final JPanel pnlChkBoxes = new JPanel(new GridLayout(2, 1, H_GAP, V_GAP));
-    pnlChkBoxes.add(chkAlwaysWork);
+    pnlChkBoxes.add(chkBackground);
     pnlChkBoxes.add(chkAutoStart);
 
     pnlCpuRight.add(lblMemory);
@@ -613,7 +614,7 @@ public class ClientGui extends JFrame implements DocumentListener
         "max memory: ~" + formatter.format(maxMemory) + " (Gb)\n" +
         "free memory / total memory: " + formatter.format(100.0*(freeMemory/totalMemory)) + "%\n" +
         "total memory / max memory: " + formatter.format(100.0*(totalMemory/maxMemory)) + "%\n" +
-        "always work: " + chkAlwaysWork.isSelected() +
+        "always work: " + chkBackground.isSelected() +
         "autostart: " + chkAutoStart.isSelected() +
         "available processors: " + processors
     );
@@ -621,8 +622,12 @@ public class ClientGui extends JFrame implements DocumentListener
     return true;
   }
 
-  private void updateNetworkGuiComponents()
+  public Client client() { return client.get(); }
+
+  private void updateNetworkComponents() { updateNetworkComponents(null); }
+  private void updateNetworkComponents(Packet p)
   {
+    if (null != p) return;
     final Client c = client.get();
     if (isConnecting.get())
     {
@@ -644,6 +649,8 @@ public class ClientGui extends JFrame implements DocumentListener
     }
   }
 
+  private boolean autostart() { return chkAutoStart.isSelected(); }
+
   private void pause()
   {
     Log.d("pausing all work...");
@@ -658,7 +665,7 @@ public class ClientGui extends JFrame implements DocumentListener
     Log.d("all work resumed");
   }
 
-  private void connectEvent()
+  private void connect()
   {
     new Thread(() ->
     {
@@ -673,7 +680,7 @@ public class ClientGui extends JFrame implements DocumentListener
         }
 
         isConnecting.set(true);
-        updateNetworkGuiComponents();
+        updateNetworkComponents();
 
         final String address = txtAddress.getText().trim();
         if ("".equals(address))
@@ -696,7 +703,7 @@ public class ClientGui extends JFrame implements DocumentListener
           throw new NumberFormatException("invalid port");
         }
 
-        final Client c = new Client(address, port, this::updateNetworkGuiComponents);
+        final Client c = new Client(address, port, this::updateNetworkComponents);
         client.set(c);
 
         sendSettings();
@@ -714,23 +721,26 @@ public class ClientGui extends JFrame implements DocumentListener
       finally
       {
         isConnecting.set(false);
-        updateNetworkGuiComponents();
+        updateNetworkComponents();
       }
     }).start();
   }
 
   private void sendSettings()
   {
-    final Client c = client.get();
-    if (null == c || !c.connected()) { Log.e("you need to be connected before updating"); return; }
-    if (!isUpdatePending.compareAndSet(false, true)) { Log.e("already working on an update, hang tight..."); return; }
+    Log.d("sending user settings to the server...");
 
+    // ensure a client exists
+    final Client client = client();
+    if (null == client || !client.connected()) { Log.e("you need to be connected before updating"); return; }
+
+    // ensure we aren't overlapping w/another thread
+    if (!isUpdatePending.compareAndSet(false, true)) { Log.e("already working on an update, hang tight..."); return; }
     btnUpdate.setEnabled(false);
     txtUsername.setEnabled(false);
     txtEmail.setEnabled(false);
-    Log.d("sending user settings to the server...");
 
-    // grab the info from the connect boxes
+    // grab the info from the connect boxes and clean it up
     String username = txtUsername.getText().trim();
     if ("".equals(username)) username = System.getProperty("user.name");
     txtUsername.setText(username);
@@ -739,17 +749,17 @@ public class ClientGui extends JFrame implements DocumentListener
     if ("".equals(email)) email = DEFAULT_EMAIL;
     txtEmail.setText(email);
 
-    c.setUsername(username);
-    if (!c.sendPacket(Packet.USERNAME_UPDATE)) { Log.e("failed to send username, try reconnecting"); return; }
-    c.setEmail(email);
-    if (!c.sendPacket(Packet.EMAIL_UPDATE)) { Log.e("failed to send email, try reconnecting"); return; }
+    // attempt to send each piece of client info to the server
+    client.setUsername(username); if (!client.sendPacket(Packet.USERNAME_UPDATE)) { Log.e("failed to send username, try reconnecting"); return; }
+    client.setEmail(email); if (!client.sendPacket(Packet.EMAIL_UPDATE)) { Log.e("failed to send email, try reconnecting"); return; }
 
+    // if all went all, update our state
     txtEmail.setEnabled(true);
     txtUsername.setEnabled(true);
     btnUpdate.setEnabled(true);
-    Log.d("the server has acknowledged your settings");
-
     isUpdatePending.set(false);
+
+    Log.d("the server has acknowledged your settings");
   }
 
   private void saveCpuSettings()
@@ -758,7 +768,7 @@ public class ClientGui extends JFrame implements DocumentListener
     prefs.putInt(CAP_NAME, sldCap.getValue());
     prefs.putInt(MEMORY_NAME, sldMemory.getValue());
     prefs.putInt(IDLE_NAME, sldIdle.getValue());
-    prefs.putBoolean(WORK_ALWAYS_NAME, chkAlwaysWork.isSelected());
+    prefs.putBoolean(BACKGROUND_NAME, chkBackground.isSelected());
     prefs.putBoolean(AUTOSTART_NAME, chkAutoStart.isSelected());
     Log.d("CPU settings saved");
   }
@@ -783,7 +793,7 @@ public class ClientGui extends JFrame implements DocumentListener
     sldCap.setValue(prefs.getInt(CAP_NAME, DEFAULT_CAP));
     sldMemory.setValue(prefs.getInt(MEMORY_NAME, DEFAULT_MEMORY));
     sldIdle.setValue(prefs.getInt(IDLE_NAME, DEFAULT_IDLE));
-    chkAlwaysWork.setSelected(prefs.getBoolean(WORK_ALWAYS_NAME, DEFAULT_WORK_ALWAYS));
+    chkBackground.setSelected(prefs.getBoolean(BACKGROUND_NAME, DEFAULT_WORK_ALWAYS));
     chkAutoStart.setSelected(prefs.getBoolean(AUTOSTART_NAME, DEFAULT_AUTOSTART));
     Log.d("CPU settings loaded");
   }
@@ -808,7 +818,7 @@ public class ClientGui extends JFrame implements DocumentListener
     sldCap.setValue(DEFAULT_CAP);
     sldMemory.setValue(DEFAULT_MEMORY);
     sldIdle.setValue(DEFAULT_IDLE);
-    chkAlwaysWork.setSelected(DEFAULT_WORK_ALWAYS);
+    chkBackground.setSelected(DEFAULT_WORK_ALWAYS);
     chkAutoStart.setSelected(DEFAULT_AUTOSTART);
     Log.d("CPU settings reset");
   }

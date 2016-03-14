@@ -10,23 +10,25 @@ import java.util.function.Consumer;
 public class Log
 {
   private static final ReentrantLock    outputLock     = new ReentrantLock(true);
-  private static       Consumer<String> outputFunction = null;
+  private static       Consumer<String> outputCallback = null;
 
-  public static void init(Consumer<String> outputFunction)
+  public static void init(Consumer<String> outputCallback)
   {
-    Utils.lockAndRun(outputLock, () -> Log.outputFunction = outputFunction);
+    Log.outputCallback = outputCallback;
   }
 
-  public static void d(final String msg)
+  public static void d(final String s)
   {
-    System.out.println(msg);
-    Utils.lockAndRun(outputLock, () -> outputFunction.accept(msg));
+    if (null != s) System.out.println(s); else e(null, null);
+    if (null != outputCallback) Utils.lockAndRun(outputLock, () -> outputCallback.accept(s));
   }
 
-  public static void e(final String msg, final Throwable t)
+  public static void e(final String s, final Throwable t)
   {
-    if (null != msg) { System.err.println(msg); Utils.lockAndRun(outputLock, () -> outputFunction.accept(msg)); }
-    if (null != t) { System.err.println(t.getMessage()); t.printStackTrace(); }
+    final String msg = (null != s && s.trim().length() > 0 ? s.trim() : "") + (null != t ? t.getMessage() : "");
+    System.err.println(!"".equals(msg) ? msg : "empty error reported");
+    if (null != t) t.printStackTrace();
+    Utils.lockAndRun(outputLock, () -> outputCallback.accept(msg));
   }
   public static void e(final String msg) { e(msg, null); }
   public static void e(final Throwable t) { e(null, t); }
