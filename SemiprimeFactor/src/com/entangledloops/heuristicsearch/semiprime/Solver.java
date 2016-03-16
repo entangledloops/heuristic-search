@@ -93,10 +93,10 @@ public class Solver implements Runnable, Serializable
   }
 
   @Override public String toString() { return semiprimeString10; }
-  public String toString(int base) { return 10 == base ? semiprimeString10 : internalBase.get() == base ? semiprimeStringInternal : semiprime.toString(base); }
+  public String toString(int base) { return 10 == base ? semiprimeString10 : internalBase() == base ? semiprimeStringInternal : semiprime.toString(base); }
 
   public int length() { return semiprimeLen10; }
-  public int length(int base) { return 10 == base ? semiprimeLen10 : internalBase.get() == base ? semiprimeLenInternal : semiprime.toString(base).length(); }
+  public int length(int base) { return 10 == base ? semiprimeLen10 : internalBase() == base ? semiprimeLenInternal : semiprime.toString(base).length(); }
 
   public void primeLen1(int len) { if (len < 1) Log.e("invalid len: " + len); else primeLen1 = len; primeLengthsKnown.set(0 != primeLen1 && 0 != primeLen2); }
   public void primeLen2(int len) { if (len < 1) Log.e("invalid len: " + len); else primeLen2 = len; primeLengthsKnown.set(0 != primeLen1 && 0 != primeLen2); }
@@ -180,11 +180,7 @@ public class Solver implements Runnable, Serializable
    */
   private boolean push(Node n)
   {
-    try
-    {
-      if (null != opened.putIfAbsent(n.toString(), n) || !open.offer(n)) regenerated();
-      return true;
-    }
+    try { if (null != opened.putIfAbsent(n.toString(), n) || !open.offer(n)) regenerated(); return true; }
     catch (Throwable t) { Log.e(t); return false; }
   }
 
@@ -208,41 +204,38 @@ public class Solver implements Runnable, Serializable
    */
   private boolean expand(final Node n)
   {
-    // check if we found the goal already or this node is the goal
-    if (goal(n)) return false; else expanded();
     if (printAllNodes()) Log.d("expanding: " + n.product.toString(10) + "(10) / " + n.product.toString(internalBase.get()) + "(" + internalBase + ") : [" + n.toString() + ":" + n.h + "]");
 
+    // check if we found the goal already or this node is the goal
+    if (goal(n)) return false; else expanded();
+
     // cache some vars
-    final int internalBase = internalBase();
     final String p1 = n.p(0, 2), p2 = n.p(1, 2);
 
     // ensure we should bother w/this node at all
     if (n.product.compareTo(semiprime) > 0 || p1.length() >= semiprimeBinaryLen || p2.length() >= semiprimeBinaryLen) return true;
 
     // generate all node combinations
-    try
+    final int internalBase = internalBase();
+    for (int i = 0; i < internalBase; ++i)
     {
-      for (int i = 0; i < internalBase; ++i)
+      for (int j = 0; j < internalBase; ++j)
       {
-        for (int j = 0; j < internalBase; ++j)
-        {
-          // generate value and hash of new candidate child
-          final String np1 = i + p1, np2 = j + p2;
-          final String key = Node.hash(np1, np2);
-          if (null != closed.get(key) || null != opened.get(key)) continue;
+        // generate value and hash of new candidate child
+        final String np1 = i + p1, np2 = j + p2;
+        final String key = Node.hash(np1, np2);
+        if (null != closed.get(key) || null != opened.get(key)) continue;
 
-          // prevents the same nodes from occurring w/children in reverse order
-          final String keyAlt = Node.hash(np2, np1);
-          if (null != closed.get(keyAlt) || null != opened.get(keyAlt)) continue;
+        // prevents the same nodes from occurring w/children in reverse order
+        final String keyAlt = Node.hash(np2, np1);
+        if (null != closed.get(keyAlt) || null != opened.get(keyAlt)) continue;
 
-          // try to push the new child
-          Node generated = new Node(key, np1, np2); generated();
-          if (!push(generated)) return false;
-          if (printAllNodes()) Log.d("generated1: " + generated.product.toString(10) + "(10) / " + generated.product.toString(internalBase) + "(" + internalBase + ") : [" + generated.toString() + ":" + generated.h + "]");
-        }
+        // try to push the new child
+        Node generated = new Node(key, np1, np2); generated();
+        if (!push(generated)) return false;
+        if (printAllNodes()) Log.d("generated1: " + generated.product.toString(10) + "(10) / " + generated.product.toString(internalBase) + "(" + internalBase + ") : [" + generated.toString() + ":" + generated.h + "]");
       }
     }
-    catch (Throwable t) { Log.e(t); return false; }
 
     // push all generated nodes simultaneously as an array
     return true;
