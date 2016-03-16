@@ -48,8 +48,8 @@ public class Solver implements Runnable, Serializable
   // the shared work completed or pending
   private static final AtomicReference<Consumer<Node>> callback = new AtomicReference<>(); ///< a function to receive the goal node (or null) upon completion
   private static final AtomicReference<Node>           goal     = new AtomicReference<>(); ///< set if/when goal is found; if set, search will end
-  private static final PriorityBlockingQueue<Node>     openHeap = new PriorityBlockingQueue<>(); ///< unbounded queue backed by heap for fast pop() behavior w/o sorting
-  private static final ConcurrentHashMap<String, Node> open     = new ConcurrentHashMap<>(); ///< the open hash table for faster lookup times
+  private static final PriorityBlockingQueue<Node>     open     = new PriorityBlockingQueue<>(); ///< unbounded queue backed by heap for fast pop() behavior w/o sorting
+  private static final ConcurrentHashMap<String, Node> opened   = new ConcurrentHashMap<>(); ///< the opened hash table for faster lookup times
   private static final ConcurrentHashMap<String, Node> closed   = new ConcurrentHashMap<>(); ///< closed hash table
 
   // some stats tracking
@@ -146,7 +146,7 @@ public class Solver implements Runnable, Serializable
             (0 != primeLen1 && n.p(0, 2).length() != primeLen1) ||
             (0 != primeLen2 && n.p(1, 2).length() != primeLen2)
         ))
-        ? null != goal() : (semiprime.equals(n.product) && goal.compareAndSet(null, n)) || null != goal();
+        ? null != goal() : (semiprime.equals(n.product) && n.validFactors() && goal.compareAndSet(null, n)) || null != goal();
   }
 
   @SuppressWarnings("StatementWithEmptyBody")
@@ -184,22 +184,22 @@ public class Solver implements Runnable, Serializable
     {
       if (n.product.compareTo(semiprime) > 0) { close(n); return true; }
       if (goal(n)) return false;
-      if (null != open.putIfAbsent(n.toString(), n)) { regenerated(); return true; }
+      if (null != opened.putIfAbsent(n.toString(), n)) { regenerated(); return true; }
       generated();
-      return openHeap.offer(n);
+      return open.offer(n);
     }
     catch (Throwable t) { Log.e(t); return false; }
   }
 
   /**
-   * pop available node of open
+   * pop available node of opened
    * @return the next available node or null if goal was found
    */
   @SuppressWarnings("StatementWithEmptyBody")
   private Node pop()
   {
     Node node;
-    try { while (null == (node = close(openHeap.poll(checkForWorkTimeout, checkForWorkTimeUnit)))) if (null != goal()) return null; }
+    try { while (null == (node = close(open.poll(checkForWorkTimeout, checkForWorkTimeUnit)))) if (null != goal()) return null; }
     catch (Throwable t) { Log.e("worker thread interrupted, terminating", t); return null; }
     return node;
   }
@@ -231,7 +231,7 @@ public class Solver implements Runnable, Serializable
         for (int j = 0; j < internalBase; ++j)
         {
           String np1 = i + p1, np2 = j + p2, key = Node.hash(np1, np2);
-          if (null != closed.get(key) || null != open.get(key)) continue;
+          if (null != closed.get(key) || null != opened.get(key)) continue;
 
           // try to push the new child
           Node generated = new Node(key, np1, np2);
@@ -243,7 +243,7 @@ public class Solver implements Runnable, Serializable
 
           // may to generate a new branch
           np1 = j + p1; np2 = i + p2; key = Node.hash(np1, np2);
-          if (null != closed.get(key) || null != open.get(key)) continue;
+          if (null != closed.get(key) || null != opened.get(key)) continue;
 
           // add the new branch
           generated = new Node(key, np1, np2);
@@ -300,10 +300,10 @@ public class Solver implements Runnable, Serializable
 
     // if no nodes were provided from elsewhere, we'll start at the beginning by
     // constructing a root node to begin search on in the requested internal base
-    if (open.isEmpty())
+    if (opened.isEmpty())
     {
       Log.d("no previous work available, branching cleanly from a new root");
-      push(new Node(new String[] {"01", "11"})); // safe to assume these are valid first 2 semiprime roots
+      push(new Node(new String[] {"1", "1"})); // safe to assume these are valid first 2 semiprime roots
     }
 
     // inform user of contract-bound search parameters
@@ -342,7 +342,10 @@ public class Solver implements Runnable, Serializable
     }
 
     // print final stats after all work is done
-    Log.d("\nfinal stats:" + stats(elapsed()));
+    Log.d("\nfinal stats:" + stats(elapsed()) +
+            "\n\topened.size(): " + opened.size() +
+            "\n\topened.size(): " + opened.size() +
+            "\n\tclosed.size(): " + closed.size());
 
     // notify waiters that we've completed factoring
     final Consumer<Node> callback = Solver.callback.get();

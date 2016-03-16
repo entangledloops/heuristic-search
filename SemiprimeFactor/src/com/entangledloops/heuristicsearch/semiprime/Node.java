@@ -48,6 +48,12 @@ public class Node implements Serializable, Comparable
   @Override public boolean equals(Object o) { return o instanceof Node && ((Node) o).key.equals(key); }
   @Override public int compareTo(Object o) { return Double.compare(h, Node.class.cast(o).h); }
 
+  public boolean validFactors()
+  {
+    for (BigInteger value : values) if (BigInteger.ONE.equals(value)) return false;
+    return true;
+  }
+
   public String p(int i, int base) { return base != Solver.internalBase() ? values[i].toString(base) : p[i]; }
   static String hash(String... p) { return Stream.of(p).reduce("", (p1,p2) -> p1 + ":" + p2); }
 
