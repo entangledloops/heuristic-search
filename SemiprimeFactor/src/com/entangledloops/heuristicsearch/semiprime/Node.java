@@ -48,6 +48,11 @@ public class Node implements Serializable, Comparable
   @Override public boolean equals(Object o) { return o instanceof Node && ((Node) o).key.equals(key); }
   @Override public int compareTo(Object o) { return Double.compare(h, Node.class.cast(o).h); }
 
+  /**
+   * This function ensures that the current partial product resembles the target semiprime
+   * in the currently fixed digit positions.
+   * @return true if everything looks okay
+   */
   boolean validFactors()
   {
     final String productString = product.toString(2);
@@ -57,6 +62,10 @@ public class Node implements Serializable, Comparable
     return pos >= 0 && ((productLen - depth < 0) ? '0' : productString.charAt(productLen - depth)) == Solver.semiprimeBinary.charAt(pos);
   }
 
+  /**
+   * Ensure that none of the factors is trivial.
+   * @return true if the factors look okay
+   */
   boolean goalFactors()
   {
     for (BigInteger value : values) if (BigInteger.ONE.equals(value)) return false;
