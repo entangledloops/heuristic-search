@@ -27,7 +27,7 @@ public class Solver implements Runnable, Serializable
   private static final AtomicBoolean cpuConscious    = new AtomicBoolean(true); ///< if true, will take additional steps to trade memory for more CPU;
   private static final AtomicBoolean memoryConscious = new AtomicBoolean(false); ///< if true, will take additional steps to trade CPU for more memory
   private static final AtomicBoolean background      = new AtomicBoolean(false);
-  private static final AtomicBoolean printAllNodes   = new AtomicBoolean(false); ///< if false, fewer sanity checks are performed on values
+  private static final AtomicBoolean printAllNodes   = new AtomicBoolean(true); ///< if false, fewer sanity checks are performed on values
   private static final AtomicInteger processors      = new AtomicInteger(Runtime.getRuntime().availableProcessors());
   private static final AtomicInteger cap             = new AtomicInteger();
 
@@ -225,30 +225,23 @@ public class Solver implements Runnable, Serializable
     // generate all node combinations
     try
     {
-      final boolean duplicateChildren = p1.equals(p2);
       for (int i = 0; i < internalBase; ++i)
       {
         for (int j = 0; j < internalBase; ++j)
         {
-          String np1 = i + p1, np2 = j + p2, key = Node.hash(np1, np2);
+          // generate value and hash of new candidate child
+          final String np1 = i + p1, np2 = j + p2;
+          final String key = Node.hash(np1, np2);
           if (null != closed.get(key) || null != opened.get(key)) continue;
+
+          // prevents the same nodes from occurring w/children in reverse order
+          final String keyAlt = Node.hash(np2, np1);
+          if (null != closed.get(keyAlt) || null != opened.get(keyAlt)) continue;
 
           // try to push the new child
           Node generated = new Node(key, np1, np2);
           if (!push(generated)) return false;
           if (printAllNodes()) Log.d("generated1: " + generated.product.toString(10) + "(10) / " + generated.product.toString(internalBase) + "(" + internalBase + ") : [" + generated.toString() + ":" + generated.h + "]");
-
-          // quick safe-to-skip check
-          if (duplicateChildren && i == j) continue;
-
-          // may to generate a new branch
-          np1 = j + p1; np2 = i + p2; key = Node.hash(np1, np2);
-          if (null != closed.get(key) || null != opened.get(key)) continue;
-
-          // add the new branch
-          generated = new Node(key, np1, np2);
-          if (!push(generated)) return false;
-          if (printAllNodes()) Log.d("generated2: " + generated.product.toString(10) + "(10) / " + generated.product.toString(internalBase) + "(" + internalBase + ") : [" + generated.toString() + ":" + generated.h + "]");
         }
       }
     }
