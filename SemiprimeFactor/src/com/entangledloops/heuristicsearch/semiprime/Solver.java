@@ -182,11 +182,8 @@ public class Solver implements Runnable, Serializable
   {
     try
     {
-      if (n.product.compareTo(semiprime) > 0) { close(n); return true; }
-      if (goal(n)) return false;
-      if (null != opened.putIfAbsent(n.toString(), n)) { regenerated(); return true; }
-      generated();
-      return open.offer(n);
+      if (null != opened.putIfAbsent(n.toString(), n) || !open.offer(n)) regenerated();
+      return true;
     }
     catch (Throwable t) { Log.e(t); return false; }
   }
@@ -212,7 +209,7 @@ public class Solver implements Runnable, Serializable
   private boolean expand(final Node n)
   {
     // check if we found the goal already or this node is the goal
-    if (null == n) return null == goal(); else expanded();
+    if (goal(n)) return false; else expanded();
     if (printAllNodes()) Log.d("expanding: " + n.product.toString(10) + "(10) / " + n.product.toString(internalBase.get()) + "(" + internalBase + ") : [" + n.toString() + ":" + n.h + "]");
 
     // cache some vars
@@ -220,7 +217,7 @@ public class Solver implements Runnable, Serializable
     final String p1 = n.p(0, 2), p2 = n.p(1, 2);
 
     // ensure we should bother w/this node at all
-    if (p1.length() >= semiprimeBinaryLen || p2.length() >= semiprimeBinaryLen) return true;
+    if (n.product.compareTo(semiprime) > 0 || p1.length() >= semiprimeBinaryLen || p2.length() >= semiprimeBinaryLen) return true;
 
     // generate all node combinations
     try
@@ -239,7 +236,7 @@ public class Solver implements Runnable, Serializable
           if (null != closed.get(keyAlt) || null != opened.get(keyAlt)) continue;
 
           // try to push the new child
-          Node generated = new Node(key, np1, np2);
+          Node generated = new Node(key, np1, np2); generated();
           if (!push(generated)) return false;
           if (printAllNodes()) Log.d("generated1: " + generated.product.toString(10) + "(10) / " + generated.product.toString(internalBase) + "(" + internalBase + ") : [" + generated.toString() + ":" + generated.h + "]");
         }
@@ -336,7 +333,7 @@ public class Solver implements Runnable, Serializable
 
     // print final stats after all work is done
     Log.d("\nfinal stats:" + stats(elapsed()) +
-            "\n\topened.size(): " + opened.size() +
+            "\n\topen.size(): " + open.size() +
             "\n\topened.size(): " + opened.size() +
             "\n\tclosed.size(): " + closed.size());
 
