@@ -117,12 +117,14 @@ public class Server
 
   public static void main(String[] args)
   {
-    final String semiprime10 = ""+(1103*1103); //"8605230192532870349";
+    //"8605230192532870349";
+    //9141272051 = 95617*95603
+    final String semiprime10 = "9141272051";
     final BigInteger semiprime = new BigInteger(semiprime10);
     final Solver solver = Solver.newInstance(semiprime10);
     if (null == solver) { Log.e("failed to create the solver task for semiprime:\n" + semiprime10); System.exit(1); }
 
-    solver.processors(1);
+    //solver.processors(1);
     //solver.primeLen1(semiprime.toString(2).length()/2);
     //solver.primeLen2(semiprime.toString(2).length()/2);
     solver.callback(n -> {
