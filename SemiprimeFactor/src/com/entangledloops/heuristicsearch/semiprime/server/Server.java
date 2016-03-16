@@ -117,7 +117,7 @@ public class Server
 
   public static void main(String[] args)
   {
-    final String semiprime10 = ""+(19*17);//(1103*1103); //"8605230192532870349";
+    final String semiprime10 = ""+(1103*1103); //"8605230192532870349";
     final BigInteger semiprime = new BigInteger(semiprime10);
     final Solver solver = Solver.newInstance(semiprime10);
     if (null == solver) { Log.e("failed to create the solver task for semiprime:\n" + semiprime10); System.exit(1); }

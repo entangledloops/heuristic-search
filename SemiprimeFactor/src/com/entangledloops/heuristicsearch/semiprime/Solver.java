@@ -27,7 +27,7 @@ public class Solver implements Runnable, Serializable
   private static final AtomicBoolean cpuConscious    = new AtomicBoolean(true); ///< if true, will take additional steps to trade memory for more CPU;
   private static final AtomicBoolean memoryConscious = new AtomicBoolean(false); ///< if true, will take additional steps to trade CPU for more memory
   private static final AtomicBoolean background      = new AtomicBoolean(false);
-  private static final AtomicBoolean printAllNodes   = new AtomicBoolean(true); ///< if false, fewer sanity checks are performed on values
+  private static final AtomicBoolean printAllNodes   = new AtomicBoolean(false); ///< if false, fewer sanity checks are performed on values
   private static final AtomicInteger processors      = new AtomicInteger(Runtime.getRuntime().availableProcessors());
   private static final AtomicInteger cap             = new AtomicInteger();
 

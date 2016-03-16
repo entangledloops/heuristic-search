@@ -478,13 +478,13 @@ public class ClientGui extends JFrame implements DocumentListener
     final JPanel pnlCpuRight = new JPanel(new GridLayout(7, 1, H_GAP, V_GAP));
 
     // setup connect button and "always work" checkbox
-    chkBackground = new JCheckBox("Work in background", prefs.getBoolean(BACKGROUND_NAME, DEFAULT_WORK_ALWAYS));
+    chkBackground = new JCheckBox("work in background", prefs.getBoolean(BACKGROUND_NAME, DEFAULT_WORK_ALWAYS));
     chkBackground.setHorizontalAlignment(SwingConstants.CENTER);
     chkBackground.setFocusPainted(false);
     chkBackground.addActionListener(l -> { client().factor().background(chkBackground.isSelected()); Log.d("background: " + (client().factor().background() ? "yes" : "no")); });
 
     // auto start with system?
-    chkAutoStart = new JCheckBox("Auto-start with system.", prefs.getBoolean(AUTOSTART_NAME, DEFAULT_AUTOSTART));
+    chkAutoStart = new JCheckBox("auto-start with system", prefs.getBoolean(AUTOSTART_NAME, DEFAULT_AUTOSTART));
     chkAutoStart.setHorizontalAlignment(SwingConstants.CENTER);
     chkAutoStart.setFocusPainted(false);
     chkAutoStart.addActionListener(l -> Log.d("autostart: " + (chkAutoStart.isSelected() ? "yes" : "no")));

@@ -58,7 +58,7 @@ public class Node implements Serializable, Comparable
   static String hash(String... p) { return Stream.of(p).reduce("", (p1,p2) -> p1 + ":" + p2); }
 
   /**
-   * Calculate the heuristic value from the input strings of partial factors.
+   * This heuristic takes each prime's difference of binary 0s/(0s+1s) from the target and sums.
    * @param p array of strings representing candidate primes
    * @return an estimate of this node's distance to goal, where 0 = goal
    */
@@ -66,10 +66,30 @@ public class Node implements Serializable, Comparable
   {
     if (null == p || 0 == p.length) return Double.POSITIVE_INFINITY;
 
+    double p0sTo1s = 0;
+    for (int i = 0; i < p.length; ++i)
+    {
+      int p0s = 0;
+      for (final char c : p[i].toCharArray()) if ('0' == c) ++p0s;
+      p0sTo1s +=  Math.abs(p0s - Solver.semiprimeBinary0sTo1s);
+    }
+
+    return p0sTo1s;
+  }
+
+  /**
+   * This heuristic sums all prime candidate's 0s and divides the total by (0s+1s),
+   * then returns the difference from the target.
+   * @param p array of strings representing candidate primes
+   * @return an estimate of this node's distance to goal, where 0 = goal
+   */
+  private static double h2(String... p)
+  {
+    if (null == p || 0 == p.length) return Double.POSITIVE_INFINITY;
+
     int[] p0s = new int[p.length];
     for (int i = 0; i < p0s.length; ++i)
     {
-      if (null == p[i]) continue;
       for (final char c : p[i].toCharArray()) if ('0' == c) ++p0s[i];
     }
 
