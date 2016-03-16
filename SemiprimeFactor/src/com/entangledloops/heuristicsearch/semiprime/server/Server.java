@@ -117,9 +117,10 @@ public class Server
 
   public static void main(String[] args)
   {
+    //rsa-220 = "2260138526203405784941654048610197513508038915719776718321197768109445641817966676608593121306582577250631562886676970448070001811149711863002112487928199487482066070131066586646083327982803560379205391980139946496955261";
     //"8605230192532870349";
     //9141272051 = 95617*95603
-    final String semiprime10 = "9141272051";
+    final String semiprime10 = "8605230192532870349";
     final BigInteger semiprime = new BigInteger(semiprime10);
     final Solver solver = Solver.newInstance(semiprime10);
     if (null == solver) { Log.e("failed to create the solver task for semiprime:\n" + semiprime10); System.exit(1); }

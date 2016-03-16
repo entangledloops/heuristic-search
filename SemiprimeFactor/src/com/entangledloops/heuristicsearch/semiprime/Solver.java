@@ -40,10 +40,10 @@ public class Solver implements Runnable, Serializable
 
   // heuristic aids
   static String semiprimeBinary;
+  static int    semiprimeBinaryLen; ///< cached internal len
   static int    semiprimeBinaryCount0; ///< cached internal len
   static int    semiprimeBinaryCount1; ///< cached internal len
   static double semiprimeBinary0sTo1s; ///< cached internal len
-  static double semiprimeBinaryLen; ///< cached internal len
 
   // the shared work completed or pending
   private static final AtomicReference<Consumer<Node>> callback = new AtomicReference<>(); ///< a function to receive the goal node (or null) upon completion
@@ -56,6 +56,7 @@ public class Solver implements Runnable, Serializable
   private static final AtomicReference<Timer>      statsTimer       = new AtomicReference<>();
   private static final AtomicReference<BigInteger> nodesGenerated   = new AtomicReference<>(BigInteger.ZERO);
   private static final AtomicReference<BigInteger> nodesRegenerated = new AtomicReference<>(BigInteger.ZERO);
+  private static final AtomicReference<BigInteger> nodesIgnored = new AtomicReference<>(BigInteger.ZERO);
   private static final AtomicReference<BigInteger> nodesExpanded    = new AtomicReference<>(BigInteger.ZERO);
   private static final AtomicReference<BigInteger> nodesClosed      = new AtomicReference<>(BigInteger.ZERO);
 
@@ -146,7 +147,7 @@ public class Solver implements Runnable, Serializable
             (0 != primeLen1 && n.p(0, 2).length() != primeLen1) ||
             (0 != primeLen2 && n.p(1, 2).length() != primeLen2)
         ))
-        ? null != goal() : (semiprime.equals(n.product) && n.validFactors() && goal.compareAndSet(null, n)) || null != goal();
+        ? null != goal() : (semiprime.equals(n.product) && n.goalFactors() && (goal.compareAndSet(null, n) || null != goal()));
   }
 
   @SuppressWarnings("StatementWithEmptyBody")
@@ -154,6 +155,9 @@ public class Solver implements Runnable, Serializable
 
   @SuppressWarnings("StatementWithEmptyBody")
   private static void regenerated() { while (!nodesRegenerated.compareAndSet(nodesRegenerated.get(), BigInteger.ONE.add(nodesRegenerated.get()))); }
+
+  @SuppressWarnings("StatementWithEmptyBody")
+  private static void ignored() { while (!nodesIgnored.compareAndSet(nodesIgnored.get(), BigInteger.ONE.add(nodesIgnored.get()))); }
 
   @SuppressWarnings("StatementWithEmptyBody")
   private static void expanded() { while (!nodesExpanded.compareAndSet(nodesExpanded.get(), BigInteger.ONE.add(nodesExpanded.get()))); }
@@ -204,6 +208,7 @@ public class Solver implements Runnable, Serializable
    */
   private boolean expand(final Node n)
   {
+    //if (nodesGenerated.get().compareTo(new BigInteger("100")) > 0) System.exit(0);
     if (printAllNodes()) Log.d("expanding: " + n.product.toString(10) + "(10) / " + n.product.toString(internalBase.get()) + "(" + internalBase + ") : [" + n.toString() + ":" + n.h + "]");
 
     // check if we found the goal already or this node is the goal
@@ -232,8 +237,9 @@ public class Solver implements Runnable, Serializable
 
         // try to push the new child
         Node generated = new Node(key, np1, np2); generated();
-        if (!push(generated)) return false;
         if (printAllNodes()) Log.d("generated1: " + generated.product.toString(10) + "(10) / " + generated.product.toString(internalBase) + "(" + internalBase + ") : [" + generated.toString() + ":" + generated.h + "]");
+        if (!generated.validFactors()) { ignored(); close(generated); }
+        else if (!push(generated)) return false;
       }
     }
 
@@ -246,7 +252,7 @@ public class Solver implements Runnable, Serializable
     final long seconds = (elapsedNanos/1000000000L);
     return "\n\telapsed: " + (seconds/60L) + " minutes, " + (seconds%60L) + " seconds" +
        "\n\tnodesGenerated: " + nodesGenerated +
-       "\n\tnodesRegenerated: " + nodesRegenerated +
+       "\n\tnodesIgnored: " + nodesIgnored +
        "\n\tnodesExpanded: " + nodesExpanded +
        "\n\tnodesClosed: " + nodesClosed;
   }

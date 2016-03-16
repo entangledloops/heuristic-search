@@ -48,7 +48,16 @@ public class Node implements Serializable, Comparable
   @Override public boolean equals(Object o) { return o instanceof Node && ((Node) o).key.equals(key); }
   @Override public int compareTo(Object o) { return Double.compare(h, Node.class.cast(o).h); }
 
-  public boolean validFactors()
+  boolean validFactors()
+  {
+    final String productString = product.toString(2);
+    final int productLen = productString.length();
+    final int depth = p[0].length();
+    final int pos = (Solver.semiprimeBinaryLen - (depth+1)) + 1;
+    return pos >= 0 && ((productLen - depth < 0) ? '0' : productString.charAt(productLen - depth)) == Solver.semiprimeBinary.charAt(pos);
+  }
+
+  boolean goalFactors()
   {
     for (BigInteger value : values) if (BigInteger.ONE.equals(value)) return false;
     return true;
