@@ -2,6 +2,7 @@ package com.entangledloops.heuristicsearch.semiprime.client;
 
 import com.entangledloops.heuristicsearch.semiprime.Log;
 import com.entangledloops.heuristicsearch.semiprime.Packet;
+import com.entangledloops.heuristicsearch.semiprime.Solver;
 import com.entangledloops.heuristicsearch.semiprime.Utils;
 
 import javax.imageio.ImageIO;
@@ -17,6 +18,7 @@ import java.awt.event.WindowEvent;
 import java.net.URI;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -30,7 +32,7 @@ public class ClientGui extends JFrame implements DocumentListener
 {
   //////////////////////////////////////////////////////////////////////////////
   //
-  // Constants
+  // constants
   //
   //////////////////////////////////////////////////////////////////////////////
 
@@ -50,21 +52,31 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final String OS               = System.getProperty("os.name");
 
   //////////////////////////////////////////////////////////////////////////////
-  //
-  // User prefs
-  //
-  //////////////////////////////////////////////////////////////////////////////
+  // user prefs
 
   private Preferences prefs;
 
-  private static final String WIDTH_NAME      = "width";
-  private static final String HEIGHT_NAME     = "height";
-  private static final String PROCESSORS_NAME = "processors";
-  private static final String CAP_NAME        = "name";
-  private static final String MEMORY_NAME     = "memory";
-  private static final String IDLE_NAME       = "idle";
-  private static final String BACKGROUND_NAME = "background";
-  private static final String AUTOSTART_NAME  = "autostart";
+  private static final String WIDTH_NAME            = "width";
+  private static final String HEIGHT_NAME           = "height";
+  private static final String PROCESSORS_NAME       = "processors";
+  private static final String CAP_NAME              = "name";
+  private static final String MEMORY_NAME           = "memory";
+  private static final String IDLE_NAME             = "idle";
+  private static final String BACKGROUND_NAME       = "background";
+  private static final String AUTOSTART_NAME        = "start search immediately";
+  private static final String SEMIPRIME_NAME        = "semiprime";
+  private static final String SAFETY_CONSCIOUS_NAME = "safety conscious";
+  private static final String CPU_CONSCIOUS_NAME    = "cpu conscious";
+  private static final String MEMORY_CONSCIOUS_NAME = "memory conscious";
+  private static final String PRINT_ALL_NODES_NAME  = "print all nodes";
+  private static final String WRITE_CSV_NAME        = "write nodes csv";
+
+  private static final int TAB_CONNECT  = 0;
+  private static final int TAB_SEARCH   = 1;
+  private static final int TAB_CPU      = 2;
+  private static final int TAB_SETTINGS = 3;
+  private static final int HISTORY_ROWS = 5;
+  private static final int HISTORY_COLS = 20;
 
   private static final int DEFAULT_PROCESSORS = Runtime.getRuntime().availableProcessors();
   private static final int DEFAULT_WIDTH      = 800;
@@ -73,41 +85,54 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final int DEFAULT_MEMORY     = 100;
   private static final int DEFAULT_IDLE       = 5;
   private static final int DEFAULT_PORT       = 12288;
-  private static final int HISTORY_ROWS       = 5;
-  private static final int HISTORY_COLS       = 20;
 
-  private static final boolean DEFAULT_WORK_ALWAYS = false;
-  private static final boolean DEFAULT_AUTOSTART   = false;
+  private static final boolean DEFAULT_WORK_ALWAYS      = false;
+  private static final boolean DEFAULT_AUTOSTART        = false;
+  private static final boolean DEFAULT_SAFETY_CONSCIOUS = Solver.safetyConscious();
+  private static final boolean DEFAULT_CPU_CONSCIOUS    = Solver.cpuConscious();
+  private static final boolean DEFAULT_MEMORY_CONSCIOUS = Solver.memoryConscious();
+  private static final boolean DEFAULT_PRINT_ALL_NODES  = Solver.printAllNodes();
+  private static final boolean DEFAULT_WRITE_CSV        = Solver.writeCsv();
 
   //////////////////////////////////////////////////////////////////////////////
-  //
-  // Gui vars
-  //
-  //////////////////////////////////////////////////////////////////////////////
+  // gui
 
   private static final int H_GAP = 10;
   private static final int V_GAP = 10;
 
-  private ImageIcon icnNode, icnNodeSmall, icnCpu, icnNet, icnSettings;
-  private JSlider sldProcessors, sldCap, sldMemory, sldIdle;
+  // global
+  private JTabbedPane         pneMain;
+  private ImageIcon           icnNode, icnNodeSmall, icnCpu, icnNet, icnSettings;
+  private SystemTray          systemTray;
+  private TrayIcon            trayIcon;
+
+  // connect tab
   private JTextField          txtUsername;
   private JTextField          txtEmail;
   private JTextField          txtAddress;
-  private SystemTray          systemTray;
-  private TrayIcon            trayIcon;
   private JTextArea           txtHistory;
   private JFormattedTextField txtPort;
-  private JCheckBox           chkBackground;
-  private JCheckBox           chkAutoStart;
   private JButton             btnConnect;
   private JButton             btnUpdate;
 
-  //////////////////////////////////////////////////////////////////////////////
-  //
-  // State vars
-  //
-  //////////////////////////////////////////////////////////////////////////////
+  // cpu tab
+  private JSlider             sldProcessors, sldCap, sldMemory, sldIdle;
+  private JCheckBox           chkBackground;
+  private JCheckBox           chkAutoStart;
 
+  // node tab
+  private JCheckBox chkSafetyConscious;
+  private JCheckBox chkCpuConscious;
+  private JCheckBox chkMemoryConscious;
+  private JCheckBox chkPrintAllNodes;
+  private JCheckBox chkWriteCsv;
+  private JTextArea txtSemiprime;
+  private JButton   btnLocalSearch;
+
+  //////////////////////////////////////////////////////////////////////////////
+  // state
+
+  private final AtomicReference<Thread> solver          = new AtomicReference<>();
   private final AtomicReference<Client> client          = new AtomicReference<>(null);
   private final AtomicBoolean           isConnecting    = new AtomicBoolean(false);
   private final AtomicBoolean           isUpdatePending = new AtomicBoolean(false);
@@ -161,8 +186,12 @@ public class ClientGui extends JFrame implements DocumentListener
   private boolean create()
   {
     ////////////////////////////////////////////////////////////////////////////
+    // attempt to locate stored user settings for loading at end of init
+
+    prefs = Preferences.userNodeForPackage(getClass());
+
     ////////////////////////////////////////////////////////////////////////////
-    // Connection tab
+    // connect tab
 
     // gather basic info about this device
     final double toGb = 1024.0 * 1024.0 * 1024.0;
@@ -277,7 +306,6 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlNet.add(pnlConnect);
 
     ////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////
     // setup the icons and menus
     try
     {
@@ -380,18 +408,72 @@ public class ClientGui extends JFrame implements DocumentListener
     setJMenuBar(mnuBar);
 
     ////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////
-    // Node tab
-    final JPanel pnlNode = new JPanel(new GridLayout(1, 1));
+    // search tab
+
+    final JPanel pnlSearch = new JPanel(new GridLayout(3, 1));
+
+    final JPanel pnlOptions = new JPanel(new GridLayout(2, 3));
+
+    chkSafetyConscious = new JCheckBox(SAFETY_CONSCIOUS_NAME, DEFAULT_SAFETY_CONSCIOUS);
+    chkSafetyConscious.addActionListener((e) -> Solver.safetyConscious(chkSafetyConscious.isSelected()));
+
+    chkCpuConscious = new JCheckBox(CPU_CONSCIOUS_NAME, DEFAULT_CPU_CONSCIOUS);
+    chkCpuConscious.addActionListener((e) -> Solver.cpuConscious(chkCpuConscious.isSelected()));
+
+    chkMemoryConscious = new JCheckBox(MEMORY_CONSCIOUS_NAME, DEFAULT_MEMORY_CONSCIOUS);
+    chkMemoryConscious.addActionListener((e) -> Solver.memoryConscious(chkMemoryConscious.isSelected()));
+
+    chkPrintAllNodes = new JCheckBox(PRINT_ALL_NODES_NAME, DEFAULT_PRINT_ALL_NODES);
+    chkPrintAllNodes.addActionListener((e) -> Solver.printAllNodes(chkPrintAllNodes.isSelected()));
+
+    chkWriteCsv = new JCheckBox(WRITE_CSV_NAME, DEFAULT_WRITE_CSV);
+    chkWriteCsv.addActionListener((e) -> Solver.writeCsv(chkWriteCsv.isSelected()));
+
+    pnlOptions.add(chkSafetyConscious);
+    pnlOptions.add(chkCpuConscious);
+    pnlOptions.add(chkMemoryConscious);
+    pnlOptions.add(chkPrintAllNodes);
+    pnlOptions.add(chkWriteCsv);
+
+    txtSemiprime = new JTextArea(HISTORY_ROWS, HISTORY_COLS);
+    txtSemiprime.setText("");
+
+    //final JPanel pnlLocalSearch = new JPanel(new GridLayout(1, 2));
+    ///@todo add base options
+
+    btnLocalSearch = new JButton("Start Local Search");
+    btnLocalSearch.addActionListener(e ->
+    {
+      final Solver solver = Solver.newInstance(txtSemiprime.getText().trim(), 10, 2);
+      if (null == solver) return;
+
+      Solver.callback(n -> {
+          if (null == n) { Log.d("no factors were found, are you sure the input is semiprime?"); return; }
+          Log.d("\nfactors found:\n" +
+              "\nsp:\n\t" + solver.toString(10) + " (" + solver.toString(2) + ")" +
+              "\np1:\n\t" + n.p(0, 10) + " (" + n.p(0, 2) + ")" +
+              "\np2:\n\t" + n.p(1, 10) + " (" + n.p(1, 2) + ")");
+      });
+
+      final Thread prev = solver(new Thread(solver));
+      if (null != prev) prev.interrupt();
+
+      final Thread solverThread = solver();
+      if (null != solverThread)
+      {
+        solverThread.start();
+        pneMain.setSelectedIndex(TAB_CONNECT);
+        updateSettings();
+      }
+    });
+
+    pnlSearch.add(pnlOptions);
+    pnlSearch.add(txtSemiprime);
+    //pnlSearch.add(pnlLocalSearch);
+    pnlSearch.add(btnLocalSearch);
 
     ////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////
-    // load user settings
-    prefs = Preferences.userNodeForPackage(getClass());
-
-    ////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////
-    // CPU tab
+    // cpu tab
 
     // setup the memory/ processing limit sliders:
     final JLabel lblProcessors = new JLabel("Processors to use");
@@ -405,7 +487,6 @@ public class ClientGui extends JFrame implements DocumentListener
     {
       if (sldProcessors.getValueIsAdjusting()) return;
       int val = sldProcessors.getValue();
-
       Log.d("processor cap adjusted: " + val);
     });
 
@@ -481,7 +562,7 @@ public class ClientGui extends JFrame implements DocumentListener
     chkBackground = new JCheckBox("work in background", prefs.getBoolean(BACKGROUND_NAME, DEFAULT_WORK_ALWAYS));
     chkBackground.setHorizontalAlignment(SwingConstants.CENTER);
     chkBackground.setFocusPainted(false);
-    chkBackground.addActionListener(l -> { client().factor().background(chkBackground.isSelected()); Log.d("background: " + (client().factor().background() ? "yes" : "no")); });
+    chkBackground.addActionListener(l -> { Solver.background(chkBackground.isSelected()); Log.d("background: " + (Solver.background() ? "yes" : "no")); });
 
     // auto start with system?
     chkAutoStart = new JCheckBox("auto-start with system", prefs.getBoolean(AUTOSTART_NAME, DEFAULT_AUTOSTART));
@@ -507,21 +588,19 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlCpu.add(pnlCpuRight);
 
     ////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////
     // settings tab
 
     final JPanel pnlSettings = new JPanel();
 
     ////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////
     // add tabs to frame
 
     // create the tabbed panes
-    final JTabbedPane pneMain = new JTabbedPane();
+    pneMain = new JTabbedPane();
     pneMain.setFocusable(false);
     pneMain.setBorder(null);
     pneMain.addTab("", icnNet, pnlNet);
-    pneMain.addTab("", icnNode, pnlNode);
+    pneMain.addTab("", icnNode, pnlSearch);
     pneMain.addTab("", icnCpu, pnlCpu);
     pneMain.addTab("", icnSettings, pnlSettings);
 
@@ -529,7 +608,6 @@ public class ClientGui extends JFrame implements DocumentListener
     getContentPane().add(pneMain);
     resetFrame();
 
-    ////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////
     // setup the system tray, if supported
 
@@ -597,6 +675,9 @@ public class ClientGui extends JFrame implements DocumentListener
     // on close, kill the server connection if there is no tray icon in use
     if (!useTray) addWindowListener(new WindowAdapter() { @Override public void windowClosing(WindowEvent e) { exit(); } });
 
+    // attempt to load stored settings
+    loadSettings();
+
     // collect garbage and report memory info
     runtime.gc();
     final double freeMemory = (double)runtime.freeMemory() / toGb;
@@ -622,7 +703,11 @@ public class ClientGui extends JFrame implements DocumentListener
     return true;
   }
 
-  public Client client() { return client.get(); }
+  private Thread solver(Thread solver) { return this.solver.getAndSet(solver); }
+  private Thread solver() { return solver.get(); }
+
+  private Client client(Client client) { this.client.set(client); return this.client.get(); }
+  private Client client() { return client.get(); }
 
   private void updateNetworkComponents() { updateNetworkComponents(null); }
   private void updateNetworkComponents(Packet p)
@@ -768,10 +853,24 @@ public class ClientGui extends JFrame implements DocumentListener
     prefs.putInt(CAP_NAME, sldCap.getValue());
     prefs.putInt(MEMORY_NAME, sldMemory.getValue());
     prefs.putInt(IDLE_NAME, sldIdle.getValue());
+
     prefs.putBoolean(BACKGROUND_NAME, chkBackground.isSelected());
     prefs.putBoolean(AUTOSTART_NAME, chkAutoStart.isSelected());
-    Log.d("CPU settings saved");
+
+    Log.d("cpu settings saved");
   }
+
+  private void saveSearchSettings()
+  {
+    prefs.putByteArray(SEMIPRIME_NAME, txtSemiprime.getText().trim().getBytes());
+
+    prefs.putBoolean(SAFETY_CONSCIOUS_NAME, chkSafetyConscious.isSelected());
+    prefs.putBoolean(CPU_CONSCIOUS_NAME, chkCpuConscious.isSelected());
+    prefs.putBoolean(MEMORY_CONSCIOUS_NAME, chkMemoryConscious.isSelected());
+    prefs.putBoolean(PRINT_ALL_NODES_NAME, chkPrintAllNodes.isSelected());
+    prefs.putBoolean(WRITE_CSV_NAME, chkWriteCsv.isSelected());
+  }
+
 
   private void saveSettings()
   {
@@ -780,6 +879,8 @@ public class ClientGui extends JFrame implements DocumentListener
     try
     {
       saveCpuSettings();
+      saveSearchSettings();
+
       prefs.flush();
     }
     catch (Throwable t) { Log.e("failed to store preferences. make sure the app has write permissions"); return; }
@@ -793,9 +894,30 @@ public class ClientGui extends JFrame implements DocumentListener
     sldCap.setValue(prefs.getInt(CAP_NAME, DEFAULT_CAP));
     sldMemory.setValue(prefs.getInt(MEMORY_NAME, DEFAULT_MEMORY));
     sldIdle.setValue(prefs.getInt(IDLE_NAME, DEFAULT_IDLE));
+
     chkBackground.setSelected(prefs.getBoolean(BACKGROUND_NAME, DEFAULT_WORK_ALWAYS));
     chkAutoStart.setSelected(prefs.getBoolean(AUTOSTART_NAME, DEFAULT_AUTOSTART));
-    Log.d("CPU settings loaded");
+
+    Log.d("cpu settings loaded");
+  }
+
+  private void loadSearchSettings()
+  {
+    // parse semiprime stored bytes -> string
+    final byte[] sp = prefs.getByteArray(SEMIPRIME_NAME, null);
+    final String temp = null != sp ? Arrays.toString(sp) : "[]";
+    final String[] parts = temp.substring(1, temp.length()-1).split(",");
+    final byte[] semiprime = new byte[parts.length];
+    int i = -1; for (String s : parts) semiprime[++i] = Byte.parseByte(s.trim());
+    txtSemiprime.setText(new String(semiprime));
+
+    chkSafetyConscious.setSelected(prefs.getBoolean(SAFETY_CONSCIOUS_NAME, DEFAULT_SAFETY_CONSCIOUS));
+    chkCpuConscious.setSelected(prefs.getBoolean(CPU_CONSCIOUS_NAME, DEFAULT_CPU_CONSCIOUS));
+    chkMemoryConscious.setSelected(prefs.getBoolean(MEMORY_CONSCIOUS_NAME, DEFAULT_MEMORY_CONSCIOUS));
+    chkPrintAllNodes.setSelected(prefs.getBoolean(PRINT_ALL_NODES_NAME, DEFAULT_PRINT_ALL_NODES));
+    chkWriteCsv.setSelected(prefs.getBoolean(WRITE_CSV_NAME, DEFAULT_WRITE_CSV));
+
+    Log.d("search settings loaded");
   }
 
   private void loadSettings()
@@ -805,11 +927,27 @@ public class ClientGui extends JFrame implements DocumentListener
     try
     {
       prefs = Preferences.userNodeForPackage(getClass());
+
       loadCpuSettings();
+      loadSearchSettings();
     }
     catch (Throwable t) { Log.e("failed to load settings. make sure app has read permissions"); return; }
 
     Log.d("all settings loaded");
+  }
+
+  private void updateSearchSettings()
+  {
+    chkSafetyConscious.setSelected(Solver.safetyConscious());
+    chkCpuConscious.setSelected(Solver.cpuConscious());
+    chkMemoryConscious.setSelected(Solver.memoryConscious());
+    chkPrintAllNodes.setSelected(Solver.printAllNodes());
+    chkWriteCsv.setSelected(Solver.writeCsv());
+  }
+
+  private void updateSettings()
+  {
+    updateSearchSettings();
   }
 
   private void resetCpuSettings()
@@ -818,9 +956,24 @@ public class ClientGui extends JFrame implements DocumentListener
     sldCap.setValue(DEFAULT_CAP);
     sldMemory.setValue(DEFAULT_MEMORY);
     sldIdle.setValue(DEFAULT_IDLE);
+
     chkBackground.setSelected(DEFAULT_WORK_ALWAYS);
     chkAutoStart.setSelected(DEFAULT_AUTOSTART);
-    Log.d("CPU settings reset");
+
+    Log.d("cpu settings reset");
+  }
+
+  private void resetSearchSettings()
+  {
+    txtSemiprime.setText("");
+
+    chkSafetyConscious.setSelected(DEFAULT_SAFETY_CONSCIOUS);
+    chkCpuConscious.setSelected(DEFAULT_CPU_CONSCIOUS);
+    chkMemoryConscious.setSelected(DEFAULT_MEMORY_CONSCIOUS);
+    chkPrintAllNodes.setSelected(DEFAULT_PRINT_ALL_NODES);
+    chkWriteCsv.setSelected(DEFAULT_WRITE_CSV);
+
+    Log.d("search settings reset");
   }
 
   private void resetSettings()
@@ -828,6 +981,7 @@ public class ClientGui extends JFrame implements DocumentListener
     Log.d("resetting all settings to defaults...");
 
     resetCpuSettings();
+    resetSearchSettings();
 
     Log.d("settings reset");
   }

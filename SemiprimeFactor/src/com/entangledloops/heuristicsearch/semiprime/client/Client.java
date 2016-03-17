@@ -1,6 +1,5 @@
 package com.entangledloops.heuristicsearch.semiprime.client;
 
-import com.entangledloops.heuristicsearch.semiprime.Solver;
 import com.entangledloops.heuristicsearch.semiprime.Log;
 import com.entangledloops.heuristicsearch.semiprime.Packet;
 import com.entangledloops.heuristicsearch.semiprime.server.Server;
@@ -23,23 +22,25 @@ import static com.entangledloops.heuristicsearch.semiprime.Packet.valueOf;
  */
 public class Client
 {
-  private final AtomicReference<Solver> factor = new AtomicReference<>();
+  // client backend
+  private final AtomicReference<Socket>         socket       = new AtomicReference<>();
+  private final AtomicReference<Thread>         clientThread = new AtomicReference<>();
 
-  private final AtomicReference<Socket>   socket       = new AtomicReference<>();
-  private final AtomicReference<Thread>   clientThread = new AtomicReference<>();
-
-  private final AtomicReference<BufferedReader> in = new AtomicReference<>();
+  // i/o
+  private final AtomicReference<BufferedReader> in  = new AtomicReference<>();
   private final AtomicReference<PrintWriter>    out = new AtomicReference<>();
+  private final Consumer<Packet> callback; ///< called every received packet
 
-  private final AtomicReference<String> username = new AtomicReference<>();
-  private final AtomicReference<String> email = new AtomicReference<>();
-  private final AtomicReference<String> ip = new AtomicReference<>();
-  private final AtomicReference<String> hostname = new AtomicReference<>();
+  // client info
+  private final AtomicReference<String>         username     = new AtomicReference<>();
+  private final AtomicReference<String>         email        = new AtomicReference<>();
+  private final AtomicReference<String>         ip           = new AtomicReference<>();
+  private final AtomicReference<String>         hostname     = new AtomicReference<>();
 
+  // state
   private final AtomicBoolean isConnected = new AtomicBoolean(false);
+  private final boolean isRemote;
 
-  private final Consumer<Packet> callback;
-  private final boolean          isRemote;
 
   /**
    * For accepting a new remote client connecting to the server.
@@ -85,9 +86,6 @@ public class Client
     Log.d("connection with " + ip() + " established");
   }
   public Client() { this(Server.DEFAULT_HOST, Server.DEFAULT_PORT, null); }
-
-  public void factor(Solver solver) { this.factor.set(solver); }
-  public Solver factor() { return factor.get(); }
 
   private void init() throws IOException
   {

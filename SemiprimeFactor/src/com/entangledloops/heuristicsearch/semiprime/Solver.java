@@ -28,6 +28,7 @@ public class Solver implements Runnable, Serializable
   private static final AtomicBoolean memoryConscious = new AtomicBoolean(false); ///< if true, will take additional steps to trade CPU for more memory
   private static final AtomicBoolean background      = new AtomicBoolean(false);
   private static final AtomicBoolean printAllNodes   = new AtomicBoolean(false); ///< if false, fewer sanity checks are performed on values
+  private static final AtomicBoolean writeCsv        = new AtomicBoolean(false); ///< controls outputting csv-formatted node info during search
   private static final AtomicInteger processors      = new AtomicInteger(Runtime.getRuntime().availableProcessors());
   private static final AtomicInteger cap             = new AtomicInteger();
 
@@ -96,29 +97,29 @@ public class Solver implements Runnable, Serializable
   @Override public String toString() { return semiprimeString10; }
   public String toString(int base) { return 10 == base ? semiprimeString10 : internalBase() == base ? semiprimeStringInternal : semiprime.toString(base); }
 
-  public int length() { return semiprimeLen10; }
-  public int length(int base) { return 10 == base ? semiprimeLen10 : internalBase() == base ? semiprimeLenInternal : semiprime.toString(base).length(); }
+  public static int length() { return semiprimeLen10; }
+  public static int length(int base) { return 10 == base ? semiprimeLen10 : internalBase() == base ? semiprimeLenInternal : semiprime.toString(base).length(); }
 
-  public void primeLen1(int len) { if (len < 1) Log.e("invalid len: " + len); else primeLen1 = len; primeLengthsKnown.set(0 != primeLen1 && 0 != primeLen2); }
-  public void primeLen2(int len) { if (len < 1) Log.e("invalid len: " + len); else primeLen2 = len; primeLengthsKnown.set(0 != primeLen1 && 0 != primeLen2); }
+  public static void primeLen1(int len) { if (len < 1) Log.e("invalid len: " + len); else primeLen1 = len; primeLengthsKnown.set(0 != primeLen1 && 0 != primeLen2); }
+  public static void primeLen2(int len) { if (len < 1) Log.e("invalid len: " + len); else primeLen2 = len; primeLengthsKnown.set(0 != primeLen1 && 0 != primeLen2); }
 
-  public long startTime() { return startTime; }
-  public long endTime() { return endTime; }
-  public long elapsed() { return endTime - startTime; }
+  public static long startTime() { return startTime; }
+  public static long endTime() { return endTime; }
+  public static long elapsed() { return endTime - startTime; }
 
-  public void background(boolean background) { Solver.background.set(background); }
-  public boolean background() { return background.get(); }
+  public static void background(boolean background) { Solver.background.set(background); }
+  public static boolean background() { return background.get(); }
 
-  public void processors(int processors) { Solver.processors.set(processors); }
-  public int processors() { return processors.get(); }
+  public static void processors(int processors) { Solver.processors.set(processors); }
+  public static int processors() { return processors.get(); }
 
-  public void cap(int cap) { this.cap.set(cap); }
-  public int cap() { return cap.get(); }
+  public static void cap(int cap) { Solver.cap.set(cap); }
+  public static int cap() { return cap.get(); }
 
-  public void callback(Consumer<Node> callback) { this.callback.set(callback); }
-  public Consumer<Node> callback() { return callback.get(); }
+  public static void callback(Consumer<Node> callback) { Solver.callback.set(callback); }
+  public static Consumer<Node> callback() { return callback.get(); }
 
-  private Node goal() { return goal.get(); }
+  private static Node goal() { return goal.get(); }
 
   public static boolean safetyConscious() { return Solver.safetyConscious.get(); }
   public static void safetyConscious(boolean enabled) { Solver.safetyConscious.set(enabled); }
@@ -131,6 +132,9 @@ public class Solver implements Runnable, Serializable
 
   public static boolean printAllNodes() { return Solver.printAllNodes.get(); }
   public static void printAllNodes(boolean enabled) { Solver.printAllNodes.set(enabled); }
+
+  public static boolean writeCsv() { return Solver.writeCsv.get(); }
+  public static void writeCsv(boolean enabled) { Solver.writeCsv.set(enabled); }
 
   public static int internalBase() { return internalBase.get(); }
 
@@ -237,7 +241,7 @@ public class Solver implements Runnable, Serializable
 
         // try to push the new child
         Node generated = new Node(key, np1, np2); generated();
-        if (printAllNodes()) Log.d("generated1: " + generated.product.toString(10) + "(10) / " + generated.product.toString(internalBase) + "(" + internalBase + ") : [" + generated.toString() + ":" + generated.h + "]");
+        if (printAllNodes()) Log.d("generated: " + generated.product.toString(10) + "(10) / " + generated.product.toString(internalBase) + "(" + internalBase + ") : [" + generated.toString() + ":" + generated.h + "]");
         if (!generated.validFactors()) { ignored(); close(generated); }
         else if (!push(generated)) return false;
       }
@@ -321,7 +325,7 @@ public class Solver implements Runnable, Serializable
 
     // launch all worker threads and wait for completion
     threads.parallelStream().forEach(Thread::start);
-    threads.stream().forEach((thread) -> { try { thread.join(); } catch (Throwable t) { Log.e("searching thread interrupted", t); } });
+    try { threads.stream().forEach((thread) -> { try { thread.join(); } catch (Throwable t) { Log.e("searching thread interrupted", t); } }); } catch (Throwable ignored) {}
 
     // cancel the timer and record end time
     if (null != (timer = statsTimer.getAndSet(null)))
