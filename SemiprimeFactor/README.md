@@ -16,17 +16,21 @@ Open a command prompt/terminal in the SemiprimeFactor subdirectory.
 To run the client:
 
 Linux / OS X:
+
 `chmod +x gradlew`
 `./gradlew run`
 
 Windows:
+
 `gradlew run`
 
 Other gradle tasks available:
+
 `runServer` - run a local server
 `dist` - build the client jar
 `distServer` - build the server jar
 `createWrapper` - updates gradle wrapper 
+
 Note: Be sure to run `createWrapper` from the parent directory so gradle files can be overwritten. A copy of gradle w/only this task is provided in the `heuristicSearch` dir to make this easier for you.
 
 ## Wiki ##
