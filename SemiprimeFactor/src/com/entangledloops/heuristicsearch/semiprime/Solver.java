@@ -62,9 +62,9 @@ public class Solver implements Runnable, Serializable
   private static final AtomicReference<BigInteger> nodesClosed      = new AtomicReference<>(BigInteger.ZERO);
 
   private static final AtomicInteger internalBase      = new AtomicInteger(2); ///< the base that will be used internally for the search representation
-  private static final AtomicInteger primeLen1 = new AtomicInteger(0); ///< optional: if set, only primes w/this len will be searched for
-  private static final AtomicInteger primeLen2 = new AtomicInteger(0); ///< using 0 searches for all length possibilities
-  private static final AtomicBoolean primeLengthsKnown = new AtomicBoolean(false); ///< if both prime children lengths are known, we can optimize during expansion
+  private static final AtomicInteger primeLen1         = new AtomicInteger(0); ///< optional: if set, only primes w/this len will be searched for
+  private static final AtomicInteger primeLen2         = new AtomicInteger(0); ///< using 0 searches for all length possibilities
+  private static final AtomicBoolean primeLengthsFixed = new AtomicBoolean(false); ///< if both prime children lengths are known, we can optimize during expansion
   private static long startTime; ///< nanoseconds
   private static long endTime; ///< nanoseconds
 
@@ -101,11 +101,13 @@ public class Solver implements Runnable, Serializable
   public static int length() { return semiprimeLen10; }
   public static int length(int base) { return 10 == base ? semiprimeLen10 : internalBase() == base ? semiprimeLenInternal : semiprime.toString(base).length(); }
 
-  public static int primeLen1() { return primeLen1.get(); }
-  public static void primeLen1(int len) { if (len < 1) Log.e("invalid len: " + len); else primeLen1.set(len); primeLengthsKnown.set(0 != primeLen1() && 0 != primeLen2()); }
+  public static int prime1Len() { return primeLen1.get(); }
+  public static void prime1Len(int len) { if (len < 0) Log.e("invalid len: " + len); else primeLen1.set(len); primeLengthsFixed.set(0 != prime1Len() && 0 != prime2Len()); }
 
-  public static int primeLen2() { return primeLen2.get(); }
-  public static void primeLen2(int len) { if (len < 1) Log.e("invalid len: " + len); else primeLen2.set(len); primeLengthsKnown.set(0 != primeLen1() && 0 != primeLen2()); }
+  public static int prime2Len() { return primeLen2.get(); }
+  public static void prime2Len(int len) { if (len < 0) Log.e("invalid len: " + len); else primeLen2.set(len); primeLengthsFixed.set(0 != prime1Len() && 0 != prime2Len()); }
+
+  public static boolean primeLengthsFixed() { return primeLengthsFixed.get(); }
 
   public static long startTime() { return startTime; }
   public static long endTime() { return endTime; }
@@ -152,8 +154,8 @@ public class Solver implements Runnable, Serializable
   {
     return null == n || (2 != internalBase() ||
         (
-            (0 != primeLen1() && n.p(0, 2).length() != primeLen1()) ||
-            (0 != primeLen2() && n.p(1, 2).length() != primeLen2())
+            (0 != prime1Len() && n.p(0, 2).length() != prime1Len()) ||
+            (0 != prime2Len() && n.p(1, 2).length() != prime2Len())
         ))
         ? null != goal() : (semiprime.equals(n.product) && n.goalFactors() && (goal.compareAndSet(null, n) || null != goal()));
   }
@@ -217,7 +219,7 @@ public class Solver implements Runnable, Serializable
   private static boolean expand(final Node n)
   {
     //if (nodesGenerated.get().compareTo(new BigInteger("100")) > 0) System.exit(0);
-    if (printAllNodes()) Log.d("expanding: " + n.product.toString(10) + "(10) / " + n.product.toString(internalBase.get()) + "(" + internalBase + ") : [" + n.toString() + ":" + n.h + "]");
+    if (printAllNodes()) Log.o("expanding: " + n.product.toString(10) + "(10) / " + n.product.toString(internalBase.get()) + "(" + internalBase + ") : [" + n.toString() + ":" + n.h + "]");
 
     // check if we found the goal already or this node is the goal
     if (goal(n)) return false; else expanded();
@@ -245,7 +247,7 @@ public class Solver implements Runnable, Serializable
 
         // try to push the new child
         Node generated = new Node(key, np1, np2); generated();
-        if (printAllNodes()) Log.d("generated: " + generated.product.toString(10) + "(10) / " + generated.product.toString(internalBase) + "(" + internalBase + ") : [" + generated.toString() + ":" + generated.h + "]");
+        if (printAllNodes()) Log.o("generated: " + generated.product.toString(10) + "(10) / " + generated.product.toString(internalBase) + "(" + internalBase + ") : [" + generated.toString() + ":" + generated.h + "]");
         if (!generated.validFactors()) { ignored(); close(generated); }
         else if (!push(generated)) return false;
       }
@@ -269,10 +271,10 @@ public class Solver implements Runnable, Serializable
   public static void reset()
   {
     // kill any running search threads
-    if (!threads.isEmpty()) { Log.d("a previous search task is still running, terminating..."); interrupt(); }
+    if (!threads.isEmpty()) { Log.o("a previous search task is still running, terminating..."); interrupt(); }
 
     // wipe search progress
-    Log.d("preparing solver for new search...");
+    Log.o("preparing solver for new search...");
     startTime = endTime = 0;
     goal.set(null);
     callback.set(null);
@@ -292,7 +294,7 @@ public class Solver implements Runnable, Serializable
   @SuppressWarnings("StatementWithEmptyBody")
   @Override public void run()
   {
-    Log.d("\n***** searching for factors of semiprime: " + semiprimeString10 + " *****");
+    Log.o("\n***** searching for factors of semiprime: " + semiprimeString10 + " *****");
 
     final int internalBase = Solver.internalBase();
 
@@ -311,7 +313,7 @@ public class Solver implements Runnable, Serializable
     if (null != timer) { timer.cancel(); endTime = startTime = 0; }
 
     // inform user of contract-bound search parameters
-    Log.d("\nsolver task parameters at launch:" +
+    Log.o("\nsolver task parameters at launch:" +
         "\n\ttarget semiprime (base 10): " + semiprimeString10 +
         "\n\tlength (base 10): " + semiprimeLen10 + " digits" +
         "\n\ttarget semiprime (base " + internalBase +"):  " + semiprimeStringInternal +
@@ -325,13 +327,13 @@ public class Solver implements Runnable, Serializable
         "\n");
 
     // build worker threads to search until goal is found or no nodes left
-    IntStream.range(0, processors()).forEach((i) -> threads.add(new Thread(() -> { Log.d("thread " + i + ": started"); while (expand(pop())); Log.d("thread " + i + ": finished"); })));
+    IntStream.range(0, processors()).forEach((i) -> threads.add(new Thread(() -> { try { Log.o("thread " + i + ": started"); while (expand(pop())); Log.o("thread " + i + ": finished"); } catch (Throwable ignored) {} })));
 
     // properly schedule a new timer
     if (statsTimer.compareAndSet(null, (timer = new Timer())))
     {
       startTime = System.nanoTime();
-      timer.schedule(new TimerTask() { @Override public void run() { Log.d("progress:" + stats((System.nanoTime() - startTime))); } }, statsPeriodMillis, statsPeriodMillis);
+      timer.schedule(new TimerTask() { @Override public void run() { Log.o("progress:" + stats((System.nanoTime() - startTime))); } }, statsPeriodMillis, statsPeriodMillis);
     }
 
     // launch all worker threads and wait for completion
@@ -347,7 +349,7 @@ public class Solver implements Runnable, Serializable
     }
 
     // print final stats after all work is done
-    Log.d("\nfinal stats:" + stats(elapsed()) +
+    Log.o("\nfinal stats:" + stats(elapsed()) +
             "\n\topen.size(): " + open.size() +
             "\n\topened.size(): " + opened.size() +
             "\n\tclosed.size(): " + closed.size());
@@ -355,10 +357,10 @@ public class Solver implements Runnable, Serializable
     // notify waiters that we've completed factoring
     final Consumer<Node> callback = Solver.callback.get();
     final Node goal = goal();
-    if (null != callback) callback.accept(goal); else Log.d((null != goal ? "factors found:\n" + goal : "factors not found"));
+    if (null != callback) callback.accept(goal); else Log.o((null != goal ? "factors found:\n" + goal : "factors not found"));
 
     // print final message and quit
-    Log.d("\n***** all threads joined and search is complete *****");
+    Log.o("\n***** all threads joined and search is complete *****");
   }
 
   // primary driver for factoring

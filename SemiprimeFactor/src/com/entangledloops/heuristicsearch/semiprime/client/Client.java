@@ -48,7 +48,7 @@ public class Client
    */
   public Client(Socket socket, Consumer<Packet> socketEventCallback)
   {
-    Log.d("accepting new client connection...");
+    Log.o("accepting new client connection...");
 
     try
     {
@@ -56,11 +56,11 @@ public class Client
       this.isRemote = true;
       this.socket.set(socket);
       init();
-      Log.d("accepted new client connection: " + ip + " (" + hostname + ")");
+      Log.o("accepted new client connection: " + ip + " (" + hostname + ")");
     }
     catch (Throwable t) { isConnected.set(false); throw new NullPointerException(); }
 
-    Log.d("connection with " + ip() + " established");
+    Log.o("connection with " + ip() + " established");
   }
   public Client(Socket socket) { this(socket, null); }
 
@@ -72,7 +72,7 @@ public class Client
    */
   public Client(String host, int port, Consumer<Packet> socketEventCallback) throws NullPointerException
   {
-    Log.d("connecting to " + host + ":" + port + "...");
+    Log.o("connecting to " + host + ":" + port + "...");
 
     try
     {
@@ -83,7 +83,7 @@ public class Client
     }
     catch (Throwable t) { isConnected.set(false); throw new NullPointerException(); }
 
-    Log.d("connection with " + ip() + " established");
+    Log.o("connection with " + ip() + " established");
   }
   public Client() { this(Server.DEFAULT_HOST, Server.DEFAULT_PORT, null); }
 
@@ -91,7 +91,7 @@ public class Client
   {
     if (!isConnected.compareAndSet(false, true))
     {
-      Log.d("duplicate connection error");
+      Log.o("duplicate connection error");
       return;
     }
 
@@ -109,7 +109,7 @@ public class Client
   public void close()
   {
     if (!isConnected.compareAndSet(true, false)) return;
-    Log.d("closing connection: " + toString() + "...");
+    Log.o("closing connection: " + toString() + "...");
 
     try { socket().close(); }
     catch (Throwable t) { Log.e(t); }
@@ -186,16 +186,16 @@ public class Client
 
   private void recvTarget()
   {
-    Log.d("receiving a new semiprime target request from " + toString() + "...");
+    Log.o("receiving a new semiprime target request from " + toString() + "...");
 
-    Log.d("semiprime target sent to " + toString());
+    Log.o("semiprime target sent to " + toString());
   }
 
   private void sendTarget()
   {
-    Log.d("sending a new semiprime target...");
+    Log.o("sending a new semiprime target...");
 
-    Log.d("semiprime target sent");
+    Log.o("semiprime target sent");
   }
 
   private void recvUsername()
@@ -204,7 +204,7 @@ public class Client
     {
       final String prev = username();
       username.set( readln() );
-      Log.d("client updated username from \"" + prev + "\" to \"" + username + "\"");
+      Log.o("client updated username from \"" + prev + "\" to \"" + username + "\"");
     }
     catch (Throwable t) { Log.e(t); }
   }
@@ -221,7 +221,7 @@ public class Client
     {
       final String prev = email();
       email.set( readln() );
-      Log.d("client updated email from \"" + prev + "\" to \"" + email + "\"");
+      Log.o("client updated email from \"" + prev + "\" to \"" + email + "\"");
     }
     catch (Throwable t) { Log.e(t); }
   }
@@ -234,98 +234,98 @@ public class Client
 
   private void recvOpenUpdate()
   {
-    Log.d("receiving open list update from " + toString() + "...");
+    Log.o("receiving open list update from " + toString() + "...");
 
-    Log.d("open list updated by " + toString());
+    Log.o("open list updated by " + toString());
   }
 
   private void sendOpenUpdate()
   {
-    Log.d("sending open list update...");
+    Log.o("sending open list update...");
 
-    Log.d("open list update sent");
+    Log.o("open list update sent");
   }
 
   private void recvOpenCheck()
   {
-    Log.d(toString() + " requested open list check...");
+    Log.o(toString() + " requested open list check...");
 
-    Log.d("open list checked and response sent to " + toString());
+    Log.o("open list checked and response sent to " + toString());
   }
 
   private void sendOpenCheck()
   {
-    Log.d("requesting open list check...");
+    Log.o("requesting open list check...");
 
-    Log.d("open list checked and response received");
+    Log.o("open list checked and response received");
   }
 
   private void recvOpenMerge()
   {
-    Log.d("merging open list with " + toString() + "...");
+    Log.o("merging open list with " + toString() + "...");
 
-    Log.d("open list merged with " + toString());
+    Log.o("open list merged with " + toString());
   }
 
   private void sendOpenMerge()
   {
-    Log.d("merging open list...");
+    Log.o("merging open list...");
 
-    Log.d("open list merged");
+    Log.o("open list merged");
   }
 
   private void recvClosedUpdate()
   {
-    Log.d("receiving closed list update from " + toString() + "...");
+    Log.o("receiving closed list update from " + toString() + "...");
 
-    Log.d("closed list update received from " + toString());
+    Log.o("closed list update received from " + toString());
   }
 
   private void sendClosedUpdate()
   {
-    Log.d("sending closed list update from " + toString() + "...");
+    Log.o("sending closed list update from " + toString() + "...");
 
-    Log.d("closed list update sent");
+    Log.o("closed list update sent");
   }
 
   private void recvClosedCheck()
   {
-    Log.d(toString() + " requested closed list check...");
+    Log.o(toString() + " requested closed list check...");
 
-    Log.d("closed list checked and response sent to " + toString());
+    Log.o("closed list checked and response sent to " + toString());
   }
 
   private void sendClosedCheck()
   {
-    Log.d("requesting closed list check...");
+    Log.o("requesting closed list check...");
 
-    Log.d("closed list checked and response received");
+    Log.o("closed list checked and response received");
   }
 
   private void recvClosedMerge()
   {
-    Log.d("merging closed list with " + toString() + "...");
+    Log.o("merging closed list with " + toString() + "...");
 
-    Log.d("closed list merged with " + toString());
+    Log.o("closed list merged with " + toString());
   }
 
   private void sendClosedMerge()
   {
-    Log.d("merging closed list...");
+    Log.o("merging closed list...");
 
-    Log.d("closed list merged");
+    Log.o("closed list merged");
   }
 
   private void recvSolved()
   {
-    Log.d(toString() + " claims to have found a solution!");
+    Log.o(toString() + " claims to have found a solution!");
   }
 
   private void sendSolved()
   {
-    Log.d("sending solution to server...");
+    Log.o("sending solution to server...");
 
-    Log.d("solution sent!");
+    Log.o("solution sent!");
   }
 
   /**
@@ -363,7 +363,7 @@ public class Client
       }
       catch (Throwable t) { if (!Thread.interrupted()) Log.e(t); }
 
-      Log.d("client connection closed");
+      Log.o("client connection closed");
     }
   }
 

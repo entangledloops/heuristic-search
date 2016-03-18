@@ -48,6 +48,8 @@ public class Node implements Serializable, Comparable
   @Override public boolean equals(Object o) { return o instanceof Node && ((Node) o).key.equals(key); }
   @Override public int compareTo(Object o) { return Double.compare(h, Node.class.cast(o).h); }
 
+  public String product(int base) { return product.toString(base); }
+
   /**
    * This function ensures that the current partial product resembles the target semiprime
    * in the currently fixed digit positions.
@@ -84,15 +86,15 @@ public class Node implements Serializable, Comparable
   {
     if (null == p || 0 == p.length) return Double.POSITIVE_INFINITY;
 
-    double p0sTo1s = 0;
+    double h = Math.max(Solver.prime1Len(), Solver.prime2Len());
     for (int i = 0; i < p.length; ++i)
     {
       int p0s = 0;
       for (final char c : p[i].toCharArray()) if ('0' == c) ++p0s;
-      p0sTo1s +=  Math.abs(p0s - Solver.semiprimeBinary0sTo1s);
+      h +=  Math.abs(p0s - Solver.semiprimeBinary0sTo1s);
     }
 
-    return p0sTo1s;
+    return h;
   }
 
   /**

@@ -40,7 +40,7 @@ public class Server
   public Server() { this(DEFAULT_PORT); }
   public Server(int port)
   {
-    Log.d("launching new socket server...");
+    Log.o("launching new socket server...");
     try
     {
       socket = new ServerSocket(port, Integer.MAX_VALUE);
@@ -60,7 +60,7 @@ public class Server
   {
     if (!exiting.compareAndSet(false,true)) return;
 
-    Log.d("shutting down the server socket...");
+    Log.o("shutting down the server socket...");
 
     try { socket.close(); }
     catch (Throwable t) { Log.e(t); }
@@ -73,7 +73,7 @@ public class Server
       catch (Throwable t2) { Log.e(t2); }
     }
 
-    Log.d("socket server shutdown");
+    Log.o("socket server shutdown");
   }
 
   //////////////////////////////////////////////////////////////////////////////
@@ -91,7 +91,7 @@ public class Server
     @Override public void run()
     {
       if (!ready.compareAndSet(false,true)) return;
-      Log.d("server thread launched and waiting for connections");
+      Log.o("server thread launched and waiting for connections");
 
       try
       {
@@ -105,13 +105,13 @@ public class Server
       try
       {
         final Iterator<Client> iterator = clients.iterator();
-        if (iterator.hasNext()) Log.d("closing all client connections...");
+        if (iterator.hasNext()) Log.o("closing all client connections...");
         while (iterator.hasNext()) { iterator.next().close(); iterator.remove(); }
       }
       catch (Throwable t) { Log.e(t); }
 
       ready.set(false);
-      Log.d("server socket closed");
+      Log.o("server socket closed");
     }
   }
 
@@ -126,11 +126,11 @@ public class Server
     if (null == solver) { Log.e("failed to create the solver task for semiprime:\n" + semiprime10); System.exit(1); }
 
     //solver.processors(1);
-    //solver.primeLen1(semiprime.toString(2).length()/2);
-    //solver.primeLen2(semiprime.toString(2).length()/2);
+    //solver.prime1Len(semiprime.toString(2).length()/2);
+    //solver.prime2Len(semiprime.toString(2).length()/2);
     solver.callback(n -> {
-        if (null == n) { Log.d("no factors were found, are you sure the input is semiprime?"); return; }
-        Log.d("\nfactors found: " +
+        if (null == n) { Log.o("no factors were found, are you sure the input is semiprime?"); return; }
+        Log.o("\nfactors found: " +
             "\n\tsp10: " + semiprime.toString(10) + " / sp2: " + semiprime.toString(2) +
             "\n\tp10: " + n.p(0, 10) + " / p2: " + n.p(0, 2) +
             "\n\tq10: " + n.p(1, 10) + " / q2: " + n.p(1, 2));

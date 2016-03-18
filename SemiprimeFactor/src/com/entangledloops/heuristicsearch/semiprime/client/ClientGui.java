@@ -15,9 +15,7 @@ import java.awt.event.*;
 import java.math.BigInteger;
 import java.net.URI;
 import java.text.DecimalFormat;
-import java.text.NumberFormat;
 import java.util.Arrays;
-import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.prefs.Preferences;
@@ -125,29 +123,29 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final int V_GAP = 10;
 
   // global
-  private JTabbedPane         pneMain;
-  private ImageIcon           icnNode, icnNodeSmall, icnCpu, icnNet, icnSettings;
-  private SystemTray          systemTray;
-  private TrayIcon            trayIcon;
+  private JTabbedPane pneMain;
+  private ImageIcon   icnNode, icnNodeSmall, icnCpu, icnNet, icnSettings;
+  private SystemTray systemTray;
+  private TrayIcon   trayIcon;
 
   // connect tab
-  private JTextField          txtUsername;
-  private JTextField          txtEmail;
-  private JTextField          txtAddress;
-  private JTextArea           txtHistory;
-  private JFormattedTextField txtPort;
-  private JButton             btnConnect;
-  private JButton             btnUpdate;
+  private JTextField txtUsername;
+  private JTextField txtEmail;
+  private JTextField txtAddress;
+  private JTextArea  txtHistory;
+  private JTextField txtPort;
+  private JButton    btnConnect;
+  private JButton    btnUpdate;
 
   // search tab
-  private JCheckBox chkSafetyConscious;
-  private JCheckBox chkCpuConscious;
-  private JCheckBox chkMemoryConscious;
-  private JCheckBox chkPrintAllNodes;
-  private JCheckBox chkWriteCsv;
-  private JButton   btnLocalSearch;
-  private JLabel    lblSemiprime;
-  private JTextArea txtSemiprime;
+  private JCheckBox  chkSafetyConscious;
+  private JCheckBox  chkCpuConscious;
+  private JCheckBox  chkMemoryConscious;
+  private JCheckBox  chkPrintAllNodes;
+  private JCheckBox  chkWriteCsv;
+  private JButton    btnSearch;
+  private JLabel     lblSemiprime;
+  private JTextArea  txtSemiprime;
   private JTextField txtSemiprimeBase, txtInternalBase, txtP1Len, txtP2Len;
 
   // cpu tab
@@ -162,6 +160,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private final AtomicReference<Client> client          = new AtomicReference<>(null);
   private final AtomicBoolean           isConnecting    = new AtomicBoolean(false);
   private final AtomicBoolean           isUpdatePending = new AtomicBoolean(false);
+  private final AtomicBoolean           isSearching     = new AtomicBoolean(false);
 
   //////////////////////////////////////////////////////////////////////////////
   //
@@ -334,7 +333,7 @@ public class ClientGui extends JFrame implements DocumentListener
       mnuBar.add(mnuAbout);
       ///////////////////////////////
     }
-    catch (Throwable t) { Log.d("for more info, visit:\n" + ABOUT_URL);  Log.e(t); }
+    catch (Throwable t) { Log.o("for more info, visit:\n" + ABOUT_URL);  Log.e(t); }
 
     setJMenuBar(mnuBar);
 
@@ -372,9 +371,9 @@ public class ClientGui extends JFrame implements DocumentListener
       catch (Throwable ignored) {} // don't care what went wrong with gui update, it's been logged anyway
     });
 
-    Log.d("\"Thank you\" raised to the 101st power for helping my semiprime research!");
-    Log.d("If you're computer cracks a target number, you will be credited in the publication (assuming you provided an email I can reach you at).");
-    Log.d("If you're interested in learning exactly what this software does and why, checkout the \"About\" menu.\n");
+    Log.o("\"Thank you\" raised to the 101st power for helping my semiprime research!");
+    Log.o("If you're computer cracks a target number, you will be credited in the publication (assuming you provided an email I can reach you at).");
+    Log.o("If you're interested in learning exactly what this software does and why, checkout the \"About\" menu.\n");
 
     final JScrollPane scrollPaneHistory = new JScrollPane(txtHistory);
     txtHistory.setHighlighter(new DefaultHighlighter());
@@ -382,37 +381,24 @@ public class ClientGui extends JFrame implements DocumentListener
     scrollPaneHistory.setVisible(true);
 
     // username
-    final JLabel lblUsername = new JLabel("Optional username:");
-    lblUsername.setHorizontalAlignment(SwingConstants.CENTER);
-    txtUsername = new JTextField(System.getProperty("user.name"));
-    txtUsername.setHorizontalAlignment(SwingConstants.CENTER);
+    final JLabel lblUsername = getLabel("Optional username:");
+    txtUsername = getTextField(System.getProperty("user.name"));
 
     // email
-    final JLabel lblEmail = new JLabel("Optional email (in case you crack a number\u2014will never share):");
-    lblEmail.setHorizontalAlignment(SwingConstants.CENTER);
-    txtEmail = new JTextField(DEFAULT_EMAIL);
-    txtEmail.setHorizontalAlignment(SwingConstants.CENTER);
+    final JLabel lblEmail = getLabel("Optional email (in case you crack a number\u2014will never share):");
+    txtEmail = getTextField(DEFAULT_EMAIL);
 
     // host address label and text box
-    final JLabel lblAddress = new JLabel("Server address:");
-    lblAddress.setHorizontalAlignment(SwingConstants.CENTER);
-    txtAddress = new JTextField(DEFAULT_HOST);
-    txtAddress.setHorizontalAlignment(SwingConstants.CENTER);
+    final JLabel lblAddress = getLabel("Server address:");
+    txtAddress = getTextField(DEFAULT_HOST);
     txtAddress.setColumns(DEFAULT_HOST.length());
 
     // port box and restrict to numbers
-    final JLabel lblPort = new JLabel("Server port:");
-    lblPort.setHorizontalAlignment(SwingConstants.CENTER);
-    final NumberFormat numberFormat = NumberFormat.getNumberInstance(Locale.getDefault());
-    final DecimalFormat decimalFormat = (DecimalFormat) numberFormat;
-    decimalFormat.setGroupingUsed(false);
-    txtPort = new JFormattedTextField(decimalFormat);
-    txtPort.setHorizontalAlignment(SwingConstants.CENTER);
+    final JLabel lblPort = getLabel("Server port:");
+    txtPort = getNumberTextField(""+DEFAULT_PORT);
     txtPort.setColumns(5);
-    txtPort.setText(DEFAULT_PORT+"");
 
-    final JLabel lblConnectNow = new JLabel("Click update if you change your username or email after connecting:");
-    lblConnectNow.setHorizontalAlignment(SwingConstants.CENTER);
+    final JLabel lblConnectNow = getLabel("Click update if you change your username or email after connecting:");
 
     btnConnect = getButton("Connect Now");
     btnConnect.addActionListener(e -> { if (isConnecting.compareAndSet(false, true)) connect(); });
@@ -446,36 +432,25 @@ public class ClientGui extends JFrame implements DocumentListener
     ////////////////////////////////////////////////////////////////////////////
     // search tab
 
-    chkSafetyConscious = new JCheckBox(SAFETY_CONSCIOUS_NAME, DEFAULT_SAFETY_CONSCIOUS);
+    chkSafetyConscious = getCheckBox(SAFETY_CONSCIOUS_NAME, DEFAULT_SAFETY_CONSCIOUS);
     chkSafetyConscious.addActionListener((e) -> Solver.safetyConscious(chkSafetyConscious.isSelected()));
-    chkSafetyConscious.setHorizontalAlignment(SwingConstants.CENTER);
-    chkSafetyConscious.setFocusPainted(false);
 
-    chkCpuConscious = new JCheckBox(CPU_CONSCIOUS_NAME, DEFAULT_CPU_CONSCIOUS);
+    chkCpuConscious = getCheckBox(CPU_CONSCIOUS_NAME, DEFAULT_CPU_CONSCIOUS);
     chkCpuConscious.addActionListener((e) -> Solver.cpuConscious(chkCpuConscious.isSelected()));
-    chkCpuConscious.setHorizontalAlignment(SwingConstants.CENTER);
-    chkCpuConscious.setFocusPainted(false);
 
-    chkMemoryConscious = new JCheckBox(MEMORY_CONSCIOUS_NAME, DEFAULT_MEMORY_CONSCIOUS);
+    chkMemoryConscious = getCheckBox(MEMORY_CONSCIOUS_NAME, DEFAULT_MEMORY_CONSCIOUS);
     chkMemoryConscious.addActionListener((e) -> Solver.memoryConscious(chkMemoryConscious.isSelected()));
-    chkMemoryConscious.setHorizontalAlignment(SwingConstants.CENTER);
-    chkMemoryConscious.setFocusPainted(false);
 
-    chkPrintAllNodes = new JCheckBox(PRINT_ALL_NODES_NAME, DEFAULT_PRINT_ALL_NODES);
+    chkPrintAllNodes = getCheckBox(PRINT_ALL_NODES_NAME, DEFAULT_PRINT_ALL_NODES);
     chkPrintAllNodes.addActionListener((e) -> Solver.printAllNodes(chkPrintAllNodes.isSelected()));
-    chkPrintAllNodes.setHorizontalAlignment(SwingConstants.CENTER);
-    chkPrintAllNodes.setFocusPainted(false);
 
-    chkWriteCsv = new JCheckBox(WRITE_CSV_NAME, DEFAULT_WRITE_CSV);
+    chkWriteCsv = getCheckBox(WRITE_CSV_NAME, DEFAULT_WRITE_CSV);
     chkWriteCsv.addActionListener((e) -> Solver.writeCsv(chkWriteCsv.isSelected()));
-    chkWriteCsv.setHorizontalAlignment(SwingConstants.CENTER);
-    chkWriteCsv.setFocusPainted(false);
 
     /////////////////////////////////////
 
-    lblSemiprime = new JLabel("Local Semiprime Target");
+    lblSemiprime = getLabel("Local Semiprime Target");
     lblSemiprime.setIcon(icnNodeSmall);
-    lblSemiprime.setHorizontalAlignment(SwingConstants.CENTER);
 
     txtSemiprime = new JTextArea(HISTORY_ROWS, HISTORY_COLS);
     txtSemiprime.setHighlighter(new DefaultHighlighter());
@@ -495,6 +470,8 @@ public class ClientGui extends JFrame implements DocumentListener
         if (containsHex) txtSemiprimeBase.setText("16");
         else if (allBinaryDigits) txtSemiprimeBase.setText("2");
         else txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE);
+        txtP1Len.setText("0");
+        txtP2Len.setText("0");
         updateSemiprimeLabel();
       }
     });
@@ -505,92 +482,117 @@ public class ClientGui extends JFrame implements DocumentListener
 
     /////////////////////////////////////
 
-    final JLabel lblSemiprimeBase = new JLabel("Semiprime Base");
-    lblSemiprimeBase.setHorizontalAlignment(SwingConstants.CENTER);
-    final JLabel lblInternalBase = new JLabel("Internal Base");
-    lblInternalBase.setHorizontalAlignment(SwingConstants.CENTER);
+    final JLabel lblSemiprimeBase = getLabel("Semiprime Base");
+    final JLabel lblInternalBase = getLabel("Internal Base");
 
-    txtSemiprimeBase = getNumberField("10");
-    txtSemiprimeBase.setHorizontalAlignment(SwingConstants.CENTER);
-    txtInternalBase = getNumberField("2");
-    txtInternalBase.setHorizontalAlignment(SwingConstants.CENTER);
+    txtSemiprimeBase = getNumberTextField("10");
+    txtInternalBase = getNumberTextField("2");
 
-    final JLabel lblP1Len = new JLabel("Prime 1 Len (internal base chars, 0 = unknown)");
-    lblP1Len.setHorizontalAlignment(SwingConstants.CENTER);
-    final JLabel lblP2Len = new JLabel("Prime 2 Len (internal base chars, 0 = unknown)");
-    lblP2Len.setHorizontalAlignment(SwingConstants.CENTER);
+    final JLabel lblP1Len = getLabel("Prime 1 Len (internal base chars, 0 = unknown)");
+    final JLabel lblP2Len = getLabel("Prime 2 Len (internal base chars, 0 = unknown)");
 
-    txtP1Len = getNumberField("0");
-    txtP1Len.setHorizontalAlignment(SwingConstants.CENTER);
-    txtP1Len.addActionListener((e) -> { try { Solver.primeLen1(Integer.parseInt(txtP1Len.getText().trim())); } catch (Throwable ignored) {} });
+    txtP1Len = getNumberTextField("0");
+    txtP1Len.addKeyListener(new KeyListener()
+    {
+      @Override public void keyTyped(KeyEvent e) {}
+      @Override public void keyPressed(KeyEvent e) {}
+      @Override public void keyReleased(KeyEvent e)
+      {
+        try
+        {
+          final int len1 = Integer.parseInt(txtP1Len.getText().trim());
+          if (len1 >= 0)
+          {
+            Solver.prime1Len(len1);
+            Solver.prime2Len(0 != len1 ? getSemiprimeLen() - len1 : 0);
+            txtP2Len.setText(""+Solver.prime2Len());
+          }
+        }
+        catch (Throwable ignored) {}
+      }
+    });
 
-    txtP2Len = getNumberField("0");
-    txtP2Len.setHorizontalAlignment(SwingConstants.CENTER);
-    txtP2Len.addActionListener((e) -> { try { Solver.primeLen2(Integer.parseInt(txtP2Len.getText().trim())); } catch (Throwable ignored) {} });
+    txtP2Len = getNumberTextField("0");
+    txtP2Len.addActionListener((e) -> { try { Solver.prime2Len(Integer.parseInt(txtP2Len.getText().trim())); } catch (Throwable ignored) {} });
 
     final JButton btnReset = getButton("Reset to Defaults");
     btnReset.addActionListener((e) -> resetSearchSettings());
     final JButton btnBenchmark = getButton("Load RSA Benchmark");
     btnBenchmark.addActionListener((e) -> loadBenchmark());
     final JButton btnRsaLen = getButton("Calc. Fixed Lengths (N/2)");
-    btnRsaLen.addActionListener((e) -> { try { final int len = getSemiprimeLen(); txtP1Len.setText(""+len/2); txtP2Len.setText(""+(len%2 != 0 ? (len/2)+1 : (len/2))); } catch (Throwable ignored) {} });
+    btnRsaLen.addActionListener((e) -> { try { final int len = getSemiprimeLen(); txtP1Len.setText(""+((len/2)+1)); txtP2Len.setText(""+((len/2)+1)); } catch (Throwable ignored) {} });
 
     /////////////////////////////////////
 
-    btnLocalSearch = getButton("Start Local Search");
-    btnLocalSearch.addActionListener(e ->
+    btnSearch = getButton("Start Local Search");
+    btnSearch.addActionListener(e ->
     {
-      // interrupt any previous solver and wait for termination
-      final Thread prev = solverThread(null);
-      if (null != prev) { try { Solver.interrupt(); prev.join(); } catch (Throwable ignored) {} }
-
-      // grab the entered search options
-      int spBase = DEFAULT_SEMIPRIME_BASE;
-      try { spBase = Integer.parseInt(clean(txtSemiprimeBase.getText())); }
-      catch (Throwable t) { Log.e("provided semiprime base was invalid, defaulting to " + DEFAULT_SEMIPRIME_BASE); txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE); }
-      finally { if (spBase < 2) { Log.e("semiprime base cannot be < 2, defaulting to " + DEFAULT_SEMIPRIME_BASE); txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE); } }
-
-      int internalBase = DEFAULT_INTERNAL_BASE;
-      try { internalBase = Integer.parseInt(clean(txtInternalBase.getText())); }
-      catch (Throwable t) { Log.e("provided internal base was invalid, defaulting to " + DEFAULT_INTERNAL_BASE); txtInternalBase.setText(""+DEFAULT_INTERNAL_BASE); }
-      finally { if (internalBase < 2) { Log.e("internal base cannot be < 2, defaulting to " + DEFAULT_INTERNAL_BASE); txtInternalBase.setText(""+DEFAULT_INTERNAL_BASE); } }
-
-      // reset the solver for a new search
-      Solver.reset();
-
-      // create a new solver based upon user request
       try
       {
-        final Solver solver = Solver.newInstance(clean(txtSemiprime.getText()), spBase, internalBase);
-        if (null == solver) return;
+        // prevent multiple clicks
+        btnSearch.setEnabled(false);
 
-        // update gui w/any corrections from solver init
-        txtInternalBase.setText(""+Solver.internalBase());
-        txtP1Len.setText(""+Solver.primeLen1());
-        txtP2Len.setText(""+Solver.primeLen2());
+        // interrupt any previous solver and wait for termination
+        if (!isSearching.compareAndSet(false, true))
+        {
+          final Thread prev = solverThread(null);
+          if (null != prev) { Log.o("interrupting search..."); Solver.interrupt(); prev.join(); Log.o("search interrupted"); return; }
+        }
 
-        // set the callback to trigger on completion
-        Solver.callback(n -> {
-            if (null == n) { Log.d("no factors were found, are you sure the input is semiprime?"); return; }
-            Log.d("\nfactors found:\n" +
-                "\nsp:\n\t" + solver.toString(10) + " (" + solver.toString(2) + ")" +
-                "\np1:\n\t" + n.p(0, 10) + " (" + n.p(0, 2) + ")" +
-                "\np2:\n\t" + n.p(1, 10) + " (" + n.p(1, 2) + ")");
+        // move to main screen to view search progress or init errors
+        btnSearch.setText("Preparing search...");
+
+        // reset the solver for a new search
+        Solver.reset();
+        Solver.safetyConscious(chkSafetyConscious.isSelected());
+        Solver.cpuConscious(chkCpuConscious.isSelected());
+        Solver.memoryConscious(chkMemoryConscious.isSelected());
+        Solver.printAllNodes(chkPrintAllNodes.isSelected());
+        Solver.writeCsv(chkWriteCsv.isSelected());
+        Solver.callback(n ->
+        {
+          Log.o("\nsearch complete:\n");
+          if (null != n) Log.o("\n\tsp:\t" + n.product(10) + " (" + n.product(2) + ")\n\tp1:\t" + n.p(0, 10) + " (" + n.p(0, 2) + ")\n\tp2:\t" + n.p(1, 10) + " (" + n.p(1, 2) + ")");
+          else Log.e("no factors could be found, are you sure the input is composite" + (Solver.primeLengthsFixed() ? "and the factors are the specified lengths" : "") + "?");
+          pneMain.setSelectedIndex(TAB_CONNECT);
+          isSearching.set(false);
+          btnSearch.setText("Start Local Search");
+          btnSearch.setEnabled(true);
         });
 
-        // set the new solver thread
-        solverThread(new Thread(solver));
+        // grab the semiprime options
+        int spBase = DEFAULT_SEMIPRIME_BASE;
+        try { spBase = Integer.parseInt(clean(txtSemiprimeBase.getText())); } catch (Throwable t) { Log.e("semiprime base invalid"); txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE); return; }
+        if (spBase < 2) { Log.e("semiprime base < 2"); txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE); return; }
 
-        // finally, if all went well launch the search
-        final Thread solverThread = solverThread();
-        if (null != solverThread)
-        {
-          solverThread.start();
-          pneMain.setSelectedIndex(TAB_CONNECT);
-          updateSettings();
-        }
+        int internalBase = DEFAULT_INTERNAL_BASE;
+        try { internalBase = Integer.parseInt(clean(txtInternalBase.getText())); }
+        catch (Throwable t) { Log.e("provided internal base was invalid, defaulting to " + DEFAULT_INTERNAL_BASE); txtInternalBase.setText(""+DEFAULT_INTERNAL_BASE); }
+        if (internalBase < 2) { Log.e("internal base cannot be < 2, defaulting to " + DEFAULT_INTERNAL_BASE); txtInternalBase.setText(""+DEFAULT_INTERNAL_BASE); return; }
+
+        // try to parse any fixed prime lengths
+        try { Solver.prime1Len(Integer.parseInt(clean(txtP1Len.getText()))); } catch (Throwable t) { Log.e("prime 1 len invalid"); return; }
+        try { Solver.prime2Len(Integer.parseInt(clean(txtP2Len.getText()))); } catch (Throwable t) { Log.e("prime 2 len invalid"); return; }
+
+        // ensure gui values reflect underlying state
+        updateSettings();
+
+        // in case search crashes app due to internal error or user picking bad flags
+        saveSettings();
+
+        // create a new solver based upon user request and launch it
+        solverThread(new Thread(Solver.newInstance(clean(txtSemiprime.getText()), spBase, internalBase)));
+
+        // prevent multiple searches
+        btnSearch.setText("Cancel Search");
       }
       catch (Throwable t) { Log.e(t); }
+      finally
+      {
+        final Thread thread = solverThread();
+        if (null != thread) thread.start(); else isSearching.set(false);
+        btnSearch.setEnabled(true);
+      }
     });
 
     /////////////////////////////////////
@@ -626,7 +628,7 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlButtons1.add(btnRsaLen);
 
     final JPanel pnlButtons2 = new JPanel(new GridLayout(1,1));
-    pnlButtons2.add(btnLocalSearch);
+    pnlButtons2.add(btnSearch);
 
     final JPanel pnlButtons = new JPanel(new GridLayout(2,1));
     pnlButtons.add(pnlButtons1);
@@ -645,8 +647,7 @@ public class ClientGui extends JFrame implements DocumentListener
     // cpu tab
 
     // setup the memory/ processing limit sliders:
-    final JLabel lblProcessors = new JLabel("Processors to use");
-    lblProcessors.setHorizontalAlignment(SwingConstants.CENTER);
+    final JLabel lblProcessors = getLabel("Processors to use");
     sldProcessors = new JSlider(1, processors, prefs.getInt(PROCESSORS_NAME, DEFAULT_PROCESSORS));
     sldProcessors.setMajorTickSpacing(1);
     sldProcessors.setSnapToTicks(true);
@@ -657,11 +658,10 @@ public class ClientGui extends JFrame implements DocumentListener
       if (sldProcessors.getValueIsAdjusting()) return;
       int val = sldProcessors.getValue();
       Solver.processors(val);
-      Log.d("processor cap adjusted: " + val);
+      Log.o("processor cap adjusted: " + val);
     });
 
-    final JLabel lblCap = new JLabel("Per-processor usage (%)");
-    lblCap.setHorizontalAlignment(SwingConstants.CENTER);
+    final JLabel lblCap = getLabel("Per-processor usage (%)");
     sldCap = new JSlider(0, 100, prefs.getInt(CAP_NAME, DEFAULT_CAP));
     sldCap.setMajorTickSpacing(25);
     sldCap.setMinorTickSpacing(5);
@@ -672,11 +672,10 @@ public class ClientGui extends JFrame implements DocumentListener
     {
       if (sldCap.getValueIsAdjusting()) return;
       int val = sldCap.getValue();
-      Log.d("CPU cap adjusted: " + val + "%");
+      Log.o("CPU cap adjusted: " + val + "%");
     });
 
-    final JLabel lblMemory = new JLabel("Memory usage (%)");
-    lblMemory.setHorizontalAlignment(SwingConstants.CENTER);
+    final JLabel lblMemory = getLabel("Memory usage (%)");
     sldMemory = new JSlider(0, 100, prefs.getInt(MEMORY_NAME, DEFAULT_MEMORY));
     sldMemory.setMajorTickSpacing(25);
     sldMemory.setMinorTickSpacing(5);
@@ -687,11 +686,10 @@ public class ClientGui extends JFrame implements DocumentListener
     {
       if (sldMemory.getValueIsAdjusting()) return;
       int val = sldMemory.getValue();
-      Log.d("memory cap adjusted: " + val + "%");
+      Log.o("memory cap adjusted: " + val + "%");
     });
 
-    final JLabel lblIdle = new JLabel("Idle time until work begins (min)");
-    lblIdle.setHorizontalAlignment(SwingConstants.CENTER);
+    final JLabel lblIdle = getLabel("Idle time until work begins (min)");
     sldIdle = new JSlider(0, 30, prefs.getInt(IDLE_NAME, DEFAULT_IDLE));
     sldIdle.setMajorTickSpacing(5);
     sldIdle.setMinorTickSpacing(1);
@@ -702,10 +700,10 @@ public class ClientGui extends JFrame implements DocumentListener
     {
       if (sldIdle.getValueIsAdjusting()) return;
       int val = sldIdle.getValue();
-      Log.d("time until work begins adjusted: " + val + " minutes");
+      Log.o("time until work begins adjusted: " + val + " minutes");
     });
 
-    final JButton btnResetCpu = getButton("Reset CPU Settings to Defaults");
+    final JButton btnResetCpu = getButton("Reset to Defaults");
     btnResetCpu.addActionListener(l ->
     {
       final int result = JOptionPane.showConfirmDialog(null, "Are you sure you want to reset all CPU settings to defaults?", "Confirm Reset", JOptionPane.YES_NO_OPTION);
@@ -718,24 +716,20 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlCpuLeft.add(sldProcessors);
     pnlCpuLeft.add(lblCap);
     pnlCpuLeft.add(sldCap);
-    pnlCpuLeft.add(new JLabel(""));
-    pnlCpuLeft.add(new JLabel(""));
+    pnlCpuLeft.add(getLabel(""));
+    pnlCpuLeft.add(getLabel(""));
     pnlCpuLeft.add(btnResetCpu);
 
     // setup the right-side:
     final JPanel pnlCpuRight = new JPanel(new GridLayout(7, 1, H_GAP, V_GAP));
 
     // setup connect button and "always work" checkbox
-    chkBackground = new JCheckBox("work in background", prefs.getBoolean(BACKGROUND_NAME, DEFAULT_WORK_ALWAYS));
-    chkBackground.setHorizontalAlignment(SwingConstants.CENTER);
-    chkBackground.setFocusPainted(false);
-    chkBackground.addActionListener(l -> { Solver.background(chkBackground.isSelected()); Log.d("background: " + (Solver.background() ? "yes" : "no")); });
+    chkBackground = getCheckBox("work in background", prefs.getBoolean(BACKGROUND_NAME, DEFAULT_WORK_ALWAYS));
+    chkBackground.addActionListener(l -> { Solver.background(chkBackground.isSelected()); Log.o("background: " + (Solver.background() ? "yes" : "no")); });
 
     // auto start with system?
-    chkAutoStart = new JCheckBox("auto-start with system", prefs.getBoolean(AUTOSTART_NAME, DEFAULT_AUTOSTART));
-    chkAutoStart.setHorizontalAlignment(SwingConstants.CENTER);
-    chkAutoStart.setFocusPainted(false);
-    chkAutoStart.addActionListener(l -> Log.d("autostart: " + (chkAutoStart.isSelected() ? "yes" : "no")));
+    chkAutoStart = getCheckBox("auto-start with system", prefs.getBoolean(AUTOSTART_NAME, DEFAULT_AUTOSTART));
+    chkAutoStart.addActionListener(l -> Log.o("autostart: " + (chkAutoStart.isSelected() ? "yes" : "no")));
 
     final JPanel pnlChkBoxes = new JPanel(new GridLayout(2, 1, H_GAP, V_GAP));
     pnlChkBoxes.add(chkBackground);
@@ -745,8 +739,8 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlCpuRight.add(sldMemory);
     pnlCpuRight.add(lblIdle);
     pnlCpuRight.add(sldIdle);
-    pnlCpuRight.add(new JLabel(""));
-    pnlCpuRight.add(new JLabel(""));
+    pnlCpuRight.add(getLabel(""));
+    pnlCpuRight.add(getLabel(""));
     pnlCpuRight.add(pnlChkBoxes);
 
     // create the full CPU panel
@@ -766,10 +760,10 @@ public class ClientGui extends JFrame implements DocumentListener
     pneMain = new JTabbedPane();
     pneMain.setFocusable(false);
     pneMain.setBorder(null);
-    pneMain.addTab("", icnNet, pnlNet);
-    pneMain.addTab("", icnNode, pnlSearch);
-    pneMain.addTab("", icnCpu, pnlCpu);
-    pneMain.addTab("", icnSettings, pnlSettings);
+    pneMain.addTab("", icnNet, pnlNet, "Connect to a compute server");
+    pneMain.addTab("", icnNode, pnlSearch, "Search settings");
+    pneMain.addTab("", icnCpu, pnlCpu, "Hardware settings");
+    pneMain.addTab("", icnSettings, pnlSettings, "Miscellaneous settings");
 
     // add the panel to the frame and show everything
     getContentPane().add(pneMain);
@@ -853,7 +847,7 @@ public class ClientGui extends JFrame implements DocumentListener
     final DecimalFormat formatter = new DecimalFormat("#.##");
 
     // report discovered system stats
-    Log.d(
+    Log.o(
         "operating system: " + OS + ", version " + System.getProperty("os.version") + "\n" +
         "current java version: " + version + ", required: 1.8+\n" +
         "note: all memory values reported are relative to the JVM, and were reported immediately after invoking the GC\n" +
@@ -891,7 +885,7 @@ public class ClientGui extends JFrame implements DocumentListener
     txtSemiprime.setText(RSA_2048);
     txtSemiprimeBase.setText("10");
     txtInternalBase.setText("2");
-    final String len = ""+(getSemiprimeLen()/2);
+    final String len = ""+((getSemiprimeLen()/2)+1);
     txtP1Len.setText(len); txtP2Len.setText(len);
     updateSemiprimeLabel();
   }
@@ -929,16 +923,16 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private void pause()
   {
-    Log.d("pausing all work...");
+    Log.o("pausing all work...");
 
-    Log.d("all work paused");
+    Log.o("all work paused");
   }
 
   private void resume()
   {
-    Log.d("resuming all work...");
+    Log.o("resuming all work...");
 
-    Log.d("all work resumed");
+    Log.o("all work resumed");
   }
 
   private void connect()
@@ -1004,7 +998,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private void sendSettings()
   {
-    Log.d("sending user settings to the server...");
+    Log.o("sending user settings to the server...");
 
     // ensure a client exists
     final Client client = client();
@@ -1035,7 +1029,7 @@ public class ClientGui extends JFrame implements DocumentListener
     btnUpdate.setEnabled(true);
     isUpdatePending.set(false);
 
-    Log.d("the server has acknowledged your settings");
+    Log.o("the server has acknowledged your settings");
   }
 
   private void saveCpuSettings()
@@ -1048,7 +1042,7 @@ public class ClientGui extends JFrame implements DocumentListener
     prefs.putBoolean(BACKGROUND_NAME, chkBackground.isSelected());
     prefs.putBoolean(AUTOSTART_NAME, chkAutoStart.isSelected());
 
-    Log.d("cpu settings saved");
+    Log.o("cpu settings saved");
   }
 
   private void saveSearchSettings()
@@ -1081,18 +1075,13 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private void saveSettings()
   {
-    Log.d("saving settings...");
+    Log.o("saving settings...");
 
-    try
-    {
-      saveCpuSettings();
-      saveSearchSettings();
+    saveSearchSettings();
+    saveCpuSettings();
+    try { prefs.flush(); } catch (Throwable ignored) {} // this always generates an error on windows, but works
 
-      prefs.flush();
-    }
-    catch (Throwable t) { Log.e("failed to store preferences. make sure the app has write permissions"); return; }
-
-    Log.d("all settings saved");
+    Log.o("all settings saved");
   }
 
   private void loadCpuSettings()
@@ -1105,7 +1094,7 @@ public class ClientGui extends JFrame implements DocumentListener
     chkBackground.setSelected(prefs.getBoolean(BACKGROUND_NAME, DEFAULT_WORK_ALWAYS));
     chkAutoStart.setSelected(prefs.getBoolean(AUTOSTART_NAME, DEFAULT_AUTOSTART));
 
-    Log.d("cpu settings loaded");
+    Log.o("cpu settings loaded");
   }
 
   private void loadSearchSettings()
@@ -1130,18 +1119,18 @@ public class ClientGui extends JFrame implements DocumentListener
     chkPrintAllNodes.setSelected(prefs.getBoolean(PRINT_ALL_NODES_NAME, DEFAULT_PRINT_ALL_NODES));
     chkWriteCsv.setSelected(prefs.getBoolean(WRITE_CSV_NAME, DEFAULT_WRITE_CSV));
 
-    Log.d("search settings loaded");
+    Log.o("search settings loaded");
   }
 
   private void loadSettings()
   {
     try
     {
-      Log.d("loading settings...");
+      Log.o("loading settings...");
       prefs = Preferences.userNodeForPackage(getClass());
       loadCpuSettings();
       loadSearchSettings();
-      Log.d("all settings loaded successfully");
+      Log.o("all settings loaded successfully");
     }
     catch (Throwable t) { Log.e("failed to load settings. make sure app has read permissions"); return; }
   }
@@ -1153,6 +1142,10 @@ public class ClientGui extends JFrame implements DocumentListener
     chkMemoryConscious.setSelected(Solver.memoryConscious());
     chkPrintAllNodes.setSelected(Solver.printAllNodes());
     chkWriteCsv.setSelected(Solver.writeCsv());
+
+    txtInternalBase.setText(""+Solver.internalBase());
+    txtP1Len.setText(""+Solver.prime1Len());
+    txtP2Len.setText(""+Solver.prime2Len());
   }
 
   private void updateSettings()
@@ -1170,7 +1163,7 @@ public class ClientGui extends JFrame implements DocumentListener
     chkBackground.setSelected(DEFAULT_WORK_ALWAYS);
     chkAutoStart.setSelected(DEFAULT_AUTOSTART);
 
-    Log.d("cpu settings reset");
+    Log.o("cpu settings reset");
   }
 
   private void resetSearchSettings()
@@ -1189,31 +1182,31 @@ public class ClientGui extends JFrame implements DocumentListener
     chkPrintAllNodes.setSelected(DEFAULT_PRINT_ALL_NODES);
     chkWriteCsv.setSelected(DEFAULT_WRITE_CSV);
 
-    Log.d("search settings reset");
+    Log.o("search settings reset");
   }
 
   private void resetSettings()
   {
-    Log.d("resetting all settings to defaults...");
+    Log.o("resetting all settings to defaults...");
 
-    resetCpuSettings();
     resetSearchSettings();
+    resetCpuSettings();
 
-    Log.d("settings reset");
+    Log.o("settings reset");
   }
 
   private void sendWork()
   {
-    Log.d("sending all completed work to server...");
+    Log.o("sending all completed work to server...");
 
-    Log.d("server successfully received all completed work");
+    Log.o("server successfully received all completed work");
   }
 
   private void recvWork()
   {
-    Log.d("requesting a new primary node...");
+    Log.o("requesting a new primary node...");
 
-    Log.d("new workload received; restarting search...");
+    Log.o("new workload received; restarting search...");
   }
 
   @Override
@@ -1246,6 +1239,14 @@ public class ClientGui extends JFrame implements DocumentListener
     }
   };
 
+  private static JCheckBox getCheckBox(String s, boolean isChecked)
+  {
+    final JCheckBox checkBox = new JCheckBox(s, isChecked);
+    checkBox.setHorizontalAlignment(SwingConstants.CENTER);
+    checkBox.setFocusPainted(false);
+    return checkBox;
+  }
+
   private static JButton getButton(String s)
   {
     final JButton button = new JButton(s);
@@ -1254,12 +1255,26 @@ public class ClientGui extends JFrame implements DocumentListener
     return button;
   }
 
-  private static JTextField getNumberField(String s) { return getNumberField(s, 2); }
-  private static JTextField getNumberField(String s, int columns)
+  private static JLabel getLabel(String s)
+  {
+    final JLabel label = new JLabel(s);
+    label.setHorizontalAlignment(SwingConstants.CENTER);
+    return label;
+  }
+
+  private static JTextField getTextField(String s)
   {
     final JTextField txtField = new JTextField(s);
-    ((AbstractDocument)txtField.getDocument()).setDocumentFilter(numberFilter);
-    txtField.setColumns(columns);
+    txtField.setHorizontalAlignment(SwingConstants.CENTER);
     return txtField;
+  }
+
+  private static JTextField getNumberTextField(String s) { return getNumberTextField(s, 2); }
+  private static JTextField getNumberTextField(String s, int columns)
+  {
+    final JTextField txtNumberField = getTextField(s);
+    ((AbstractDocument)txtNumberField.getDocument()).setDocumentFilter(numberFilter);
+    txtNumberField.setColumns(columns);
+    return txtNumberField;
   }
 }

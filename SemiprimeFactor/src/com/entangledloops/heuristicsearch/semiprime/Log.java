@@ -17,7 +17,7 @@ public class Log
     Log.outputCallback = outputCallback;
   }
 
-  public static void d(final String s)
+  public static void o(final String s)
   {
     if (null != s) System.out.println(s); else e(null, null);
     if (null != outputCallback) Utils.lockAndRun(outputLock, () -> outputCallback.accept(s));
