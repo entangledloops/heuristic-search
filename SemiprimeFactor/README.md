@@ -15,13 +15,13 @@ Pull this git repo:
 Open a command prompt/terminal in the SemiprimeFactor subdirectory.
 To run the client:
 
-Linux / OS X:
+**Linux / OS X:**
 
 `chmod +x gradlew`
 
 `./gradlew run`
 
-Windows:
+**Windows:**
 
 `gradlew run`
 
