@@ -519,7 +519,7 @@ public class ClientGui extends JFrame implements DocumentListener
     btnReset.addActionListener((e) -> resetSearchSettings());
     final JButton btnBenchmark = getButton("Load RSA Benchmark");
     btnBenchmark.addActionListener((e) -> loadBenchmark());
-    final JButton btnRsaLen = getButton("Calc. Fixed Lengths (N/2)");
+    final JButton btnRsaLen = getButton("Assume Fixed Length Primes (N/2)");
     btnRsaLen.addActionListener((e) -> { try { final int len = getSemiprimeLen(); txtP1Len.setText(""+((len/2)+1)); txtP2Len.setText(""+((len/2)+1)); } catch (Throwable ignored) {} });
 
     /////////////////////////////////////
@@ -551,8 +551,8 @@ public class ClientGui extends JFrame implements DocumentListener
         Solver.writeCsv(chkWriteCsv.isSelected());
         Solver.callback(n ->
         {
-          Log.o("\nsearch complete:\n");
-          if (null != n) Log.o("\n\tsp:\t" + n.product(10) + " (" + n.product(2) + ")\n\tp1:\t" + n.p(0, 10) + " (" + n.p(0, 2) + ")\n\tp2:\t" + n.p(1, 10) + " (" + n.p(1, 2) + ")");
+          Log.o("\nsearch complete:\n\t");
+          if (null != n) Log.o("sp:\t" + n.product(10) + " (" + n.product(2) + ")\n\tp1:\t" + n.p(0, 10) + " (" + n.p(0, 2) + ")\n\tp2:\t" + n.p(1, 10) + " (" + n.p(1, 2) + ")");
           else Log.e("no factors could be found, are you sure the input is composite" + (Solver.primeLengthsFixed() ? "and the factors are the specified lengths" : "") + "?");
           pneMain.setSelectedIndex(TAB_CONNECT);
           isSearching.set(false);

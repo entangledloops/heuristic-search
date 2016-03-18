@@ -318,6 +318,8 @@ public class Solver implements Runnable, Serializable
         "\n\tlength (base 10): " + semiprimeLen10 + " digits" +
         "\n\ttarget semiprime (base " + internalBase +"):  " + semiprimeStringInternal +
         "\n\tlength (base " + internalBase + "):  " + semiprimeLenInternal + " digits" +
+        "\n\tprime 1 len: " + (0 != prime1Len() ? prime1Len() : "any") +
+        "\n\tprime 2 len: " + (0 != prime2Len() ? prime2Len() : "any") +
         "\n\tbackground: " + background() +
         "\n\tprocessors: " + processors() +
         "\n\tcap: " + cap() +

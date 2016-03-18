@@ -91,7 +91,7 @@ public class Node implements Serializable, Comparable
     {
       int p0s = 0;
       for (final char c : p[i].toCharArray()) if ('0' == c) ++p0s;
-      h +=  Math.abs(p0s - Solver.semiprimeBinary0sTo1s);
+      h +=  Math.abs(((double)p0s/(double)p[i].length()) - Solver.semiprimeBinary0sTo1s);
     }
 
     return h;
