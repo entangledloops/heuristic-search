@@ -444,9 +444,18 @@ public class ClientGui extends JFrame implements DocumentListener
     btnLocalSearch = new JButton("Start Local Search");
     btnLocalSearch.addActionListener(e ->
     {
+      // interrupt any previous solver and wait for termination
+      final Thread prev = solverThread(null);
+      if (null != prev) { try { Solver.interrupt(); prev.join(); } catch (Throwable ignored) {} }
+
+      // reset the solver for a new search
+      Solver.reset();
+
+      // create a new solver based upon user request
       final Solver solver = Solver.newInstance(txtSemiprime.getText().trim(), 10, 2);
       if (null == solver) return;
 
+      // set the callback to trigger on completion
       Solver.callback(n -> {
           if (null == n) { Log.d("no factors were found, are you sure the input is semiprime?"); return; }
           Log.d("\nfactors found:\n" +
@@ -455,10 +464,11 @@ public class ClientGui extends JFrame implements DocumentListener
               "\np2:\n\t" + n.p(1, 10) + " (" + n.p(1, 2) + ")");
       });
 
-      final Thread prev = solver(new Thread(solver));
-      if (null != prev) prev.interrupt();
+      // set the new solver thread
+      solverThread(new Thread(solver));
 
-      final Thread solverThread = solver();
+      // finally, if all went well launch the search
+      final Thread solverThread = solverThread();
       if (null != solverThread)
       {
         solverThread.start();
@@ -695,16 +705,16 @@ public class ClientGui extends JFrame implements DocumentListener
         "max memory: ~" + formatter.format(maxMemory) + " (Gb)\n" +
         "free memory / total memory: " + formatter.format(100.0*(freeMemory/totalMemory)) + "%\n" +
         "total memory / max memory: " + formatter.format(100.0*(totalMemory/maxMemory)) + "%\n" +
-        "always work: " + chkBackground.isSelected() +
-        "autostart: " + chkAutoStart.isSelected() +
+        "always work: " + chkBackground.isSelected() + "\n" +
+        "autostart: " + chkAutoStart.isSelected() + "\n" +
         "available processors: " + processors
     );
 
     return true;
   }
 
-  private Thread solver(Thread solver) { return this.solver.getAndSet(solver); }
-  private Thread solver() { return solver.get(); }
+  private Thread solverThread(Thread solver) { return this.solver.getAndSet(solver); }
+  private Thread solverThread() { return solver.get(); }
 
   private Client client(Client client) { this.client.set(client); return this.client.get(); }
   private Client client() { return client.get(); }

@@ -144,7 +144,7 @@ public class Solver implements Runnable, Serializable
    * @param n a node to test against the target
    * @return true if this is the goal or a goal node has been found
    */
-  private boolean goal(Node n)
+  private static boolean goal(Node n)
   {
     return null == n || (2 != internalBase() ||
         (
@@ -174,7 +174,7 @@ public class Solver implements Runnable, Serializable
    * @param n
    * @return the input node (to assist w/function chaining)
    */
-  private Node close(Node n)
+  private static Node close(Node n)
   {
     if (null == n) return null;
     if (null == closed.putIfAbsent(n.toString(), n)) closed();
@@ -186,7 +186,7 @@ public class Solver implements Runnable, Serializable
    * @param n a node to attempt adding
    * @return false on exception (possible null pointer or out of heap memory)
    */
-  private boolean push(Node n)
+  private static boolean push(Node n)
   {
     try { if (null != opened.putIfAbsent(n.toString(), n) || !open.offer(n)) regenerated(); return true; }
     catch (Throwable t) { Log.e(t); return false; }
@@ -197,7 +197,7 @@ public class Solver implements Runnable, Serializable
    * @return the next available node or null if goal was found
    */
   @SuppressWarnings("StatementWithEmptyBody")
-  private Node pop()
+  private static Node pop()
   {
     Node node;
     try { while (null == (node = close(open.poll(checkForWorkTimeout, checkForWorkTimeUnit)))) if (null != goal()) return null; }
@@ -210,7 +210,7 @@ public class Solver implements Runnable, Serializable
    * @param n
    * @return true continues the search, false indicates completion
    */
-  private boolean expand(final Node n)
+  private static boolean expand(final Node n)
   {
     //if (nodesGenerated.get().compareTo(new BigInteger("100")) > 0) System.exit(0);
     if (printAllNodes()) Log.d("expanding: " + n.product.toString(10) + "(10) / " + n.product.toString(internalBase.get()) + "(" + internalBase + ") : [" + n.toString() + ":" + n.h + "]");
@@ -251,7 +251,7 @@ public class Solver implements Runnable, Serializable
     return true;
   }
 
-  private String stats(final long elapsedNanos)
+  private static String stats(final long elapsedNanos)
   {
     final long seconds = (elapsedNanos/1000000000L);
     return "\n\telapsed: " + (seconds/60L) + " minutes, " + (seconds%60L) + " seconds" +
@@ -261,21 +261,35 @@ public class Solver implements Runnable, Serializable
        "\n\tnodesClosed: " + nodesClosed;
   }
 
+  // resets the search
+  public static void reset()
+  {
+    // kill any running search threads
+    if (!threads.isEmpty()) { Log.d("a previous search task is still running, terminating..."); interrupt(); }
+
+    // wipe search progress
+    Log.d("preparing solver for new search...");
+    goal.set(null);
+    callback.set(null);
+    open.clear();
+    opened.clear();
+    closed.clear();
+
+    // push the root search node
+    push(new Node(new String[] {"1", "1"})); // safe to assume these are valid first 2 semiprime roots
+  }
+
+  public static void interrupt()
+  {
+    threads.stream().forEach(Thread::interrupt);
+  }
+
   @SuppressWarnings("StatementWithEmptyBody")
   @Override public void run()
   {
     Log.d("\n***** searching for factors of semiprime: " + semiprimeString10 + " *****");
 
     final int internalBase = Solver.internalBase();
-
-    // kill any previous factorization task
-    if (!threads.isEmpty())
-    {
-      Log.d("a previous factorization task is still running, forcefully terminating...");
-      for (Thread thread : threads) { try { thread.interrupt(); thread.join(TimeUnit.MILLISECONDS.convert(checkForWorkTimeout, checkForWorkTimeUnit)); } catch (Throwable t) { Log.e(t); } }
-      threads.clear();
-      Log.d("previous task killed");
-    }
 
     // ensure user provided valid flags
     if (safetyConscious() && !cpuConscious() && !memoryConscious())
@@ -290,14 +304,6 @@ public class Solver implements Runnable, Serializable
     // atomically cancel and clear any previous timer tasks
     Timer timer = statsTimer.getAndSet(null);
     if (null != timer) { timer.cancel(); endTime = startTime = 0; }
-
-    // if no nodes were provided from elsewhere, we'll start at the beginning by
-    // constructing a root node to begin search on in the requested internal base
-    if (opened.isEmpty())
-    {
-      Log.d("no previous work available, branching cleanly from a new root");
-      push(new Node(new String[] {"1", "1"})); // safe to assume these are valid first 2 semiprime roots
-    }
 
     // inform user of contract-bound search parameters
     Log.d("\nsolver task parameters at launch:" +
@@ -326,6 +332,7 @@ public class Solver implements Runnable, Serializable
     // launch all worker threads and wait for completion
     threads.parallelStream().forEach(Thread::start);
     try { threads.stream().forEach((thread) -> { try { thread.join(); } catch (Throwable t) { Log.e("searching thread interrupted", t); } }); } catch (Throwable ignored) {}
+    threads.clear();
 
     // cancel the timer and record end time
     if (null != (timer = statsTimer.getAndSet(null)))
