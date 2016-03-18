@@ -75,7 +75,7 @@ public class Node implements Serializable, Comparable
   }
 
   public String p(int i, int base) { return base != Solver.internalBase() ? values[i].toString(base) : p[i]; }
-  static String hash(String... p) { return Stream.of(p).reduce("", (p1,p2) -> p1 + ":" + p2); }
+  static String hash(String... p) { return Stream.of(p).skip(1).reduce(p[0], (p1,p2) -> p1 + ":" + p2); }
 
   /**
    * This heuristic takes each prime's difference of binary 0s/(0s+1s) from the target and sums.

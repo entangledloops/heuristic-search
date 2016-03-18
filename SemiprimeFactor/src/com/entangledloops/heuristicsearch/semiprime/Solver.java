@@ -18,11 +18,15 @@ import java.util.stream.IntStream;
  */
 public class Solver implements Runnable, Serializable
 {
-  private static final long statsPeriodMillis = 10000L;
-  private static final long checkForWorkTimeout = 1L;
+  // wait-for-work timeout
+  private static final long     statsPeriodMillis    = 10000L;
+  private static final long     checkForWorkTimeout  = 1L;
   private static final TimeUnit checkForWorkTimeUnit = TimeUnit.MILLISECONDS;
 
-  private static final List<Thread>  threads         = Collections.synchronizedList(new ArrayList<>());
+  // worker threads
+  private static final List<Thread> threads = Collections.synchronizedList(new ArrayList<>());
+
+  // state vars
   private static final AtomicBoolean safetyConscious = new AtomicBoolean(true); ///< if false, fewer sanity checks are performed on values and most statistics will be ignored
   private static final AtomicBoolean cpuConscious    = new AtomicBoolean(true); ///< if true, will take additional steps to trade memory for more CPU;
   private static final AtomicBoolean memoryConscious = new AtomicBoolean(false); ///< if true, will take additional steps to trade CPU for more memory
@@ -30,7 +34,8 @@ public class Solver implements Runnable, Serializable
   private static final AtomicBoolean printAllNodes   = new AtomicBoolean(false); ///< if false, fewer sanity checks are performed on values
   private static final AtomicBoolean writeCsv        = new AtomicBoolean(false); ///< controls outputting csv-formatted node info during search
   private static final AtomicInteger processors      = new AtomicInteger(Runtime.getRuntime().availableProcessors());
-  private static final AtomicInteger cap             = new AtomicInteger();
+  private static final AtomicInteger processorCap    = new AtomicInteger(100);
+  private static final AtomicInteger memoryCap       = new AtomicInteger(100);
 
   // vars cached for performance
   private static BigInteger semiprime; ///< the target semiprime value
@@ -47,17 +52,17 @@ public class Solver implements Runnable, Serializable
   static double semiprimeBinary0sTo1s; ///< cached internal len
 
   // the shared work completed or pending
-  private static final AtomicReference<Consumer<Node>> callback = new AtomicReference<>(); ///< a function to receive the goal node (or null) upon completion
-  private static final AtomicReference<Node>           goal     = new AtomicReference<>(); ///< set if/when goal is found; if set, search will end
   private static final PriorityBlockingQueue<Node>     open     = new PriorityBlockingQueue<>(); ///< unbounded queue backed by heap for fast pop() behavior w/o sorting
   private static final ConcurrentHashMap<String, Node> opened   = new ConcurrentHashMap<>(); ///< the opened hash table for faster lookup times
   private static final ConcurrentHashMap<String, Node> closed   = new ConcurrentHashMap<>(); ///< closed hash table
+  private static final AtomicReference<Node>           goal     = new AtomicReference<>(); ///< set if/when goal is found; if set, search will end
+  private static final AtomicReference<Consumer<Node>> callback = new AtomicReference<>(); ///< a function to receive the goal node (or null) upon completion
 
   // some stats tracking
-  private static final AtomicReference<Timer>      statsTimer       = new AtomicReference<>();
+  private static final AtomicReference<Timer>      statsTimer       = new AtomicReference<>(); ///< periodic reporting on search
   private static final AtomicReference<BigInteger> nodesGenerated   = new AtomicReference<>(BigInteger.ZERO);
   private static final AtomicReference<BigInteger> nodesRegenerated = new AtomicReference<>(BigInteger.ZERO);
-  private static final AtomicReference<BigInteger> nodesIgnored = new AtomicReference<>(BigInteger.ZERO);
+  private static final AtomicReference<BigInteger> nodesIgnored     = new AtomicReference<>(BigInteger.ZERO);
   private static final AtomicReference<BigInteger> nodesExpanded    = new AtomicReference<>(BigInteger.ZERO);
   private static final AtomicReference<BigInteger> nodesClosed      = new AtomicReference<>(BigInteger.ZERO);
 
@@ -119,8 +124,11 @@ public class Solver implements Runnable, Serializable
   public static void processors(int processors) { Solver.processors.set(processors); }
   public static int processors() { return processors.get(); }
 
-  public static void cap(int cap) { Solver.cap.set(cap); }
-  public static int cap() { return cap.get(); }
+  public static void processorCap(int cap) { Solver.processorCap.set(cap); }
+  public static int processorCap() { return processorCap.get(); }
+
+  public static void memoryCap(int cap) { Solver.memoryCap.set(cap); }
+  public static int memoryCap() { return memoryCap.get(); }
 
   public static void callback(Consumer<Node> callback) { Solver.callback.set(callback); }
   public static Consumer<Node> callback() { return callback.get(); }
@@ -219,7 +227,7 @@ public class Solver implements Runnable, Serializable
   private static boolean expand(final Node n)
   {
     //if (nodesGenerated.get().compareTo(new BigInteger("100")) > 0) System.exit(0);
-    if (printAllNodes()) Log.o("expanding: " + n.product.toString(10) + "(10) / " + n.product.toString(internalBase.get()) + "(" + internalBase + ") : [" + n.toString() + ":" + n.h + "]");
+    if (printAllNodes()) Log.o("expanding: " + n.product.toString(10) + " / " + n.product.toString(internalBase.get()) + " : [" + n.toString() + ":" + n.h + "]");
 
     // check if we found the goal already or this node is the goal
     if (goal(n)) return false; else expanded();
@@ -247,7 +255,7 @@ public class Solver implements Runnable, Serializable
 
         // try to push the new child
         Node generated = new Node(key, np1, np2); generated();
-        if (printAllNodes()) Log.o("generated: " + generated.product.toString(10) + "(10) / " + generated.product.toString(internalBase) + "(" + internalBase + ") : [" + generated.toString() + ":" + generated.h + "]");
+        if (printAllNodes()) Log.o("generated: " + generated.product.toString(10) + " / " + generated.product.toString(internalBase) + " : [" + generated.toString() + ":" + generated.h + "]");
         if (!generated.validFactors()) { ignored(); close(generated); }
         else if (!push(generated)) return false;
       }
@@ -272,18 +280,30 @@ public class Solver implements Runnable, Serializable
   {
     // kill any running search threads
     if (!threads.isEmpty()) { Log.o("a previous search task is still running, terminating..."); interrupt(); }
-
-    // wipe search progress
     Log.o("preparing solver for new search...");
+
+    // wipe previous search info
     startTime = endTime = 0;
+
+    nodesGenerated.set(BigInteger.ZERO);
+    nodesRegenerated.set(BigInteger.ZERO);
+    nodesIgnored.set(BigInteger.ZERO);
+    nodesExpanded.set(BigInteger.ZERO);
+
+    prime1Len(0);
+    prime2Len(0);
+    primeLengthsFixed.set(false);
+
     goal.set(null);
     callback.set(null);
+
     open.clear();
     opened.clear();
     closed.clear();
 
-    // push the root search node
     push(new Node(new String[] {"1", "1"})); // safe to assume these are valid first 2 semiprime roots
+
+    Log.o("solver reset");
   }
 
   public static void interrupt()
@@ -322,7 +342,7 @@ public class Solver implements Runnable, Serializable
         "\n\tprime 2 len: " + (0 != prime2Len() ? prime2Len() : "any") +
         "\n\tbackground: " + background() +
         "\n\tprocessors: " + processors() +
-        "\n\tcap: " + cap() +
+        "\n\tprocessorCap: " + processorCap() +
         "\n\tcpuConscious: " + cpuConscious +
         "\n\tmemoryConscious: " + memoryConscious +
         "\n\tmodifying settings during execution may produce undefined behavior" +

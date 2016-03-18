@@ -73,9 +73,9 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final String WIDTH_NAME            = "width";
   private static final String HEIGHT_NAME           = "height";
   private static final String PROCESSORS_NAME       = "processors";
-  private static final String CAP_NAME              = "name";
-  private static final String MEMORY_NAME           = "memory";
-  private static final String IDLE_NAME             = "idle";
+  private static final String PROCESSOR_CAP_NAME    = "processor cap";
+  private static final String MEMORY_CAP_NAME       = "memory cap";
+  private static final String IDLE_MINUTES_NAME     = "idle minutes";
   private static final String BACKGROUND_NAME       = "background";
   private static final String AUTOSTART_NAME        = "start search immediately";
   private static final String SEMIPRIME_NAME        = "semiprime";
@@ -92,23 +92,23 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final int TAB_CONNECT  = 0;
   private static final int TAB_SEARCH   = 1;
   private static final int TAB_CPU      = 2;
-  private static final int TAB_SETTINGS = 3;
+  private static final int TAB_MISC     = 3;
   private static final int HISTORY_ROWS = 5;
   private static final int HISTORY_COLS = 20;
 
-  private static final int DEFAULT_PROCESSORS     = Runtime.getRuntime().availableProcessors();
   private static final int DEFAULT_SEMIPRIME_BASE = 10;
-  private static final int DEFAULT_INTERNAL_BASE  = 2;
-  private static final int DEFAULT_P1_LEN         = 0;
-  private static final int DEFAULT_P2_LEN         = 0;
+  private static final int DEFAULT_INTERNAL_BASE  = Solver.internalBase();
+  private static final int DEFAULT_P1_LEN         = Solver.prime1Len();
+  private static final int DEFAULT_P2_LEN         = Solver.prime2Len();
+  private static final int DEFAULT_PROCESSORS     = Solver.processors();
+  private static final int DEFAULT_PROCESSOR_CAP  = Solver.processorCap();
+  private static final int DEFAULT_MEMORY_CAP     = Solver.memoryCap();
+  private static final int DEFAULT_IDLE_MINUTES   = 5;
+  private static final int DEFAULT_PORT           = 12288;
   private static final int DEFAULT_WIDTH          = 800;
   private static final int DEFAULT_HEIGHT         = 600;
-  private static final int DEFAULT_CAP            = 100;
-  private static final int DEFAULT_MEMORY         = 100;
-  private static final int DEFAULT_IDLE           = 5;
-  private static final int DEFAULT_PORT           = 12288;
 
-  private static final boolean DEFAULT_WORK_ALWAYS      = false;
+  private static final boolean DEFAULT_WORK_ALWAYS      = true;
   private static final boolean DEFAULT_AUTOSTART        = false;
   private static final boolean DEFAULT_SAFETY_CONSCIOUS = Solver.safetyConscious();
   private static final boolean DEFAULT_CPU_CONSCIOUS    = Solver.cpuConscious();
@@ -124,7 +124,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
   // global
   private JTabbedPane pneMain;
-  private ImageIcon   icnNode, icnNodeSmall, icnCpu, icnNet, icnSettings;
+  private ImageIcon   icnNode, icnNodeSmall, icnCpu, icnNet, icnMisc;
   private SystemTray systemTray;
   private TrayIcon   trayIcon;
 
@@ -149,7 +149,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private JTextField txtSemiprimeBase, txtInternalBase, txtP1Len, txtP2Len;
 
   // cpu tab
-  private JSlider sldProcessors, sldCap, sldMemory, sldIdle;
+  private JSlider sldProcessors, sldProcessorCap, sldMemoryCap, sldIdle;
   private JCheckBox chkBackground;
   private JCheckBox chkAutoStart;
 
@@ -208,16 +208,20 @@ public class ClientGui extends JFrame implements DocumentListener
     System.exit(0);
   }
 
-  // re-initializes the window's components
+  /**
+   * Generates a new window for the app that provides a gui to manage a local
+   * search or contribute to an ongoing server-based search.
+   *
+   * @return true if everything went okay, false otherwise
+   */
   private boolean create()
   {
-    ////////////////////////////////////////////////////////////////////////////
-    // attempt to locate stored user settings for loading at end of init
-
+    // the preferences object that will hold all user settings
     prefs = Preferences.userNodeForPackage(getClass());
 
     ////////////////////////////////////////////////////////////////////////////
     // icons
+
     try
     {
       final boolean jar = Utils.jar();
@@ -225,7 +229,7 @@ public class ClientGui extends JFrame implements DocumentListener
       icnNode = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NODE))) : new ImageIcon(Utils.getResource(ICON_NODE));
       icnCpu = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_CPU))) : new ImageIcon(Utils.getResource(ICON_CPU));
       icnNet = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NET))) : new ImageIcon(Utils.getResource(ICON_NET));
-      icnSettings = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_SETTINGS))) : new ImageIcon(Utils.getResource(ICON_SETTINGS));
+      icnMisc = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_SETTINGS))) : new ImageIcon(Utils.getResource(ICON_SETTINGS));
       setIconImage(icnNode.getImage());
     }
     catch (Throwable t) { Log.e(t); }
@@ -249,7 +253,6 @@ public class ClientGui extends JFrame implements DocumentListener
 
     ///////////////////////////////
     mnuFile.addSeparator();
-    ///////////////////////////////
 
     final JMenuItem mnuSendWork = new JMenuItem("Send Completed Work Now");
     mnuSendWork.addActionListener(l -> sendWork());
@@ -261,7 +264,6 @@ public class ClientGui extends JFrame implements DocumentListener
 
     ///////////////////////////////
     mnuFile.addSeparator();
-    ///////////////////////////////
 
     final JMenuItem mnuQuit = new JMenuItem("Quit Discarding Changes");
     mnuQuit.addActionListener(l -> exit(false));
@@ -276,7 +278,6 @@ public class ClientGui extends JFrame implements DocumentListener
     {
       final JMenu mnuAbout = new JMenu("About");
 
-      ///////////////////////////////
       final URI aboutURI = new URI(ABOUT_URL);
       final JMenuItem mnuSPF = new JMenuItem("What is Semiprime Factorization?");
       mnuSPF.addActionListener(l ->
@@ -297,7 +298,6 @@ public class ClientGui extends JFrame implements DocumentListener
 
       ///////////////////////////////
       mnuAbout.addSeparator();
-      ///////////////////////////////
 
       final URI downloadURI = new URI(SOURCE_URL);
       final JMenuItem mnuDownload = new JMenuItem("Download Latest Client");
@@ -319,7 +319,6 @@ public class ClientGui extends JFrame implements DocumentListener
 
       ///////////////////////////////
       mnuAbout.addSeparator();
-      ///////////////////////////////
 
       final URI homepageURI = new URI(HOMEPAGE_URL);
       final JMenuItem mnuHomepage = new JMenuItem("My Homepage");
@@ -331,7 +330,6 @@ public class ClientGui extends JFrame implements DocumentListener
       mnuAbout.add(mnuHomepage);
 
       mnuBar.add(mnuAbout);
-      ///////////////////////////////
     }
     catch (Throwable t) { Log.o("for more info, visit:\n" + ABOUT_URL);  Log.e(t); }
 
@@ -460,19 +458,32 @@ public class ClientGui extends JFrame implements DocumentListener
       @Override public void keyPressed(KeyEvent e) {}
       @Override public void keyReleased(KeyEvent e)
       {
+        // grab the inputted target value and strip formatting
         final String s = clean(txtSemiprime.getText()).toLowerCase();
-        boolean allBinaryDigits = true, containsHex = false;
+
+        // the assumptions made here regarding base are just to help speed up selecting settings,
+        // they are by *no means* meant to account for all "base-cases", which wouldn't be possible
+        // to do correctly in all cases w/o user-input anyway
+        boolean allBinaryDigits = true, containsHex = false, whitespaceChange = true;
         for (char c : s.toCharArray())
         {
+          if (Character.isWhitespace(c)) continue; else whitespaceChange = false;
           if ('a' == c || 'b' == c || 'c' == c || 'd' == c || 'e' == c || 'f' == c) { containsHex = true; break; }
           else if (c != '0' && c != '1') { allBinaryDigits = false; }
         }
-        if (containsHex) txtSemiprimeBase.setText("16");
-        else if (allBinaryDigits) txtSemiprimeBase.setText("2");
-        else txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE);
-        txtP1Len.setText("0");
-        txtP2Len.setText("0");
-        updateSemiprimeLabel();
+
+        // if the change wasn't trivial...
+        if (!whitespaceChange)
+        {
+          // try to guess the base
+          final String prevBase = clean(txtSemiprimeBase.getText());
+          if (containsHex) txtSemiprimeBase.setText("16");
+          else if (allBinaryDigits) txtSemiprimeBase.setText("2");
+          else txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE);
+
+          // further ensure value change and clear old prime lengths
+          if (!prevBase.equals(clean(txtSemiprimeBase.getText()))) { txtP1Len.setText("0"); txtP2Len.setText("0"); updateSemiprimeLabel(); }
+        }
       }
     });
 
@@ -488,8 +499,8 @@ public class ClientGui extends JFrame implements DocumentListener
     txtSemiprimeBase = getNumberTextField("10");
     txtInternalBase = getNumberTextField("2");
 
-    final JLabel lblP1Len = getLabel("Prime 1 Len (internal base chars, 0 = unknown)");
-    final JLabel lblP2Len = getLabel("Prime 2 Len (internal base chars, 0 = unknown)");
+    final JLabel lblP1Len = getLabel("Prime 1 Len (internal base, 0 = unknown)");
+    final JLabel lblP2Len = getLabel("Prime 2 Len (internal base, 0 = unknown)");
 
     txtP1Len = getNumberTextField("0");
     txtP1Len.addKeyListener(new KeyListener()
@@ -503,8 +514,7 @@ public class ClientGui extends JFrame implements DocumentListener
           final int len1 = Integer.parseInt(txtP1Len.getText().trim());
           if (len1 >= 0)
           {
-            Solver.prime1Len(len1);
-            Solver.prime2Len(0 != len1 ? getSemiprimeLen() - len1 : 0);
+            Solver.prime1Len(len1); Solver.prime2Len(0 != len1 ? getSemiprimeLen() - len1 : 0);
             txtP2Len.setText(""+Solver.prime2Len());
           }
         }
@@ -551,14 +561,18 @@ public class ClientGui extends JFrame implements DocumentListener
         Solver.writeCsv(chkWriteCsv.isSelected());
         Solver.callback(n ->
         {
-          Log.o("\nsearch complete:\n\t");
-          if (null != n) Log.o("sp:\t" + n.product(10) + " (" + n.product(2) + ")\n\tp1:\t" + n.p(0, 10) + " (" + n.p(0, 2) + ")\n\tp2:\t" + n.p(1, 10) + " (" + n.p(1, 2) + ")");
-          else Log.e("no factors could be found, are you sure the input is composite" + (Solver.primeLengthsFixed() ? "and the factors are the specified lengths" : "") + "?");
+          Log.o("\nsearch complete:\n");
+          if (null != n) Log.o("\tsp:\t" + n.product(10) + " (" + n.product(2) + ")\n\tp1:\t" + n.p(0, 10) + " (" + n.p(0, 2) + ")\n\tp2:\t" + n.p(1, 10) + " (" + n.p(1, 2) + ")");
+          else Log.e("\tno factors could be found, are you sure the input is composite" + (Solver.primeLengthsFixed() ? "and the factors are the specified lengths" : "") + "?");
           pneMain.setSelectedIndex(TAB_CONNECT);
           isSearching.set(false);
           btnSearch.setText("Start Local Search");
           btnSearch.setEnabled(true);
         });
+
+        // try to parse any fixed prime lengths
+        try { Solver.prime1Len(Integer.parseInt(clean(txtP1Len.getText()))); } catch (Throwable t) { Log.e("prime 1 len invalid"); return; }
+        try { Solver.prime2Len(Integer.parseInt(clean(txtP2Len.getText()))); } catch (Throwable t) { Log.e("prime 2 len invalid"); return; }
 
         // grab the semiprime options
         int spBase = DEFAULT_SEMIPRIME_BASE;
@@ -570,18 +584,14 @@ public class ClientGui extends JFrame implements DocumentListener
         catch (Throwable t) { Log.e("provided internal base was invalid, defaulting to " + DEFAULT_INTERNAL_BASE); txtInternalBase.setText(""+DEFAULT_INTERNAL_BASE); }
         if (internalBase < 2) { Log.e("internal base cannot be < 2, defaulting to " + DEFAULT_INTERNAL_BASE); txtInternalBase.setText(""+DEFAULT_INTERNAL_BASE); return; }
 
-        // try to parse any fixed prime lengths
-        try { Solver.prime1Len(Integer.parseInt(clean(txtP1Len.getText()))); } catch (Throwable t) { Log.e("prime 1 len invalid"); return; }
-        try { Solver.prime2Len(Integer.parseInt(clean(txtP2Len.getText()))); } catch (Throwable t) { Log.e("prime 2 len invalid"); return; }
+        // create a new solver based upon user request and launch it
+        solverThread(new Thread(Solver.newInstance(clean(txtSemiprime.getText()), spBase, internalBase)));
 
         // ensure gui values reflect underlying state
         updateSettings();
 
         // in case search crashes app due to internal error or user picking bad flags
         saveSettings();
-
-        // create a new solver based upon user request and launch it
-        solverThread(new Thread(Solver.newInstance(clean(txtSemiprime.getText()), spBase, internalBase)));
 
         // prevent multiple searches
         btnSearch.setText("Cancel Search");
@@ -658,39 +668,41 @@ public class ClientGui extends JFrame implements DocumentListener
       if (sldProcessors.getValueIsAdjusting()) return;
       int val = sldProcessors.getValue();
       Solver.processors(val);
-      Log.o("processor cap adjusted: " + val);
+      Log.o("processors: " + val);
     });
 
-    final JLabel lblCap = getLabel("Per-processor usage (%)");
-    sldCap = new JSlider(0, 100, prefs.getInt(CAP_NAME, DEFAULT_CAP));
-    sldCap.setMajorTickSpacing(25);
-    sldCap.setMinorTickSpacing(5);
-    sldCap.setSnapToTicks(true);
-    sldCap.setPaintLabels(true);
-    sldCap.setPaintTicks(true);
-    sldCap.addChangeListener(c ->
+    final JLabel lblCap = getLabel("Per-processor usage limit (%)");
+    sldProcessorCap = new JSlider(0, 100, prefs.getInt(PROCESSOR_CAP_NAME, DEFAULT_PROCESSOR_CAP));
+    sldProcessorCap.setMajorTickSpacing(25);
+    sldProcessorCap.setMinorTickSpacing(5);
+    sldProcessorCap.setSnapToTicks(true);
+    sldProcessorCap.setPaintLabels(true);
+    sldProcessorCap.setPaintTicks(true);
+    sldProcessorCap.addChangeListener(c ->
     {
-      if (sldCap.getValueIsAdjusting()) return;
-      int val = sldCap.getValue();
-      Log.o("CPU cap adjusted: " + val + "%");
+      if (sldProcessorCap.getValueIsAdjusting()) return;
+      int val = sldProcessorCap.getValue();
+      Solver.processorCap(val);
+      Log.o("processorCap: " + val + "%");
     });
 
-    final JLabel lblMemory = getLabel("Memory usage (%)");
-    sldMemory = new JSlider(0, 100, prefs.getInt(MEMORY_NAME, DEFAULT_MEMORY));
-    sldMemory.setMajorTickSpacing(25);
-    sldMemory.setMinorTickSpacing(5);
-    sldMemory.setSnapToTicks(true);
-    sldMemory.setPaintLabels(true);
-    sldMemory.setPaintTicks(true);
-    sldMemory.addChangeListener(c ->
+    final JLabel lblMemory = getLabel("Memory usage limit (%)");
+    sldMemoryCap = new JSlider(0, 100, prefs.getInt(MEMORY_CAP_NAME, DEFAULT_MEMORY_CAP));
+    sldMemoryCap.setMajorTickSpacing(25);
+    sldMemoryCap.setMinorTickSpacing(5);
+    sldMemoryCap.setSnapToTicks(true);
+    sldMemoryCap.setPaintLabels(true);
+    sldMemoryCap.setPaintTicks(true);
+    sldMemoryCap.addChangeListener(c ->
     {
-      if (sldMemory.getValueIsAdjusting()) return;
-      int val = sldMemory.getValue();
-      Log.o("memory cap adjusted: " + val + "%");
+      if (sldMemoryCap.getValueIsAdjusting()) return;
+      int val = sldMemoryCap.getValue();
+      Solver.memoryCap(val);
+      Log.o("memoryCap: " + val + "%");
     });
 
     final JLabel lblIdle = getLabel("Idle time until work begins (min)");
-    sldIdle = new JSlider(0, 30, prefs.getInt(IDLE_NAME, DEFAULT_IDLE));
+    sldIdle = new JSlider(0, 30, prefs.getInt(IDLE_MINUTES_NAME, DEFAULT_IDLE_MINUTES));
     sldIdle.setMajorTickSpacing(5);
     sldIdle.setMinorTickSpacing(1);
     sldIdle.setSnapToTicks(true);
@@ -700,7 +712,7 @@ public class ClientGui extends JFrame implements DocumentListener
     {
       if (sldIdle.getValueIsAdjusting()) return;
       int val = sldIdle.getValue();
-      Log.o("time until work begins adjusted: " + val + " minutes");
+      Log.o("idle delay before search: " + val + " minutes");
     });
 
     final JButton btnResetCpu = getButton("Reset to Defaults");
@@ -715,7 +727,7 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlCpuLeft.add(lblProcessors);
     pnlCpuLeft.add(sldProcessors);
     pnlCpuLeft.add(lblCap);
-    pnlCpuLeft.add(sldCap);
+    pnlCpuLeft.add(sldProcessorCap);
     pnlCpuLeft.add(getLabel(""));
     pnlCpuLeft.add(getLabel(""));
     pnlCpuLeft.add(btnResetCpu);
@@ -736,7 +748,7 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlChkBoxes.add(chkAutoStart);
 
     pnlCpuRight.add(lblMemory);
-    pnlCpuRight.add(sldMemory);
+    pnlCpuRight.add(sldMemoryCap);
     pnlCpuRight.add(lblIdle);
     pnlCpuRight.add(sldIdle);
     pnlCpuRight.add(getLabel(""));
@@ -749,9 +761,10 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlCpu.add(pnlCpuRight);
 
     ////////////////////////////////////////////////////////////////////////////
-    // settings tab
+    // miscellaneous tab
 
-    final JPanel pnlSettings = new JPanel();
+    final JPanel pnlMisc = new JPanel(new GridLayout(1,1));
+    pnlMisc.add(getLabel("You will find additional settings here when they become available."));
 
     ////////////////////////////////////////////////////////////////////////////
     // add tabs to frame
@@ -763,7 +776,7 @@ public class ClientGui extends JFrame implements DocumentListener
     pneMain.addTab("", icnNet, pnlNet, "Connect to a compute server");
     pneMain.addTab("", icnNode, pnlSearch, "Search settings");
     pneMain.addTab("", icnCpu, pnlCpu, "Hardware settings");
-    pneMain.addTab("", icnSettings, pnlSettings, "Miscellaneous settings");
+    pneMain.addTab("", icnMisc, pnlMisc, "Miscellaneous settings");
 
     // add the panel to the frame and show everything
     getContentPane().add(pneMain);
@@ -829,8 +842,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
       trayIcon.setPopupMenu(popup);
 
-      try { systemTray.add(trayIcon); }
-      catch (Throwable t) { Log.e("couldn't create a tray icon, will exit on window close instead"); useTray = false; }
+      try { systemTray.add(trayIcon); } catch (Throwable t) { useTray = false; Log.e("couldn't create tray icon, will exit on window close immediately"); }
     }
 
     // on close, kill the server connection if there is no tray icon in use
@@ -877,7 +889,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private void updateSemiprimeLabel()
   {
-    lblSemiprime.setText("Local Semiprime Target (len: " + getSemiprimeLen() + ")");
+    lblSemiprime.setText("Local Semiprime Target (len: " + clean(txtSemiprime.getText()).length() + ", internal len: " + getSemiprimeLen() + ")");
   }
 
   private void loadBenchmark()
@@ -1035,9 +1047,9 @@ public class ClientGui extends JFrame implements DocumentListener
   private void saveCpuSettings()
   {
     prefs.putInt(PROCESSORS_NAME, sldProcessors.getValue());
-    prefs.putInt(CAP_NAME, sldCap.getValue());
-    prefs.putInt(MEMORY_NAME, sldMemory.getValue());
-    prefs.putInt(IDLE_NAME, sldIdle.getValue());
+    prefs.putInt(PROCESSOR_CAP_NAME, sldProcessorCap.getValue());
+    prefs.putInt(MEMORY_CAP_NAME, sldMemoryCap.getValue());
+    prefs.putInt(IDLE_MINUTES_NAME, sldIdle.getValue());
 
     prefs.putBoolean(BACKGROUND_NAME, chkBackground.isSelected());
     prefs.putBoolean(AUTOSTART_NAME, chkAutoStart.isSelected());
@@ -1086,10 +1098,19 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private void loadCpuSettings()
   {
-    sldProcessors.setValue(prefs.getInt(PROCESSORS_NAME, DEFAULT_PROCESSORS));
-    sldCap.setValue(prefs.getInt(CAP_NAME, DEFAULT_CAP));
-    sldMemory.setValue(prefs.getInt(MEMORY_NAME, DEFAULT_MEMORY));
-    sldIdle.setValue(prefs.getInt(IDLE_NAME, DEFAULT_IDLE));
+    final int processors = prefs.getInt(PROCESSORS_NAME, DEFAULT_PROCESSORS);
+    sldProcessors.setValue(processors);
+    Solver.processors(processors);
+
+    final int processorCap = prefs.getInt(PROCESSOR_CAP_NAME, DEFAULT_PROCESSOR_CAP);
+    sldProcessorCap.setValue(processorCap);
+    Solver.processorCap(processorCap);
+
+    final int memory = prefs.getInt(MEMORY_CAP_NAME, DEFAULT_MEMORY_CAP);
+    sldMemoryCap.setValue(memory);
+    Solver.memoryCap(memory);
+
+    sldIdle.setValue(prefs.getInt(IDLE_MINUTES_NAME, DEFAULT_IDLE_MINUTES));
 
     chkBackground.setSelected(prefs.getBoolean(BACKGROUND_NAME, DEFAULT_WORK_ALWAYS));
     chkAutoStart.setSelected(prefs.getBoolean(AUTOSTART_NAME, DEFAULT_AUTOSTART));
@@ -1156,9 +1177,9 @@ public class ClientGui extends JFrame implements DocumentListener
   private void resetCpuSettings()
   {
     sldProcessors.setValue(DEFAULT_PROCESSORS);
-    sldCap.setValue(DEFAULT_CAP);
-    sldMemory.setValue(DEFAULT_MEMORY);
-    sldIdle.setValue(DEFAULT_IDLE);
+    sldProcessorCap.setValue(DEFAULT_PROCESSOR_CAP);
+    sldMemoryCap.setValue(DEFAULT_MEMORY_CAP);
+    sldIdle.setValue(DEFAULT_IDLE_MINUTES);
 
     chkBackground.setSelected(DEFAULT_WORK_ALWAYS);
     chkAutoStart.setSelected(DEFAULT_AUTOSTART);
