@@ -520,7 +520,7 @@ public class ClientGui extends JFrame implements DocumentListener
     final JButton btnBenchmark = getButton("Load RSA Benchmark");
     btnBenchmark.addActionListener((e) -> loadBenchmark());
     final JButton btnRsaLen = getButton("Assume Fixed Length Primes (N/2)");
-    btnRsaLen.addActionListener((e) -> { try { final int len = getSemiprimeLen(); txtP1Len.setText(""+((len/2)+1)); txtP2Len.setText(""+((len/2)+1)); } catch (Throwable ignored) {} });
+    btnRsaLen.addActionListener((e) -> { try { final int len = getSemiprimeLen(); txtP1Len.setText(""+((len/2)+(0==len%2?0:1))); txtP2Len.setText(""+((len/2)+(0==len%2?0:1))); } catch (Throwable ignored) {} });
 
     /////////////////////////////////////
 
@@ -885,7 +885,7 @@ public class ClientGui extends JFrame implements DocumentListener
     txtSemiprime.setText(RSA_2048);
     txtSemiprimeBase.setText("10");
     txtInternalBase.setText("2");
-    final String len = ""+((getSemiprimeLen()/2)+1);
+    final String len = ""+((getSemiprimeLen()/2)+(0==getSemiprimeLen()%2?0:1));
     txtP1Len.setText(len); txtP2Len.setText(len);
     updateSemiprimeLabel();
   }
