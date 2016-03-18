@@ -230,11 +230,9 @@ public class ClientGui extends JFrame implements DocumentListener
     Log.d("If you're interested in learning exactly what this software does and why, checkout the \"About\" menu.\n");
 
     final JScrollPane scrollPaneHistory = new JScrollPane(txtHistory);
+    txtHistory.setHighlighter(new DefaultHighlighter());
     scrollPaneHistory.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
     scrollPaneHistory.setVisible(true);
-
-    DefaultHighlighter highlighter = new DefaultHighlighter();
-    txtHistory.setHighlighter(highlighter);
 
     // username
     final JLabel lblUsername = new JLabel("Optional username:");
@@ -410,36 +408,47 @@ public class ClientGui extends JFrame implements DocumentListener
     ////////////////////////////////////////////////////////////////////////////
     // search tab
 
-    final JPanel pnlSearch = new JPanel(new GridLayout(3, 1));
-
-    final JPanel pnlOptions = new JPanel(new GridLayout(2, 3));
-
     chkSafetyConscious = new JCheckBox(SAFETY_CONSCIOUS_NAME, DEFAULT_SAFETY_CONSCIOUS);
     chkSafetyConscious.addActionListener((e) -> Solver.safetyConscious(chkSafetyConscious.isSelected()));
+    chkSafetyConscious.setHorizontalAlignment(SwingConstants.CENTER);
+    chkSafetyConscious.setFocusPainted(false);
 
     chkCpuConscious = new JCheckBox(CPU_CONSCIOUS_NAME, DEFAULT_CPU_CONSCIOUS);
     chkCpuConscious.addActionListener((e) -> Solver.cpuConscious(chkCpuConscious.isSelected()));
+    chkCpuConscious.setHorizontalAlignment(SwingConstants.CENTER);
+    chkCpuConscious.setFocusPainted(false);
 
     chkMemoryConscious = new JCheckBox(MEMORY_CONSCIOUS_NAME, DEFAULT_MEMORY_CONSCIOUS);
     chkMemoryConscious.addActionListener((e) -> Solver.memoryConscious(chkMemoryConscious.isSelected()));
+    chkMemoryConscious.setHorizontalAlignment(SwingConstants.CENTER);
+    chkMemoryConscious.setFocusPainted(false);
 
     chkPrintAllNodes = new JCheckBox(PRINT_ALL_NODES_NAME, DEFAULT_PRINT_ALL_NODES);
     chkPrintAllNodes.addActionListener((e) -> Solver.printAllNodes(chkPrintAllNodes.isSelected()));
+    chkPrintAllNodes.setHorizontalAlignment(SwingConstants.CENTER);
+    chkPrintAllNodes.setFocusPainted(false);
 
     chkWriteCsv = new JCheckBox(WRITE_CSV_NAME, DEFAULT_WRITE_CSV);
     chkWriteCsv.addActionListener((e) -> Solver.writeCsv(chkWriteCsv.isSelected()));
-
-    pnlOptions.add(chkSafetyConscious);
-    pnlOptions.add(chkCpuConscious);
-    pnlOptions.add(chkMemoryConscious);
-    pnlOptions.add(chkPrintAllNodes);
-    pnlOptions.add(chkWriteCsv);
+    chkWriteCsv.setHorizontalAlignment(SwingConstants.CENTER);
+    chkWriteCsv.setFocusPainted(false);
 
     txtSemiprime = new JTextArea(HISTORY_ROWS, HISTORY_COLS);
-    txtSemiprime.setText("");
+    txtSemiprime.setHighlighter(new DefaultHighlighter());
+    txtSemiprime.setText("323");
 
-    //final JPanel pnlLocalSearch = new JPanel(new GridLayout(1, 2));
-    ///@todo add base options
+    final JScrollPane scrollPaneSemiprime = new JScrollPane(txtSemiprime);
+    scrollPaneSemiprime.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+    scrollPaneSemiprime.setVisible(true);
+
+    final JLabel lblSemiprimeBase = new JLabel("Semiprime Base");
+    lblSemiprimeBase.setHorizontalAlignment(SwingConstants.CENTER);
+    final JLabel lblInternalBase = new JLabel("Internal Base");
+    lblInternalBase.setHorizontalAlignment(SwingConstants.CENTER);
+    final JTextField txtSemiprimeBase = new JTextField("10");
+    txtSemiprimeBase.setHorizontalAlignment(SwingConstants.CENTER);
+    final JTextField txtInternalBase = new JTextField("2");
+    txtInternalBase.setHorizontalAlignment(SwingConstants.CENTER);
 
     btnLocalSearch = new JButton("Start Local Search");
     btnLocalSearch.addActionListener(e ->
@@ -448,11 +457,22 @@ public class ClientGui extends JFrame implements DocumentListener
       final Thread prev = solverThread(null);
       if (null != prev) { try { Solver.interrupt(); prev.join(); } catch (Throwable ignored) {} }
 
+      // grab the entered search options
+      int spBase = 10;
+      try { spBase = Integer.parseInt(txtSemiprimeBase.getText().trim()); }
+      catch (Throwable t) { Log.e("provided semiprime base was invalid, defaulting to 10"); txtSemiprimeBase.setText("10"); }
+      finally { if (spBase < 2) { Log.e("semiprime base cannot be < 2, defaulting to 10"); txtSemiprimeBase.setText("10"); } }
+
+      int internalBase = 10;
+      try { internalBase = Integer.parseInt(txtInternalBase.getText().trim()); }
+      catch (Throwable t) { Log.e("provided internal base was invalid, defaulting to 10"); txtInternalBase.setText("10"); }
+      finally { if (internalBase < 2) { Log.e("internal base cannot be < 2, defaulting to 10"); txtInternalBase.setText("10"); } }
+
       // reset the solver for a new search
       Solver.reset();
 
       // create a new solver based upon user request
-      final Solver solver = Solver.newInstance(txtSemiprime.getText().trim(), 10, 2);
+      final Solver solver = Solver.newInstance(txtSemiprime.getText().replace("\n","").replace("\t","").replace("\r","").trim(), spBase, internalBase);
       if (null == solver) return;
 
       // set the callback to trigger on completion
@@ -477,10 +497,35 @@ public class ClientGui extends JFrame implements DocumentListener
       }
     });
 
-    pnlSearch.add(pnlOptions);
-    pnlSearch.add(txtSemiprime);
-    //pnlSearch.add(pnlLocalSearch);
-    pnlSearch.add(btnLocalSearch);
+    final JLabel lblSemiprime = new JLabel("Semiprime Target");
+    lblSemiprime.setIcon(icnNodeSmall);
+    lblSemiprime.setHorizontalAlignment(SwingConstants.CENTER);
+
+    final JPanel pnlSearchOptions = new JPanel(new GridLayout(2, 3));
+    pnlSearchOptions.add(chkSafetyConscious);
+    pnlSearchOptions.add(chkCpuConscious);
+    pnlSearchOptions.add(chkMemoryConscious);
+    pnlSearchOptions.add(chkPrintAllNodes);
+    pnlSearchOptions.add(chkWriteCsv);
+
+    final JPanel pnlSemiprime = new JPanel(new GridLayout(2,1));
+    pnlSemiprime.add(lblSemiprime);
+    pnlSemiprime.add(scrollPaneSemiprime);
+
+    final JPanel pnlSemiprimeOptions = new JPanel(new GridLayout(2,2));
+    pnlSemiprimeOptions.add(lblSemiprimeBase);
+    pnlSemiprimeOptions.add(txtSemiprimeBase);
+    pnlSemiprimeOptions.add(lblInternalBase);
+    pnlSemiprimeOptions.add(txtInternalBase);
+
+    final JPanel pnlLocalSearch = new JPanel(new GridLayout(2, 1));
+    pnlLocalSearch.add(pnlSemiprimeOptions);
+    pnlLocalSearch.add(btnLocalSearch);
+
+    final JPanel pnlSearch = new JPanel(new GridLayout(3, 1));
+    pnlSearch.add(pnlSearchOptions);
+    pnlSearch.add(pnlSemiprime);
+    pnlSearch.add(pnlLocalSearch);
 
     ////////////////////////////////////////////////////////////////////////////
     // cpu tab
