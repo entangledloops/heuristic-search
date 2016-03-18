@@ -431,18 +431,23 @@ public class ClientGui extends JFrame implements DocumentListener
     // search tab
 
     chkSafetyConscious = getCheckBox(SAFETY_CONSCIOUS_NAME, DEFAULT_SAFETY_CONSCIOUS);
+    chkSafetyConscious.setToolTipText("Additional safety precautions will be taken at launch and during search to prevent crashes or runaway computation.");
     chkSafetyConscious.addActionListener((e) -> Solver.safetyConscious(chkSafetyConscious.isSelected()));
 
     chkCpuConscious = getCheckBox(CPU_CONSCIOUS_NAME, DEFAULT_CPU_CONSCIOUS);
-    chkCpuConscious.addActionListener((e) -> Solver.cpuConscious(chkCpuConscious.isSelected()));
+    chkCpuConscious.setToolTipText("<html>CPU performance will be favored, but (possibly lots) more memory will be consumed.<br>Watch caching if you have a solid state drive.</html>");
+    chkCpuConscious.addActionListener((e) -> { chkMemoryConscious.setSelected(!chkCpuConscious.isSelected()); Solver.cpuConscious(chkCpuConscious.isSelected()); });
 
     chkMemoryConscious = getCheckBox(MEMORY_CONSCIOUS_NAME, DEFAULT_MEMORY_CONSCIOUS);
-    chkMemoryConscious.addActionListener((e) -> Solver.memoryConscious(chkMemoryConscious.isSelected()));
+    chkMemoryConscious.setToolTipText("Memory will be spared, but possibly at great cost to CPU time.");
+    chkMemoryConscious.addActionListener((e) -> { chkCpuConscious.setSelected(chkMemoryConscious.isSelected()); Solver.memoryConscious(chkMemoryConscious.isSelected()); });
 
     chkPrintAllNodes = getCheckBox(PRINT_ALL_NODES_NAME, DEFAULT_PRINT_ALL_NODES);
+    chkPrintAllNodes.setToolTipText("<html>All nodes generated and expanded will be printed in the order of occurrence.<br>This will bring search speed to a halt and eat tons of memory for large search spaces!</html>");
     chkPrintAllNodes.addActionListener((e) -> Solver.printAllNodes(chkPrintAllNodes.isSelected()));
 
     chkWriteCsv = getCheckBox(WRITE_CSV_NAME, DEFAULT_WRITE_CSV);
+    chkWriteCsv.setToolTipText("<html>All nodes generated will be written to disk in CSV format in order of occurrence.<br>This may bring search speed to a halt and/or fill your disk!</html>");
     chkWriteCsv.addActionListener((e) -> Solver.writeCsv(chkWriteCsv.isSelected()));
 
     /////////////////////////////////////
@@ -493,16 +498,29 @@ public class ClientGui extends JFrame implements DocumentListener
 
     /////////////////////////////////////
 
+    final String semiprimeBaseHelp = "The base that you are providing your semiprime in.";
+    final String internalBaseHelp = "The base that will be used internally by the solver.";
+    final String primeLengthHelp = "Measured in digits of internal base.\nUse 0 if unknown.";
+
     final JLabel lblSemiprimeBase = getLabel("Semiprime Base");
+    lblSemiprimeBase.setToolTipText(semiprimeBaseHelp);
     final JLabel lblInternalBase = getLabel("Internal Base");
+    lblInternalBase.setToolTipText(internalBaseHelp);
 
     txtSemiprimeBase = getNumberTextField("10");
-    txtInternalBase = getNumberTextField("2");
+    txtSemiprimeBase.setToolTipText(semiprimeBaseHelp);
 
-    final JLabel lblP1Len = getLabel("Prime 1 Len (internal base, 0 = unknown)");
-    final JLabel lblP2Len = getLabel("Prime 2 Len (internal base, 0 = unknown)");
+    txtInternalBase = getNumberTextField("2");
+    txtInternalBase.setEnabled(false);
+    txtInternalBase.setToolTipText(internalBaseHelp);
+
+    final JLabel lblP1Len = getLabel("Prime 1 Length");
+    lblP1Len.setToolTipText(primeLengthHelp);
+    final JLabel lblP2Len = getLabel("Prime 2 Length");
+    lblP2Len.setToolTipText(primeLengthHelp);
 
     txtP1Len = getNumberTextField("0");
+    txtP1Len.setToolTipText(primeLengthHelp);
     txtP1Len.addKeyListener(new KeyListener()
     {
       @Override public void keyTyped(KeyEvent e) {}
@@ -523,13 +541,19 @@ public class ClientGui extends JFrame implements DocumentListener
     });
 
     txtP2Len = getNumberTextField("0");
+    txtP2Len.setToolTipText(primeLengthHelp);
     txtP2Len.addActionListener((e) -> { try { Solver.prime2Len(Integer.parseInt(txtP2Len.getText().trim())); } catch (Throwable ignored) {} });
 
     final JButton btnReset = getButton("Reset to Defaults");
+    btnReset.setToolTipText("This will reset the search settings to defaults (w/o clearing the current semiprime value).");
     btnReset.addActionListener((e) -> resetSearchSettings());
+
     final JButton btnBenchmark = getButton("Load RSA Benchmark");
+    btnBenchmark.setToolTipText("Loads a pre-selected unsolved benchmark to run against.");
     btnBenchmark.addActionListener((e) -> loadBenchmark());
-    final JButton btnRsaLen = getButton("Assume Fixed Length Primes (N/2)");
+
+    final JButton btnRsaLen = getButton("Calc. N/2 (assumes fixed length primes)");
+    btnRsaLen.setToolTipText("If you know the lengths of your primes in advance, you can greatly aid the search.");
     btnRsaLen.addActionListener((e) -> { try { final int len = getSemiprimeLen(); txtP1Len.setText(""+((len/2)+(0==len%2?0:1))); txtP2Len.setText(""+((len/2)+(0==len%2?0:1))); } catch (Throwable ignored) {} });
 
     /////////////////////////////////////
