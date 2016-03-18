@@ -18,6 +18,7 @@ To run the client:
 Linux / OS X:
 
 `chmod +x gradlew`
+
 `./gradlew run`
 
 Windows:
