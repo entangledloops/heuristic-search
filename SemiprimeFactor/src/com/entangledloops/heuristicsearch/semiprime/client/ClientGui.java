@@ -9,12 +9,10 @@ import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.text.DefaultHighlighter;
+import javax.swing.text.*;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
+import java.awt.event.*;
+import java.math.BigInteger;
 import java.net.URI;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
@@ -23,6 +21,7 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.prefs.Preferences;
+import java.util.regex.Pattern;
 
 /**
  * @author Stephen Dunn
@@ -36,7 +35,23 @@ public class ClientGui extends JFrame implements DocumentListener
   //
   //////////////////////////////////////////////////////////////////////////////
 
-  private static final String VERSION          = "0.3a";
+  //////////////////////////////////////////////////////////////////////////////
+  // benchmarks
+
+  private static final String RSA_2048 = "2519590847565789349402718324004839857142928" +
+      "212620403202777713783604366202070\n7595556264018525880784406918290641249515082" +
+      "189298559149176184502808489120072\n8449926873928072877767359714183472702618963" +
+      "750149718246911650776133798590957\n0009733045974880842840179742910064245869181" +
+      "719511874612151517265463228221686\n9987549182422433637259085141865462043576798" +
+      "423387184774447920739934236584823\n8242811981638150106748104516603773060562016" +
+      "196762561338441436038339044149526\n3443219011465754445417842402092461651572335" +
+      "077870774981712577246796292638635\n6373289912154831438167899885040445364023527" +
+      "381951378636564391212010397122822\n120720357";
+
+  //////////////////////////////////////////////////////////////////////////////
+  // globals
+
+  private static final String VERSION          = "0.4a";
   private static final String ICON_NODE_SMALL  = "node16x16.png";
   private static final String ICON_NODE        = "node32x32.png";
   private static final String ICON_CPU         = "cpu32x32.png";
@@ -50,6 +65,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final String HOMEPAGE_URL     = "http://www.entangledloops.com";
   private static final String DEFAULT_HOST     = "semiprime.servebeer.com";
   private static final String OS               = System.getProperty("os.name");
+
 
   //////////////////////////////////////////////////////////////////////////////
   // user prefs
@@ -70,6 +86,10 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final String MEMORY_CONSCIOUS_NAME = "memory conscious";
   private static final String PRINT_ALL_NODES_NAME  = "print all nodes";
   private static final String WRITE_CSV_NAME        = "write nodes csv";
+  private static final String SEMIPRIME_BASE_NAME   = "semiprime base";
+  private static final String INTERNAL_BASE_NAME    = "internal base";
+  private static final String P1_LEN_NAME           = "p1 len";
+  private static final String P2_LEN_NAME           = "p2 len";
 
   private static final int TAB_CONNECT  = 0;
   private static final int TAB_SEARCH   = 1;
@@ -78,13 +98,17 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final int HISTORY_ROWS = 5;
   private static final int HISTORY_COLS = 20;
 
-  private static final int DEFAULT_PROCESSORS = Runtime.getRuntime().availableProcessors();
-  private static final int DEFAULT_WIDTH      = 800;
-  private static final int DEFAULT_HEIGHT     = 600;
-  private static final int DEFAULT_CAP        = 100;
-  private static final int DEFAULT_MEMORY     = 100;
-  private static final int DEFAULT_IDLE       = 5;
-  private static final int DEFAULT_PORT       = 12288;
+  private static final int DEFAULT_PROCESSORS     = Runtime.getRuntime().availableProcessors();
+  private static final int DEFAULT_SEMIPRIME_BASE = 10;
+  private static final int DEFAULT_INTERNAL_BASE  = 2;
+  private static final int DEFAULT_P1_LEN         = 0;
+  private static final int DEFAULT_P2_LEN         = 0;
+  private static final int DEFAULT_WIDTH          = 800;
+  private static final int DEFAULT_HEIGHT         = 600;
+  private static final int DEFAULT_CAP            = 100;
+  private static final int DEFAULT_MEMORY         = 100;
+  private static final int DEFAULT_IDLE           = 5;
+  private static final int DEFAULT_PORT           = 12288;
 
   private static final boolean DEFAULT_WORK_ALWAYS      = false;
   private static final boolean DEFAULT_AUTOSTART        = false;
@@ -115,19 +139,21 @@ public class ClientGui extends JFrame implements DocumentListener
   private JButton             btnConnect;
   private JButton             btnUpdate;
 
-  // cpu tab
-  private JSlider             sldProcessors, sldCap, sldMemory, sldIdle;
-  private JCheckBox           chkBackground;
-  private JCheckBox           chkAutoStart;
-
-  // node tab
+  // search tab
   private JCheckBox chkSafetyConscious;
   private JCheckBox chkCpuConscious;
   private JCheckBox chkMemoryConscious;
   private JCheckBox chkPrintAllNodes;
   private JCheckBox chkWriteCsv;
-  private JTextArea txtSemiprime;
   private JButton   btnLocalSearch;
+  private JLabel    lblSemiprime;
+  private JTextArea txtSemiprime;
+  private JTextField txtSemiprimeBase, txtInternalBase, txtP1Len, txtP2Len;
+
+  // cpu tab
+  private JSlider sldProcessors, sldCap, sldMemory, sldIdle;
+  private JCheckBox chkBackground;
+  private JCheckBox chkAutoStart;
 
   //////////////////////////////////////////////////////////////////////////////
   // state
@@ -170,13 +196,14 @@ public class ClientGui extends JFrame implements DocumentListener
     setLocationRelativeTo(getRootPane());
   }
 
-  private void exit()
+  private void exit() { exit(true); }
+  private void exit(boolean save)
   {
-    saveSettings();
+    if (save) saveSettings();
     sendWork();
 
-    final Client connection = client.getAndSet(null);
-    if (null != connection && connection.connected()) connection.close();
+    final Client client = this.client.getAndSet(null);
+    if (null != client && client.connected()) client.close();
     if (null != systemTray && null != trayIcon) systemTray.remove(trayIcon);
 
     System.exit(0);
@@ -191,6 +218,127 @@ public class ClientGui extends JFrame implements DocumentListener
     prefs = Preferences.userNodeForPackage(getClass());
 
     ////////////////////////////////////////////////////////////////////////////
+    // icons
+    try
+    {
+      final boolean jar = Utils.jar();
+      icnNodeSmall = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NODE_SMALL))) : new ImageIcon(Utils.getResource(ICON_NODE_SMALL));
+      icnNode = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NODE))) : new ImageIcon(Utils.getResource(ICON_NODE));
+      icnCpu = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_CPU))) : new ImageIcon(Utils.getResource(ICON_CPU));
+      icnNet = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NET))) : new ImageIcon(Utils.getResource(ICON_NET));
+      icnSettings = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_SETTINGS))) : new ImageIcon(Utils.getResource(ICON_SETTINGS));
+      setIconImage(icnNode.getImage());
+    }
+    catch (Throwable t) { Log.e(t); }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // menus
+
+    final JMenuBar mnuBar = new JMenuBar();
+
+    ///////////////////////////////
+    final JMenu mnuFile = new JMenu("File");
+    mnuBar.add(mnuFile);
+
+    final JMenuItem mnuSaveSettings = new JMenuItem("Save Settings");
+    mnuSaveSettings.addActionListener(l -> saveSettings());
+    mnuFile.add(mnuSaveSettings);
+
+    final JMenuItem mnuLoadSettings = new JMenuItem("Load Settings");
+    mnuLoadSettings.addActionListener(l -> loadSettings());
+    mnuFile.add(mnuLoadSettings);
+
+    ///////////////////////////////
+    mnuFile.addSeparator();
+    ///////////////////////////////
+
+    final JMenuItem mnuSendWork = new JMenuItem("Send Completed Work Now");
+    mnuSendWork.addActionListener(l -> sendWork());
+    mnuFile.add(mnuSendWork);
+
+    final JMenuItem mnuRecvWork = new JMenuItem("Request New Search Root");
+    mnuRecvWork.addActionListener(l -> recvWork());
+    mnuFile.add(mnuRecvWork);
+
+    ///////////////////////////////
+    mnuFile.addSeparator();
+    ///////////////////////////////
+
+    final JMenuItem mnuQuit = new JMenuItem("Quit Discarding Changes");
+    mnuQuit.addActionListener(l -> exit(false));
+    mnuFile.add(mnuQuit);
+
+    final JMenuItem mnuSaveAndQuit = new JMenuItem("Save & Quit");
+    mnuSaveAndQuit.addActionListener(l -> exit());
+    mnuFile.add(mnuSaveAndQuit);
+    ///////////////////////////////
+
+    try
+    {
+      final JMenu mnuAbout = new JMenu("About");
+
+      ///////////////////////////////
+      final URI aboutURI = new URI(ABOUT_URL);
+      final JMenuItem mnuSPF = new JMenuItem("What is Semiprime Factorization?");
+      mnuSPF.addActionListener(l ->
+      {
+        try { java.awt.Desktop.getDesktop().browse(aboutURI); }
+        catch (Throwable t) { Log.e(t); }
+      });
+      mnuAbout.add(mnuSPF);
+
+      final URI noMathURI = new URI(NO_MATH_URL);
+      final JMenuItem mnuNoMath = new JMenuItem("Explain it again, but like I don't know any math.");
+      mnuNoMath.addActionListener(l ->
+      {
+        try { java.awt.Desktop.getDesktop().browse(noMathURI); }
+        catch (Throwable t) { Log.e(t); }
+      });
+      mnuAbout.add(mnuNoMath);
+
+      ///////////////////////////////
+      mnuAbout.addSeparator();
+      ///////////////////////////////
+
+      final URI downloadURI = new URI(SOURCE_URL);
+      final JMenuItem mnuDownload = new JMenuItem("Download Latest Client");
+      mnuDownload.addActionListener(l ->
+      {
+        try { java.awt.Desktop.getDesktop().browse(downloadURI); }
+        catch (Throwable t) { Log.e(t); }
+      });
+      mnuAbout.add(mnuDownload);
+
+      final URI sourceURI = new URI(SOURCE_URL);
+      final JMenuItem mnuSource = new JMenuItem("Source Code");
+      mnuSource.addActionListener(l ->
+      {
+        try { java.awt.Desktop.getDesktop().browse(sourceURI); }
+        catch (Throwable t) { Log.e(t); }
+      });
+      mnuAbout.add(mnuSource);
+
+      ///////////////////////////////
+      mnuAbout.addSeparator();
+      ///////////////////////////////
+
+      final URI homepageURI = new URI(HOMEPAGE_URL);
+      final JMenuItem mnuHomepage = new JMenuItem("My Homepage");
+      mnuHomepage.addActionListener(l ->
+      {
+        try { java.awt.Desktop.getDesktop().browse(homepageURI); }
+        catch (Throwable t) { Log.e(t); }
+      });
+      mnuAbout.add(mnuHomepage);
+
+      mnuBar.add(mnuAbout);
+      ///////////////////////////////
+    }
+    catch (Throwable t) { Log.d("for more info, visit:\n" + ABOUT_URL);  Log.e(t); }
+
+    setJMenuBar(mnuBar);
+
+    ////////////////////////////////////////////////////////////////////////////
     // connect tab
 
     // gather basic info about this device
@@ -201,7 +349,6 @@ public class ClientGui extends JFrame implements DocumentListener
 
     // initialize all components to default settings
     txtHistory = new JTextArea();
-
     txtHistory.setRows(HISTORY_ROWS);
     txtHistory.setColumns(HISTORY_COLS);
     txtHistory.setLineWrap(true);
@@ -267,17 +414,10 @@ public class ClientGui extends JFrame implements DocumentListener
     final JLabel lblConnectNow = new JLabel("Click update if you change your username or email after connecting:");
     lblConnectNow.setHorizontalAlignment(SwingConstants.CENTER);
 
-    btnConnect = new JButton("Connect Now");
-    btnConnect.setHorizontalAlignment(SwingConstants.CENTER);
-    btnConnect.setFocusPainted(false);
-    btnConnect.addActionListener(e ->
-    {
-      if (isConnecting.compareAndSet(false, true)) connect();
-    });
+    btnConnect = getButton("Connect Now");
+    btnConnect.addActionListener(e -> { if (isConnecting.compareAndSet(false, true)) connect(); });
 
-    btnUpdate = new JButton("Update");
-    btnUpdate.setHorizontalAlignment(SwingConstants.CENTER);
-    btnUpdate.setFocusPainted(false);
+    btnUpdate = getButton("Update");
     btnUpdate.setEnabled(false);
     btnUpdate.addActionListener(e -> sendSettings());
 
@@ -302,108 +442,6 @@ public class ClientGui extends JFrame implements DocumentListener
     final JPanel pnlNet = new JPanel(new GridLayout(2, 1));
     pnlNet.add(scrollPaneHistory);
     pnlNet.add(pnlConnect);
-
-    ////////////////////////////////////////////////////////////////////////////
-    // setup the icons and menus
-    try
-    {
-      final boolean jar = Utils.jar();
-      icnNodeSmall = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NODE_SMALL))) : new ImageIcon(Utils.getResource(ICON_NODE_SMALL));
-      icnNode = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NODE))) : new ImageIcon(Utils.getResource(ICON_NODE));
-      icnCpu = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_CPU))) : new ImageIcon(Utils.getResource(ICON_CPU));
-      icnNet = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NET))) : new ImageIcon(Utils.getResource(ICON_NET));
-      icnSettings = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_SETTINGS))) : new ImageIcon(Utils.getResource(ICON_SETTINGS));
-      setIconImage(icnNode.getImage());
-    }
-    catch (Throwable t) { Log.e(t); }
-
-    final JMenuBar mnuBar = new JMenuBar();
-
-    final JMenu mnuFile = new JMenu("File");
-    mnuBar.add(mnuFile);
-
-    final JMenuItem mnuSaveSettings = new JMenuItem("Save Settings");
-    mnuSaveSettings.addActionListener(l -> saveSettings());
-    mnuFile.add(mnuSaveSettings);
-
-    final JMenuItem mnuLoadSettings = new JMenuItem("Load Settings");
-    mnuLoadSettings.addActionListener(l -> loadSettings());
-    mnuFile.add(mnuLoadSettings);
-
-    mnuFile.addSeparator();
-
-    final JMenuItem mnuSendWork = new JMenuItem("Send All Completed Work");
-    mnuSendWork.addActionListener(l -> sendWork());
-    mnuFile.add(mnuSendWork);
-
-    final JMenuItem mnuRecvWork = new JMenuItem("Request a New Node");
-    mnuRecvWork.addActionListener(l -> recvWork());
-    mnuFile.add(mnuRecvWork);
-
-    mnuFile.addSeparator();
-
-    final JMenuItem mnuQuit = new JMenuItem("Save & Quit");
-    mnuQuit.addActionListener(l -> exit());
-    mnuFile.add(mnuQuit);
-
-    try
-    {
-      final JMenu mnuAbout = new JMenu("About");
-
-      final URI aboutURI = new URI(ABOUT_URL);
-      final JMenuItem mnuSPF = new JMenuItem("What is Semiprime Factorization?");
-      mnuSPF.addActionListener(l ->
-      {
-        try { java.awt.Desktop.getDesktop().browse(aboutURI); }
-        catch (Throwable t) { Log.e(t); }
-      });
-      mnuAbout.add(mnuSPF);
-
-      final URI noMathURI = new URI(NO_MATH_URL);
-      final JMenuItem mnuNoMath = new JMenuItem("Explain it again, but like I don't know any math.");
-      mnuNoMath.addActionListener(l ->
-      {
-        try { java.awt.Desktop.getDesktop().browse(noMathURI); }
-        catch (Throwable t) { Log.e(t); }
-      });
-      mnuAbout.add(mnuNoMath);
-
-      mnuAbout.addSeparator();
-
-      final URI downloadURI = new URI(SOURCE_URL);
-      final JMenuItem mnuDownload = new JMenuItem("Download Latest Client");
-      mnuDownload.addActionListener(l ->
-      {
-        try { java.awt.Desktop.getDesktop().browse(downloadURI); }
-        catch (Throwable t) { Log.e(t); }
-      });
-      mnuAbout.add(mnuDownload);
-
-      final URI sourceURI = new URI(SOURCE_URL);
-      final JMenuItem mnuSource = new JMenuItem("Source Code");
-      mnuSource.addActionListener(l ->
-      {
-        try { java.awt.Desktop.getDesktop().browse(sourceURI); }
-        catch (Throwable t) { Log.e(t); }
-      });
-      mnuAbout.add(mnuSource);
-
-      mnuAbout.addSeparator();
-
-      final URI homepageURI = new URI(HOMEPAGE_URL);
-      final JMenuItem mnuHomepage = new JMenuItem("My Homepage");
-      mnuHomepage.addActionListener(l ->
-      {
-        try { java.awt.Desktop.getDesktop().browse(homepageURI); }
-        catch (Throwable t) { Log.e(t); }
-      });
-      mnuAbout.add(mnuHomepage);
-
-      mnuBar.add(mnuAbout);
-    }
-    catch (Throwable t) { Log.d("for more info, visit:\n" + ABOUT_URL);  Log.e(t); }
-
-    setJMenuBar(mnuBar);
 
     ////////////////////////////////////////////////////////////////////////////
     // search tab
@@ -433,24 +471,73 @@ public class ClientGui extends JFrame implements DocumentListener
     chkWriteCsv.setHorizontalAlignment(SwingConstants.CENTER);
     chkWriteCsv.setFocusPainted(false);
 
+    /////////////////////////////////////
+
+    lblSemiprime = new JLabel("Local Semiprime Target");
+    lblSemiprime.setIcon(icnNodeSmall);
+    lblSemiprime.setHorizontalAlignment(SwingConstants.CENTER);
+
     txtSemiprime = new JTextArea(HISTORY_ROWS, HISTORY_COLS);
     txtSemiprime.setHighlighter(new DefaultHighlighter());
-    txtSemiprime.setText("323");
+    txtSemiprime.addKeyListener(new KeyListener()
+    {
+      @Override public void keyTyped(KeyEvent e) {}
+      @Override public void keyPressed(KeyEvent e) {}
+      @Override public void keyReleased(KeyEvent e)
+      {
+        final String s = clean(txtSemiprime.getText()).toLowerCase();
+        boolean allBinaryDigits = true, containsHex = false;
+        for (char c : s.toCharArray())
+        {
+          if ('a' == c || 'b' == c || 'c' == c || 'd' == c || 'e' == c || 'f' == c) { containsHex = true; break; }
+          else if (c != '0' && c != '1') { allBinaryDigits = false; }
+        }
+        if (containsHex) txtSemiprimeBase.setText("16");
+        else if (allBinaryDigits) txtSemiprimeBase.setText("2");
+        else txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE);
+        updateSemiprimeLabel();
+      }
+    });
 
     final JScrollPane scrollPaneSemiprime = new JScrollPane(txtSemiprime);
     scrollPaneSemiprime.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
     scrollPaneSemiprime.setVisible(true);
 
+    /////////////////////////////////////
+
     final JLabel lblSemiprimeBase = new JLabel("Semiprime Base");
     lblSemiprimeBase.setHorizontalAlignment(SwingConstants.CENTER);
     final JLabel lblInternalBase = new JLabel("Internal Base");
     lblInternalBase.setHorizontalAlignment(SwingConstants.CENTER);
-    final JTextField txtSemiprimeBase = new JTextField("10");
+
+    txtSemiprimeBase = getNumberField("10");
     txtSemiprimeBase.setHorizontalAlignment(SwingConstants.CENTER);
-    final JTextField txtInternalBase = new JTextField("2");
+    txtInternalBase = getNumberField("2");
     txtInternalBase.setHorizontalAlignment(SwingConstants.CENTER);
 
-    btnLocalSearch = new JButton("Start Local Search");
+    final JLabel lblP1Len = new JLabel("Prime 1 Len (internal base chars, 0 = unknown)");
+    lblP1Len.setHorizontalAlignment(SwingConstants.CENTER);
+    final JLabel lblP2Len = new JLabel("Prime 2 Len (internal base chars, 0 = unknown)");
+    lblP2Len.setHorizontalAlignment(SwingConstants.CENTER);
+
+    txtP1Len = getNumberField("0");
+    txtP1Len.setHorizontalAlignment(SwingConstants.CENTER);
+    txtP1Len.addActionListener((e) -> { try { Solver.primeLen1(Integer.parseInt(txtP1Len.getText().trim())); } catch (Throwable ignored) {} });
+
+    txtP2Len = getNumberField("0");
+    txtP2Len.setHorizontalAlignment(SwingConstants.CENTER);
+    txtP2Len.addActionListener((e) -> { try { Solver.primeLen2(Integer.parseInt(txtP2Len.getText().trim())); } catch (Throwable ignored) {} });
+
+    final JButton btnReset = getButton("Reset to Defaults");
+    btnReset.addActionListener((e) -> resetSearchSettings());
+    final JButton btnBenchmark = getButton("Load RSA Benchmark");
+    btnBenchmark.addActionListener((e) -> loadBenchmark());
+    final JButton btnRsaLen = getButton("Calc. Fixed Lengths (N/2)");
+    btnRsaLen.addActionListener((e) -> { try { final int len = getSemiprimeLen(); txtP1Len.setText(""+len/2); txtP2Len.setText(""+(len%2 != 0 ? (len/2)+1 : (len/2))); } catch (Throwable ignored) {} });
+
+    /////////////////////////////////////
+
+    btnLocalSearch = getButton("Start Local Search");
     btnLocalSearch.addActionListener(e ->
     {
       // interrupt any previous solver and wait for termination
@@ -458,15 +545,15 @@ public class ClientGui extends JFrame implements DocumentListener
       if (null != prev) { try { Solver.interrupt(); prev.join(); } catch (Throwable ignored) {} }
 
       // grab the entered search options
-      int spBase = 10;
-      try { spBase = Integer.parseInt(txtSemiprimeBase.getText().trim()); }
-      catch (Throwable t) { Log.e("provided semiprime base was invalid, defaulting to 10"); txtSemiprimeBase.setText("10"); }
-      finally { if (spBase < 2) { Log.e("semiprime base cannot be < 2, defaulting to 10"); txtSemiprimeBase.setText("10"); } }
+      int spBase = DEFAULT_SEMIPRIME_BASE;
+      try { spBase = Integer.parseInt(clean(txtSemiprimeBase.getText())); }
+      catch (Throwable t) { Log.e("provided semiprime base was invalid, defaulting to " + DEFAULT_SEMIPRIME_BASE); txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE); }
+      finally { if (spBase < 2) { Log.e("semiprime base cannot be < 2, defaulting to " + DEFAULT_SEMIPRIME_BASE); txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE); } }
 
-      int internalBase = 10;
-      try { internalBase = Integer.parseInt(txtInternalBase.getText().trim()); }
-      catch (Throwable t) { Log.e("provided internal base was invalid, defaulting to 10"); txtInternalBase.setText("10"); }
-      finally { if (internalBase < 2) { Log.e("internal base cannot be < 2, defaulting to 10"); txtInternalBase.setText("10"); } }
+      int internalBase = DEFAULT_INTERNAL_BASE;
+      try { internalBase = Integer.parseInt(clean(txtInternalBase.getText())); }
+      catch (Throwable t) { Log.e("provided internal base was invalid, defaulting to " + DEFAULT_INTERNAL_BASE); txtInternalBase.setText(""+DEFAULT_INTERNAL_BASE); }
+      finally { if (internalBase < 2) { Log.e("internal base cannot be < 2, defaulting to " + DEFAULT_INTERNAL_BASE); txtInternalBase.setText(""+DEFAULT_INTERNAL_BASE); } }
 
       // reset the solver for a new search
       Solver.reset();
@@ -474,8 +561,13 @@ public class ClientGui extends JFrame implements DocumentListener
       // create a new solver based upon user request
       try
       {
-        final Solver solver = Solver.newInstance(txtSemiprime.getText().replace(" ", "").replace("\n","").replace("\t","").trim(), spBase, internalBase);
+        final Solver solver = Solver.newInstance(clean(txtSemiprime.getText()), spBase, internalBase);
         if (null == solver) return;
+
+        // update gui w/any corrections from solver init
+        txtInternalBase.setText(""+Solver.internalBase());
+        txtP1Len.setText(""+Solver.primeLen1());
+        txtP2Len.setText(""+Solver.primeLen2());
 
         // set the callback to trigger on completion
         Solver.callback(n -> {
@@ -501,9 +593,7 @@ public class ClientGui extends JFrame implements DocumentListener
       catch (Throwable t) { Log.e(t); }
     });
 
-    final JLabel lblSemiprime = new JLabel("Semiprime Target");
-    lblSemiprime.setIcon(icnNodeSmall);
-    lblSemiprime.setHorizontalAlignment(SwingConstants.CENTER);
+    /////////////////////////////////////
 
     final JPanel pnlSearchOptions = new JPanel(new GridLayout(2, 3));
     pnlSearchOptions.add(chkSafetyConscious);
@@ -511,24 +601,44 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlSearchOptions.add(chkMemoryConscious);
     pnlSearchOptions.add(chkPrintAllNodes);
     pnlSearchOptions.add(chkWriteCsv);
+    pnlSearchOptions.add( Box.createHorizontalBox() );
 
-    final JPanel pnlSemiprime = new JPanel(new GridLayout(2,1));
-    pnlSemiprime.add(lblSemiprime);
-    pnlSemiprime.add(scrollPaneSemiprime);
+    final JPanel pnlHeader = new JPanel(new GridLayout(2, 1));
+    pnlHeader.add(pnlSearchOptions);
+    pnlHeader.add(lblSemiprime);
 
-    final JPanel pnlSemiprimeOptions = new JPanel(new GridLayout(2,2));
+    final JPanel pnlSemiprimeOptions = new JPanel(new GridLayout(4,2));
     pnlSemiprimeOptions.add(lblSemiprimeBase);
     pnlSemiprimeOptions.add(txtSemiprimeBase);
     pnlSemiprimeOptions.add(lblInternalBase);
     pnlSemiprimeOptions.add(txtInternalBase);
+    pnlSemiprimeOptions.add(lblP1Len);
+    pnlSemiprimeOptions.add(txtP1Len);
+    pnlSemiprimeOptions.add(lblP2Len);
+    pnlSemiprimeOptions.add(txtP2Len);
+
+    final JPanel pnlButtons0 = new JPanel(new GridLayout(1,2));
+    pnlButtons0.add(btnReset);
+    pnlButtons0.add(btnBenchmark);
+
+    final JPanel pnlButtons1 = new JPanel(new GridLayout(1,2));
+    pnlButtons1.add(pnlButtons0);
+    pnlButtons1.add(btnRsaLen);
+
+    final JPanel pnlButtons2 = new JPanel(new GridLayout(1,1));
+    pnlButtons2.add(btnLocalSearch);
+
+    final JPanel pnlButtons = new JPanel(new GridLayout(2,1));
+    pnlButtons.add(pnlButtons1);
+    pnlButtons.add(pnlButtons2);
 
     final JPanel pnlLocalSearch = new JPanel(new GridLayout(2, 1));
     pnlLocalSearch.add(pnlSemiprimeOptions);
-    pnlLocalSearch.add(btnLocalSearch);
+    pnlLocalSearch.add(pnlButtons);
 
     final JPanel pnlSearch = new JPanel(new GridLayout(3, 1));
-    pnlSearch.add(pnlSearchOptions);
-    pnlSearch.add(pnlSemiprime);
+    pnlSearch.add(pnlHeader);
+    pnlSearch.add(scrollPaneSemiprime);
     pnlSearch.add(pnlLocalSearch);
 
     ////////////////////////////////////////////////////////////////////////////
@@ -549,7 +659,6 @@ public class ClientGui extends JFrame implements DocumentListener
       Solver.processors(val);
       Log.d("processor cap adjusted: " + val);
     });
-
 
     final JLabel lblCap = new JLabel("Per-processor usage (%)");
     lblCap.setHorizontalAlignment(SwingConstants.CENTER);
@@ -596,9 +705,7 @@ public class ClientGui extends JFrame implements DocumentListener
       Log.d("time until work begins adjusted: " + val + " minutes");
     });
 
-    final JButton btnResetCpu = new JButton("Reset CPU Settings to Defaults");
-    btnResetCpu.setHorizontalAlignment(SwingConstants.CENTER);
-    btnResetCpu.setFocusPainted(false);
+    final JButton btnResetCpu = getButton("Reset CPU Settings to Defaults");
     btnResetCpu.addActionListener(l ->
     {
       final int result = JOptionPane.showConfirmDialog(null, "Are you sure you want to reset all CPU settings to defaults?", "Confirm Reset", JOptionPane.YES_NO_OPTION);
@@ -763,6 +870,32 @@ public class ClientGui extends JFrame implements DocumentListener
     return true;
   }
 
+  private int getSemiprimeLen()
+  {
+    try
+    {
+      final int spBase = Integer.parseInt(clean(txtSemiprimeBase.getText()));
+      final int internalBase = Integer.parseInt(clean(txtInternalBase.getText()));
+      return new BigInteger(clean(txtSemiprime.getText()), spBase).toString(internalBase).length();
+    }
+    catch (Throwable t) { return 0; }
+  }
+
+  private void updateSemiprimeLabel()
+  {
+    lblSemiprime.setText("Local Semiprime Target (len: " + getSemiprimeLen() + ")");
+  }
+
+  private void loadBenchmark()
+  {
+    txtSemiprime.setText(RSA_2048);
+    txtSemiprimeBase.setText("10");
+    txtInternalBase.setText("2");
+    final String len = ""+(getSemiprimeLen()/2);
+    txtP1Len.setText(len); txtP2Len.setText(len);
+    updateSemiprimeLabel();
+  }
+
   private Thread solverThread(Thread solver) { return this.solver.getAndSet(solver); }
   private Thread solverThread() { return solver.get(); }
 
@@ -793,8 +926,6 @@ public class ClientGui extends JFrame implements DocumentListener
       btnConnect.setText("Disconnect");
     }
   }
-
-  private boolean autostart() { return chkAutoStart.isSelected(); }
 
   private void pause()
   {
@@ -924,6 +1055,22 @@ public class ClientGui extends JFrame implements DocumentListener
   {
     prefs.putByteArray(SEMIPRIME_NAME, txtSemiprime.getText().trim().getBytes());
 
+    int spBase = prefs.getInt(SEMIPRIME_BASE_NAME, DEFAULT_SEMIPRIME_BASE);
+    try { spBase = Integer.parseInt(txtSemiprimeBase.getText().trim()); } catch (Throwable ignored) {}
+    prefs.putInt(SEMIPRIME_BASE_NAME, spBase);
+
+    int internalBase = prefs.getInt(INTERNAL_BASE_NAME, DEFAULT_INTERNAL_BASE);
+    try { internalBase = Integer.parseInt(txtInternalBase.getText().trim()); } catch (Throwable ignored) {}
+    prefs.putInt(INTERNAL_BASE_NAME, internalBase);
+
+    int p1Len = prefs.getInt(P1_LEN_NAME, DEFAULT_P1_LEN);
+    try { p1Len = Integer.parseInt(txtP1Len.getText().trim()); } catch (Throwable ignored) {}
+    prefs.putInt(P1_LEN_NAME, p1Len);
+
+    int p2Len = prefs.getInt(P2_LEN_NAME, DEFAULT_P2_LEN);
+    try { p2Len = Integer.parseInt(txtP2Len.getText().trim()); } catch (Throwable ignored) {}
+    prefs.putInt(P2_LEN_NAME, p2Len);
+
     prefs.putBoolean(SAFETY_CONSCIOUS_NAME, chkSafetyConscious.isSelected());
     prefs.putBoolean(CPU_CONSCIOUS_NAME, chkCpuConscious.isSelected());
     prefs.putBoolean(MEMORY_CONSCIOUS_NAME, chkMemoryConscious.isSelected());
@@ -970,6 +1117,12 @@ public class ClientGui extends JFrame implements DocumentListener
     final byte[] semiprime = new byte[parts.length];
     int i = -1; for (String s : parts) semiprime[++i] = Byte.parseByte(s.trim());
     txtSemiprime.setText(new String(semiprime));
+    updateSemiprimeLabel();
+
+    txtSemiprimeBase.setText(""+prefs.getInt(SEMIPRIME_BASE_NAME, DEFAULT_SEMIPRIME_BASE));
+    txtInternalBase.setText(""+prefs.getInt(INTERNAL_BASE_NAME, DEFAULT_INTERNAL_BASE));
+    txtP1Len.setText(""+prefs.getInt(P1_LEN_NAME, DEFAULT_P1_LEN));
+    txtP2Len.setText(""+prefs.getInt(P2_LEN_NAME, DEFAULT_P2_LEN));
 
     chkSafetyConscious.setSelected(prefs.getBoolean(SAFETY_CONSCIOUS_NAME, DEFAULT_SAFETY_CONSCIOUS));
     chkCpuConscious.setSelected(prefs.getBoolean(CPU_CONSCIOUS_NAME, DEFAULT_CPU_CONSCIOUS));
@@ -982,18 +1135,15 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private void loadSettings()
   {
-    Log.d("loading settings...");
-
     try
     {
+      Log.d("loading settings...");
       prefs = Preferences.userNodeForPackage(getClass());
-
       loadCpuSettings();
       loadSearchSettings();
+      Log.d("all settings loaded successfully");
     }
     catch (Throwable t) { Log.e("failed to load settings. make sure app has read permissions"); return; }
-
-    Log.d("all settings loaded");
   }
 
   private void updateSearchSettings()
@@ -1026,6 +1176,12 @@ public class ClientGui extends JFrame implements DocumentListener
   private void resetSearchSettings()
   {
     txtSemiprime.setText("");
+    updateSemiprimeLabel();
+
+    txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE);
+    txtInternalBase.setText(""+DEFAULT_INTERNAL_BASE);
+    txtP1Len.setText(""+DEFAULT_P1_LEN);
+    txtP2Len.setText(""+DEFAULT_P2_LEN);
 
     chkSafetyConscious.setSelected(DEFAULT_SAFETY_CONSCIOUS);
     chkCpuConscious.setSelected(DEFAULT_CPU_CONSCIOUS);
@@ -1076,5 +1232,34 @@ public class ClientGui extends JFrame implements DocumentListener
   public void changedUpdate(DocumentEvent e)
   {
 
+  }
+
+  private static String clean(String s) { return null != s ? s.replace(" ", "").replace("\t","").replace("\n","").replace("\r","").trim() : "";}
+
+  private static final DocumentFilter numberFilter = new DocumentFilter()
+  {
+    final Pattern regEx = Pattern.compile("\\d+");
+    @Override public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs) throws BadLocationException
+    {
+      if (!regEx.matcher(text).matches()) return;
+      super.replace(fb, offset, length, text, attrs);
+    }
+  };
+
+  private static JButton getButton(String s)
+  {
+    final JButton button = new JButton(s);
+    button.setHorizontalAlignment(SwingConstants.CENTER);
+    button.setFocusPainted(false);
+    return button;
+  }
+
+  private static JTextField getNumberField(String s) { return getNumberField(s, 2); }
+  private static JTextField getNumberField(String s, int columns)
+  {
+    final JTextField txtField = new JTextField(s);
+    ((AbstractDocument)txtField.getDocument()).setDocumentFilter(numberFilter);
+    txtField.setColumns(columns);
+    return txtField;
   }
 }

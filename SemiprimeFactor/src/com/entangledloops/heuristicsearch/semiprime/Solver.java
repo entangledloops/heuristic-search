@@ -62,9 +62,9 @@ public class Solver implements Runnable, Serializable
   private static final AtomicReference<BigInteger> nodesClosed      = new AtomicReference<>(BigInteger.ZERO);
 
   private static final AtomicInteger internalBase      = new AtomicInteger(2); ///< the base that will be used internally for the search representation
+  private static final AtomicInteger primeLen1 = new AtomicInteger(0); ///< optional: if set, only primes w/this len will be searched for
+  private static final AtomicInteger primeLen2 = new AtomicInteger(0); ///< using 0 searches for all length possibilities
   private static final AtomicBoolean primeLengthsKnown = new AtomicBoolean(false); ///< if both prime children lengths are known, we can optimize during expansion
-  private static int  primeLen1; ///< optional: if set, only primes w/this len will be searched for
-  private static int  primeLen2; ///< using 0 searches for all length possibilities
   private static long startTime; ///< nanoseconds
   private static long endTime; ///< nanoseconds
 
@@ -101,8 +101,11 @@ public class Solver implements Runnable, Serializable
   public static int length() { return semiprimeLen10; }
   public static int length(int base) { return 10 == base ? semiprimeLen10 : internalBase() == base ? semiprimeLenInternal : semiprime.toString(base).length(); }
 
-  public static void primeLen1(int len) { if (len < 1) Log.e("invalid len: " + len); else primeLen1 = len; primeLengthsKnown.set(0 != primeLen1 && 0 != primeLen2); }
-  public static void primeLen2(int len) { if (len < 1) Log.e("invalid len: " + len); else primeLen2 = len; primeLengthsKnown.set(0 != primeLen1 && 0 != primeLen2); }
+  public static int primeLen1() { return primeLen1.get(); }
+  public static void primeLen1(int len) { if (len < 1) Log.e("invalid len: " + len); else primeLen1.set(len); primeLengthsKnown.set(0 != primeLen1() && 0 != primeLen2()); }
+
+  public static int primeLen2() { return primeLen2.get(); }
+  public static void primeLen2(int len) { if (len < 1) Log.e("invalid len: " + len); else primeLen2.set(len); primeLengthsKnown.set(0 != primeLen1() && 0 != primeLen2()); }
 
   public static long startTime() { return startTime; }
   public static long endTime() { return endTime; }
@@ -149,8 +152,8 @@ public class Solver implements Runnable, Serializable
   {
     return null == n || (2 != internalBase() ||
         (
-            (0 != primeLen1 && n.p(0, 2).length() != primeLen1) ||
-            (0 != primeLen2 && n.p(1, 2).length() != primeLen2)
+            (0 != primeLen1() && n.p(0, 2).length() != primeLen1()) ||
+            (0 != primeLen2() && n.p(1, 2).length() != primeLen2())
         ))
         ? null != goal() : (semiprime.equals(n.product) && n.goalFactors() && (goal.compareAndSet(null, n) || null != goal()));
   }
@@ -270,6 +273,7 @@ public class Solver implements Runnable, Serializable
 
     // wipe search progress
     Log.d("preparing solver for new search...");
+    startTime = endTime = 0;
     goal.set(null);
     callback.set(null);
     open.clear();
