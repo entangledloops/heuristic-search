@@ -586,8 +586,8 @@ public class ClientGui extends JFrame implements DocumentListener
         Solver.callback(n ->
         {
           Log.o("\nsearch complete:\n");
-          if (null != n) Log.o("\tsp:\t" + n.product(10) + " (" + n.product(2) + ")\n\tp1:\t" + n.p(0, 10) + " (" + n.p(0, 2) + ")\n\tp2:\t" + n.p(1, 10) + " (" + n.p(1, 2) + ")");
-          else Log.e("\tno factors could be found, are you sure the input is composite" + (Solver.primeLengthsFixed() ? "and the factors are the specified lengths" : "") + "?");
+          if (null != n) Log.o("\tsp:\t" + n.product(10) + " (" + n.product() + ")\n\tp1:\t" + n.p(0, 10) + " (" + n.p(0) + ")\n\tp2:\t" + n.p(1, 10) + " (" + n.p(1) + ")");
+          else Log.e("\tno factors could be found, are you sure the input is composite" + (Solver.primeLengthsFixed() ? " and the factors are the specified lengths" : "") + "?");
           pneMain.setSelectedIndex(TAB_CONNECT);
           isSearching.set(false);
           btnSearch.setText("Start Local Search");

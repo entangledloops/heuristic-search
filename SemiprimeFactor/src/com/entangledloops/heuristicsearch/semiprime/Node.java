@@ -2,7 +2,6 @@ package com.entangledloops.heuristicsearch.semiprime;
 
 import java.io.Serializable;
 import java.math.BigInteger;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -12,13 +11,11 @@ import java.util.stream.Stream;
  */
 public class Node implements Serializable, Comparable
 {
-  private final AtomicBoolean locked = new AtomicBoolean(false); ///< is this node locked by a worker client?
   private final String key; ///< cached key value for performance
-
-  final String[]     p;
-  final BigInteger[] values;
-  final BigInteger   product; ///< the partial factors for this node
-  final double       h; ///< the heuristic search values for this node
+  private final String[]     p;
+  private final BigInteger[] values;
+  final         BigInteger   product; ///< the partial factors for this node
+  final         double       h; ///< the heuristic search values for this node
 
   Node(final String[] p) { this(hash(p), p); }
   Node(final String key, final String... p)
@@ -30,12 +27,9 @@ public class Node implements Serializable, Comparable
     final int internalBase = Solver.internalBase();
     for (int i = 0; i < p.length; ++i)
     {
-      String formatted = p[i];
-      if (Solver.safetyConscious())
-      {
-        while (formatted.startsWith("0") && formatted.length() > 0) formatted = formatted.substring(1);
-        if ("".equals(formatted)) throw new NullPointerException("an impossibly \"even prime\" (" + i + ") was somehow generated");
-      }
+      int pos = 0; while ('0' == p[i].charAt(pos)) ++pos;
+      final String formatted = p[0].substring(pos);
+      if (Solver.safetyConscious() && "".equals(formatted)) throw new NullPointerException("an impossibly \"even prime\" (" + i + ") was somehow generated");
       values[i] = new BigInteger(formatted, internalBase);
     }
 
@@ -48,6 +42,7 @@ public class Node implements Serializable, Comparable
   @Override public boolean equals(Object o) { return o instanceof Node && ((Node) o).key.equals(key); }
   @Override public int compareTo(Object o) { return Double.compare(h, Node.class.cast(o).h); }
 
+  public String product() { return product.toString(Solver.internalBase()); }
   public String product(int base) { return product.toString(base); }
 
   /**
@@ -74,6 +69,7 @@ public class Node implements Serializable, Comparable
     return true;
   }
 
+  public String p(int i) { return p[i]; }
   public String p(int i, int base) { return base != Solver.internalBase() ? values[i].toString(base) : p[i]; }
   static String hash(String... p) { return Stream.of(p).skip(1).reduce(p[0], (p1,p2) -> p1 + ":" + p2); }
 

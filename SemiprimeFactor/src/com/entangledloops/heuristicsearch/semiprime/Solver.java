@@ -69,7 +69,6 @@ public class Solver implements Runnable, Serializable
   private static final AtomicInteger internalBase      = new AtomicInteger(2); ///< the base that will be used internally for the search representation
   private static final AtomicInteger primeLen1         = new AtomicInteger(0); ///< optional: if set, only primes w/this len will be searched for
   private static final AtomicInteger primeLen2         = new AtomicInteger(0); ///< using 0 searches for all length possibilities
-  private static final AtomicBoolean primeLengthsFixed = new AtomicBoolean(false); ///< if both prime children lengths are known, we can optimize during expansion
   private static long startTime; ///< nanoseconds
   private static long endTime; ///< nanoseconds
 
@@ -107,12 +106,12 @@ public class Solver implements Runnable, Serializable
   public static int length(int base) { return 10 == base ? semiprimeLen10 : internalBase() == base ? semiprimeLenInternal : semiprime.toString(base).length(); }
 
   public static int prime1Len() { return primeLen1.get(); }
-  public static void prime1Len(int len) { if (len < 0) Log.e("invalid len: " + len); else primeLen1.set(len); primeLengthsFixed.set(0 != prime1Len() && 0 != prime2Len()); }
+  public static void prime1Len(int len) { if (len < 0) Log.e("invalid len: " + len); else primeLen1.set(len); }
 
   public static int prime2Len() { return primeLen2.get(); }
-  public static void prime2Len(int len) { if (len < 0) Log.e("invalid len: " + len); else primeLen2.set(len); primeLengthsFixed.set(0 != prime1Len() && 0 != prime2Len()); }
+  public static void prime2Len(int len) { if (len < 0) Log.e("invalid len: " + len); else primeLen2.set(len); }
 
-  public static boolean primeLengthsFixed() { return primeLengthsFixed.get(); }
+  public static boolean primeLengthsFixed() { return 0 != prime1Len() && 0 != prime2Len(); }
 
   public static long startTime() { return startTime; }
   public static long endTime() { return endTime; }
@@ -162,8 +161,8 @@ public class Solver implements Runnable, Serializable
   {
     return null == n || (2 != internalBase() ||
         (
-            (0 != prime1Len() && n.p(0, 2).length() != prime1Len()) ||
-            (0 != prime2Len() && n.p(1, 2).length() != prime2Len())
+            (0 != prime1Len() && n.p(0).length() != prime1Len()) ||
+            (0 != prime2Len() && n.p(1).length() != prime2Len())
         ))
         ? null != goal() : (semiprime.equals(n.product) && n.goalFactors() && (goal.compareAndSet(null, n) || null != goal()));
   }
@@ -292,7 +291,6 @@ public class Solver implements Runnable, Serializable
 
     prime1Len(0);
     prime2Len(0);
-    primeLengthsFixed.set(false);
 
     goal.set(null);
     callback.set(null);
@@ -314,8 +312,7 @@ public class Solver implements Runnable, Serializable
   @SuppressWarnings("StatementWithEmptyBody")
   @Override public void run()
   {
-    Log.o("\n***** searching for factors of semiprime: " + semiprimeString10 + " *****");
-
+    Log.o("\n***** searching for factors *****");
     final int internalBase = Solver.internalBase();
 
     // ensure user provided valid flags
@@ -333,13 +330,13 @@ public class Solver implements Runnable, Serializable
     if (null != timer) { timer.cancel(); endTime = startTime = 0; }
 
     // inform user of contract-bound search parameters
-    Log.o("\nsolver task parameters at launch:" +
-        "\n\ttarget semiprime (base 10): " + semiprimeString10 +
-        "\n\tlength (base 10): " + semiprimeLen10 + " digits" +
-        "\n\ttarget semiprime (base " + internalBase +"):  " + semiprimeStringInternal +
-        "\n\tlength (base " + internalBase + "):  " + semiprimeLenInternal + " digits" +
-        "\n\tprime 1 len: " + (0 != prime1Len() ? prime1Len() : "any") +
-        "\n\tprime 2 len: " + (0 != prime2Len() ? prime2Len() : "any") +
+    Log.o("\ninitial parameters:" +
+        "\n\ttarget (base 10): " + semiprimeString10 +
+        "\n\ttarget (base " + internalBase + "):  " + semiprimeStringInternal +
+        "\n\tlength (base 10): " + semiprimeLen10 +
+        "\n\tlength (base " + internalBase + "): " + semiprimeLenInternal +
+        "\n\tp1 length (base " + internalBase + "): " + (0 != prime1Len() ? prime1Len() : "any") +
+        "\n\tp2 length (base " + internalBase + "): " + (0 != prime2Len() ? prime2Len() : "any") +
         "\n\tbackground: " + background() +
         "\n\tprocessors: " + processors() +
         "\n\tprocessorCap: " + processorCap() +
