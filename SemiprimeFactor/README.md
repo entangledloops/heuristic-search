@@ -6,7 +6,7 @@ You need at least [Java 1.8](https://www.java.com/en/download/) installed.
 
 ## Build Requirements ##
 
-If you want to build from source, you'll need at least the [Java 1.8 JDK](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html).
+If you want to build from source, you'll need at least [Java 1.8 JRE](http://www.oracle.com/technetwork/java/javase/downloads/jre8-downloads-2133155.html) to run the client directly, and/or the [Java 1.8 JDK](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html) if you want to build the redistributable jar.
 
 Pull this git repo:
 
