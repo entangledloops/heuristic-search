@@ -472,29 +472,33 @@ public class ClientGui extends JFrame implements DocumentListener
       Solver.reset();
 
       // create a new solver based upon user request
-      final Solver solver = Solver.newInstance(txtSemiprime.getText().replace("\n","").replace("\t","").replace("\r","").trim(), spBase, internalBase);
-      if (null == solver) return;
-
-      // set the callback to trigger on completion
-      Solver.callback(n -> {
-          if (null == n) { Log.d("no factors were found, are you sure the input is semiprime?"); return; }
-          Log.d("\nfactors found:\n" +
-              "\nsp:\n\t" + solver.toString(10) + " (" + solver.toString(2) + ")" +
-              "\np1:\n\t" + n.p(0, 10) + " (" + n.p(0, 2) + ")" +
-              "\np2:\n\t" + n.p(1, 10) + " (" + n.p(1, 2) + ")");
-      });
-
-      // set the new solver thread
-      solverThread(new Thread(solver));
-
-      // finally, if all went well launch the search
-      final Thread solverThread = solverThread();
-      if (null != solverThread)
+      try
       {
-        solverThread.start();
-        pneMain.setSelectedIndex(TAB_CONNECT);
-        updateSettings();
+        final Solver solver = Solver.newInstance(txtSemiprime.getText().replace(" ", "").replace("\n","").replace("\t","").trim(), spBase, internalBase);
+        if (null == solver) return;
+
+        // set the callback to trigger on completion
+        Solver.callback(n -> {
+            if (null == n) { Log.d("no factors were found, are you sure the input is semiprime?"); return; }
+            Log.d("\nfactors found:\n" +
+                "\nsp:\n\t" + solver.toString(10) + " (" + solver.toString(2) + ")" +
+                "\np1:\n\t" + n.p(0, 10) + " (" + n.p(0, 2) + ")" +
+                "\np2:\n\t" + n.p(1, 10) + " (" + n.p(1, 2) + ")");
+        });
+
+        // set the new solver thread
+        solverThread(new Thread(solver));
+
+        // finally, if all went well launch the search
+        final Thread solverThread = solverThread();
+        if (null != solverThread)
+        {
+          solverThread.start();
+          pneMain.setSelectedIndex(TAB_CONNECT);
+          updateSettings();
+        }
       }
+      catch (Throwable t) { Log.e(t); }
     });
 
     final JLabel lblSemiprime = new JLabel("Semiprime Target");
@@ -542,6 +546,7 @@ public class ClientGui extends JFrame implements DocumentListener
     {
       if (sldProcessors.getValueIsAdjusting()) return;
       int val = sldProcessors.getValue();
+      Solver.processors(val);
       Log.d("processor cap adjusted: " + val);
     });
 

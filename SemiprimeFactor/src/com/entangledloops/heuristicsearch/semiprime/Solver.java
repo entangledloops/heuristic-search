@@ -74,7 +74,8 @@ public class Solver implements Runnable, Serializable
     if (null == semiprime || "".equals(semiprime) || semiprimeBase < 2 || internalBase < 2) throw new NullPointerException("invalid target or base");
 
     // check for obviously composite values
-    if ((Solver.semiprime = new BigInteger(semiprime, semiprimeBase)).compareTo(new BigInteger("4")) < 0 || Solver.semiprime.mod(new BigInteger("2")).equals(BigInteger.ZERO)) throw new NullPointerException("input is not a semiprime number");
+    if ((Solver.semiprime = new BigInteger(semiprime, semiprimeBase)).compareTo(new BigInteger("4")) < 0) throw new NullPointerException("input is not a semiprime number");
+    if (Solver.semiprime.mod(new BigInteger("2")).equals(BigInteger.ZERO)) throw new NullPointerException("input is divisible by 2");
 
     // setup cache
     Solver.internalBase.set(internalBase);
