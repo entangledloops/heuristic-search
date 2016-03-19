@@ -570,7 +570,7 @@ public class ClientGui extends JFrame implements DocumentListener
         if (!isSearching.compareAndSet(false, true))
         {
           final Thread prev = solverThread(null);
-          if (null != prev) { Log.o("interrupting search..."); Solver.interrupt(); prev.join(); Log.o("search interrupted"); return; }
+          if (null != prev) { Log.o("interrupting search..."); Solver.interrupt(); prev.join(); return; }
         }
 
         // move to main screen to view search progress or init errors
@@ -583,15 +583,16 @@ public class ClientGui extends JFrame implements DocumentListener
         Solver.memoryConscious(chkMemoryConscious.isSelected());
         Solver.printAllNodes(chkPrintAllNodes.isSelected());
         Solver.writeCsv(chkWriteCsv.isSelected());
+        Solver.processors(sldProcessors.getValue());
+        Solver.processorCap(sldProcessorCap.getValue());
+        Solver.memoryCap(sldMemoryCap.getValue());
         Solver.callback(n ->
         {
-          Log.o("\nsearch complete:\n");
-          if (null != n) Log.o("\tsp:\t" + n.product(10) + " (" + n.product() + ")\n\tp1:\t" + n.p(0, 10) + " (" + n.p(0) + ")\n\tp2:\t" + n.p(1, 10) + " (" + n.p(1) + ")");
-          else Log.e("\tno factors could be found, are you sure the input is composite" + (Solver.primeLengthsFixed() ? " and the factors are the specified lengths" : "") + "?");
-          pneMain.setSelectedIndex(TAB_CONNECT);
+          // null == solverThread() -> search was cancelled before completion
+          if (null != n) { pneMain.setSelectedIndex(TAB_CONNECT); Log.o("\nsearch complete:\n\n\tsp:\t" + n.product(10) + " (" + n.product() + ")\n\tp1:\t" + n.factor(0, 10) + " (" + n.factor(0) + ")\n\tp2:\t" + n.factor(1, 10) + " (" + n.factor(1) + ")"); }
+          else if (null != solverThread()) { pneMain.setSelectedIndex(TAB_CONNECT); Log.e("search complete:\n\n\tno factors could be found, are you sure the input is composite" + (Solver.primeLengthsFixed() ? " and the factors are the specified lengths" : "") + "?"); }
           isSearching.set(false);
           btnSearch.setText("Start Local Search");
-          btnSearch.setEnabled(true);
         });
 
         // try to parse any fixed prime lengths

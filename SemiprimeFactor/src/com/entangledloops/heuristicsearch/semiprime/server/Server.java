@@ -132,8 +132,8 @@ public class Server
         if (null == n) { Log.o("no factors were found, are you sure the input is semiprime?"); return; }
         Log.o("\nfactors found: " +
             "\n\tsp10: " + semiprime.toString(10) + " / sp2: " + semiprime.toString(2) +
-            "\n\tp10: " + n.p(0, 10) + " / p2: " + n.p(0, 2) +
-            "\n\tq10: " + n.p(1, 10) + " / q2: " + n.p(1, 2));
+            "\n\tp10: " + n.factor(0, 10) + " / p2: " + n.factor(0, 2) +
+            "\n\tq10: " + n.factor(1, 10) + " / q2: " + n.factor(1, 2));
     });
 
     solver.run();

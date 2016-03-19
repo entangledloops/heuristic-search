@@ -8,9 +8,12 @@ import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.IntStream;
+
+import static java.lang.System.nanoTime;
 
 /**
  * @author Stephen Dunn
@@ -23,8 +26,6 @@ public class Solver implements Runnable, Serializable
   private static final long     checkForWorkTimeout  = 1L;
   private static final TimeUnit checkForWorkTimeUnit = TimeUnit.MILLISECONDS;
 
-  // worker threads
-  private static final List<Thread> threads = Collections.synchronizedList(new ArrayList<>());
 
   // state vars
   private static final AtomicBoolean safetyConscious = new AtomicBoolean(true); ///< if false, fewer sanity checks are performed on values and most statistics will be ignored
@@ -37,12 +38,36 @@ public class Solver implements Runnable, Serializable
   private static final AtomicInteger processorCap    = new AtomicInteger(100);
   private static final AtomicInteger memoryCap       = new AtomicInteger(100);
 
+  // search state
+  private static final List<Thread>                    threads  = Collections.synchronizedList(new ArrayList<>()); ///< worker threads
+  private static final PriorityBlockingQueue<Node>     open     = new PriorityBlockingQueue<>(); ///< unbounded queue backed by heap for fast pop() behavior w/o sorting
+  private static final ConcurrentHashMap<String, Node> opened   = new ConcurrentHashMap<>(); ///< the opened hash table for faster lookup times
+  private static final ConcurrentHashMap<String, Node> closed   = new ConcurrentHashMap<>(); ///< closed hash table
+  private static final AtomicReference<Node>           goal     = new AtomicReference<>(); ///< set if/when goal is found; if set, search will end
+  private static final AtomicReference<Consumer<Node>> callback = new AtomicReference<>(); ///< a function to receive the goal node (or null) upon completion
+
+  // some stats tracking
+  private static final AtomicReference<BigInteger> nodesGenerated   = new AtomicReference<>(BigInteger.ZERO);
+  private static final AtomicReference<BigInteger> nodesRegenerated = new AtomicReference<>(BigInteger.ZERO);
+  private static final AtomicReference<BigInteger> nodesIgnored     = new AtomicReference<>(BigInteger.ZERO);
+  private static final AtomicReference<BigInteger> nodesExpanded    = new AtomicReference<>(BigInteger.ZERO);
+  private static final AtomicReference<BigInteger> nodesClosed      = new AtomicReference<>(BigInteger.ZERO);
+  private static final AtomicReference<Timer>      statsTimer       = new AtomicReference<>(); ///< periodic reporting on search
+  private static final AtomicLong startTime = new AtomicLong(); ///< nanoseconds
+  private static final AtomicLong endTime = new AtomicLong(); ///< nanoseconds
+
+  // numerical info
+  private static final AtomicReference<BigInteger> semiprime    = new AtomicReference<>(BigInteger.ZERO); ///< the target semiprime value
+  private static final AtomicInteger               internalBase = new AtomicInteger(2); ///< the base that will be used internally for the search representation
+  private static final AtomicInteger               primeLen1    = new AtomicInteger(0); ///< optional: if set, only primes w/this len will be searched for
+  private static final AtomicInteger               primeLen2    = new AtomicInteger(0); ///< using 0 searches for all length possibilities
+
+
   // vars cached for performance
-  private static BigInteger semiprime; ///< the target semiprime value
-  private static String     semiprimeString10; ///< cached base 10
-  private static String     semiprimeStringInternal; ///< cached internal base
-  private static int        semiprimeLen10; ///< cached base 10
-  private static int        semiprimeLenInternal; ///< cached internal len
+  private static String semiprimeString10; ///< cached base 10
+  private static String semiprimeStringInternal; ///< cached internal base
+  private static int    semiprimeLen10; ///< cached base 10
+  private static int    semiprimeLenInternal; ///< cached internal len
 
   // heuristic aids
   static String semiprimeBinary;
@@ -51,59 +76,39 @@ public class Solver implements Runnable, Serializable
   static int    semiprimeBinaryCount1; ///< cached internal len
   static double semiprimeBinary0sTo1s; ///< cached internal len
 
-  // the shared work completed or pending
-  private static final PriorityBlockingQueue<Node>     open     = new PriorityBlockingQueue<>(); ///< unbounded queue backed by heap for fast pop() behavior w/o sorting
-  private static final ConcurrentHashMap<String, Node> opened   = new ConcurrentHashMap<>(); ///< the opened hash table for faster lookup times
-  private static final ConcurrentHashMap<String, Node> closed   = new ConcurrentHashMap<>(); ///< closed hash table
-  private static final AtomicReference<Node>           goal     = new AtomicReference<>(); ///< set if/when goal is found; if set, search will end
-  private static final AtomicReference<Consumer<Node>> callback = new AtomicReference<>(); ///< a function to receive the goal node (or null) upon completion
-
-  // some stats tracking
-  private static final AtomicReference<Timer>      statsTimer       = new AtomicReference<>(); ///< periodic reporting on search
-  private static final AtomicReference<BigInteger> nodesGenerated   = new AtomicReference<>(BigInteger.ZERO);
-  private static final AtomicReference<BigInteger> nodesRegenerated = new AtomicReference<>(BigInteger.ZERO);
-  private static final AtomicReference<BigInteger> nodesIgnored     = new AtomicReference<>(BigInteger.ZERO);
-  private static final AtomicReference<BigInteger> nodesExpanded    = new AtomicReference<>(BigInteger.ZERO);
-  private static final AtomicReference<BigInteger> nodesClosed      = new AtomicReference<>(BigInteger.ZERO);
-
-  private static final AtomicInteger internalBase      = new AtomicInteger(2); ///< the base that will be used internally for the search representation
-  private static final AtomicInteger primeLen1         = new AtomicInteger(0); ///< optional: if set, only primes w/this len will be searched for
-  private static final AtomicInteger primeLen2         = new AtomicInteger(0); ///< using 0 searches for all length possibilities
-  private static long startTime; ///< nanoseconds
-  private static long endTime; ///< nanoseconds
-
   private Solver(final String semiprime, final int semiprimeBase, final int internalBase)
   {
     // check for invalid params
     if (null == semiprime || "".equals(semiprime) || semiprimeBase < 2 || internalBase < 2) throw new NullPointerException("invalid target or base");
 
     // check for obviously composite values
-    if ((Solver.semiprime = new BigInteger(semiprime, semiprimeBase)).compareTo(new BigInteger("4")) < 0) throw new NullPointerException("input is not a semiprime number");
-    if (Solver.semiprime.mod(new BigInteger("2")).equals(BigInteger.ZERO)) throw new NullPointerException("input is divisible by 2");
+    Solver.semiprime.set(new BigInteger(semiprime, semiprimeBase));
+    if (semiprime().compareTo(BigInteger.valueOf(4)) < 0) throw new NullPointerException("input is not a semiprime number");
+    if (semiprime().mod(BigInteger.valueOf(2)).equals(BigInteger.ZERO)) throw new NullPointerException("input is divisible by 2");
 
     // setup cache
-    Solver.internalBase.set(internalBase);
-    Solver.semiprimeString10 = Solver.semiprime.toString(10);
+    Solver.semiprimeString10 = Solver.semiprime().toString(10);
     Solver.semiprimeLen10 = Solver.semiprimeString10.length();
-    Solver.semiprimeStringInternal = Solver.semiprime.toString(internalBase);
-    Solver.semiprimeLenInternal = Solver.semiprimeStringInternal.length();
-    Solver.semiprimeBinary = Solver.semiprime.toString(2);
+
+    Solver.semiprimeBinary = Solver.semiprime().toString(2);
     Solver.semiprimeBinaryLen = Solver.semiprimeBinary.length();
 
-    // to aid w/heuristics
-    for (final char c : semiprimeBinary.toCharArray())
-    {
-      if ('0' == c) ++semiprimeBinaryCount0;
-      else ++semiprimeBinaryCount1;
-    }
-    semiprimeBinary0sTo1s = (double)(semiprimeBinaryCount0)/(double)Solver.semiprimeBinary.length();
+    Solver.internalBase.set(internalBase);
+    Solver.semiprimeStringInternal = semiprime().toString(internalBase);
+    Solver.semiprimeLenInternal = Solver.semiprimeStringInternal.length();
+
+    // cached heuristics aids
+    for (final char c : semiprimeBinary.toCharArray()) { if ('0' == c) ++semiprimeBinaryCount0; else ++semiprimeBinaryCount1; }
+    semiprimeBinary0sTo1s = (double)semiprimeBinaryCount0/(double)semiprimeBinaryLen;
   }
 
   @Override public String toString() { return semiprimeString10; }
-  public String toString(int base) { return 10 == base ? semiprimeString10 : internalBase() == base ? semiprimeStringInternal : semiprime.toString(base); }
+  public String toString(int base) { return 10 == base ? semiprimeString10 : internalBase() == base ? semiprimeStringInternal : semiprime().toString(base); }
+
+  public static BigInteger semiprime() { return semiprime.get(); }
 
   public static int length() { return semiprimeLen10; }
-  public static int length(int base) { return 10 == base ? semiprimeLen10 : internalBase() == base ? semiprimeLenInternal : semiprime.toString(base).length(); }
+  public static int length(int base) { return 10 == base ? semiprimeLen10 : internalBase() == base ? semiprimeLenInternal : semiprime().toString(base).length(); }
 
   public static int prime1Len() { return primeLen1.get(); }
   public static void prime1Len(int len) { if (len < 0) Log.e("invalid len: " + len); else primeLen1.set(len); }
@@ -113,9 +118,9 @@ public class Solver implements Runnable, Serializable
 
   public static boolean primeLengthsFixed() { return 0 != prime1Len() && 0 != prime2Len(); }
 
-  public static long startTime() { return startTime; }
-  public static long endTime() { return endTime; }
-  public static long elapsed() { return endTime - startTime; }
+  public static long startTime() { return startTime.get(); }
+  public static long endTime() { return endTime.get(); }
+  public static long elapsed() { return endTime.get() - startTime.get(); }
 
   public static void background(boolean background) { Solver.background.set(background); }
   public static boolean background() { return background.get(); }
@@ -159,12 +164,7 @@ public class Solver implements Runnable, Serializable
    */
   private static boolean goal(Node n)
   {
-    return null == n || (2 != internalBase() ||
-        (
-            (0 != prime1Len() && n.p(0).length() != prime1Len()) ||
-            (0 != prime2Len() && n.p(1).length() != prime2Len())
-        ))
-        ? null != goal() : (semiprime.equals(n.product) && n.goalFactors() && (goal.compareAndSet(null, n) || null != goal()));
+    return null == n ? null != goal() : (semiprime().equals(n.product) && n.goalFactors() && (goal.compareAndSet(null, n) || null != goal()));
   }
 
   @SuppressWarnings("StatementWithEmptyBody")
@@ -213,8 +213,7 @@ public class Solver implements Runnable, Serializable
   private static Node pop()
   {
     Node node;
-    try { while (null == (node = close(open.poll(checkForWorkTimeout, checkForWorkTimeUnit)))) if (null != goal()) return null; }
-    catch (Throwable t) { Log.e("worker thread interrupted, terminating", t); return null; }
+    try { while (null == (node = close(open.poll(checkForWorkTimeout, checkForWorkTimeUnit)))) if (null != goal()) return null; } catch (Throwable t) { return null; }
     return node;
   }
 
@@ -225,17 +224,17 @@ public class Solver implements Runnable, Serializable
    */
   private static boolean expand(final Node n)
   {
-    //if (nodesGenerated.get().compareTo(new BigInteger("100")) > 0) System.exit(0);
+    //if (nodesGenerated.get().compareTo(BigInteger.valueOf(100)) > 0) System.exit(0);
     if (printAllNodes()) Log.o("expanding: " + n.product.toString(10) + " / " + n.product.toString(internalBase.get()) + " : [" + n.toString() + ":" + n.h + "]");
 
     // check if we found the goal already or this node is the goal
     if (goal(n)) return false; else expanded();
 
     // cache some vars
-    final String p1 = n.p(0, 2), p2 = n.p(1, 2);
+    final String p1 = n.factor(0, 2), p2 = n.factor(1, 2);
 
     // ensure we should bother w/this node at all
-    if (n.product.compareTo(semiprime) > 0 || p1.length() >= semiprimeBinaryLen || p2.length() >= semiprimeBinaryLen) return true;
+    if (n.product.compareTo(semiprime()) > 0 || p1.length() >= semiprimeBinaryLen || p2.length() >= semiprimeBinaryLen) return true;
 
     // generate all node combinations
     final int internalBase = internalBase();
@@ -282,7 +281,8 @@ public class Solver implements Runnable, Serializable
     Log.o("preparing solver for new search...");
 
     // wipe previous search info
-    startTime = endTime = 0;
+    startTime.set(0);
+    endTime.set(0);
 
     nodesGenerated.set(BigInteger.ZERO);
     nodesRegenerated.set(BigInteger.ZERO);
@@ -327,7 +327,7 @@ public class Solver implements Runnable, Serializable
 
     // atomically cancel and clear any previous timer tasks
     Timer timer = statsTimer.getAndSet(null);
-    if (null != timer) { timer.cancel(); endTime = startTime = 0; }
+    if (null != timer) { timer.cancel(); endTime.set(0); startTime.set(0); }
 
     // inform user of contract-bound search parameters
     Log.o("\ninitial parameters:" +
@@ -351,8 +351,8 @@ public class Solver implements Runnable, Serializable
     // properly schedule a new timer
     if (statsTimer.compareAndSet(null, (timer = new Timer())))
     {
-      startTime = System.nanoTime();
-      timer.schedule(new TimerTask() { @Override public void run() { Log.o("progress:" + stats((System.nanoTime() - startTime))); } }, statsPeriodMillis, statsPeriodMillis);
+      startTime.set(nanoTime());
+      timer.schedule(new TimerTask() { @Override public void run() { Log.o("progress:" + stats((nanoTime() - startTime.get()))); } }, statsPeriodMillis, statsPeriodMillis);
     }
 
     // launch all worker threads and wait for completion
@@ -364,7 +364,7 @@ public class Solver implements Runnable, Serializable
     if (null != (timer = statsTimer.getAndSet(null)))
     {
       timer.cancel();
-      endTime = System.nanoTime();
+      endTime.set(System.nanoTime());
     }
 
     // print final stats after all work is done
