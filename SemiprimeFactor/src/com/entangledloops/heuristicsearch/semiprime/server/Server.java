@@ -1,10 +1,8 @@
 package com.entangledloops.heuristicsearch.semiprime.server;
 
-import com.entangledloops.heuristicsearch.semiprime.Solver;
 import com.entangledloops.heuristicsearch.semiprime.Log;
 import com.entangledloops.heuristicsearch.semiprime.client.Client;
 
-import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.util.Iterator;
 import java.util.Queue;
@@ -117,36 +115,14 @@ public class Server
 
   public static void main(String[] args)
   {
-    //rsa-220 = "2260138526203405784941654048610197513508038915719776718321197768109445641817966676608593121306582577250631562886676970448070001811149711863002112487928199487482066070131066586646083327982803560379205391980139946496955261";
-    //"8605230192532870349";
-    //9141272051 = 95617*95603
-    final String semiprime10 = "8605230192532870349";
-    final BigInteger semiprime = new BigInteger(semiprime10);
-    final Solver solver = Solver.newInstance(semiprime10);
-    if (null == solver) { Log.e("failed to create the solver task for semiprime:\n" + semiprime10); System.exit(1); }
-
-    //solver.processors(1);
-    //solver.prime1Len(semiprime.toString(2).length()/2);
-    //solver.prime2Len(semiprime.toString(2).length()/2);
-    solver.callback(n -> {
-        if (null == n) { Log.o("no factors were found, are you sure the input is semiprime?"); return; }
-        Log.o("\nfactors found: " +
-            "\n\tsp10: " + semiprime.toString(10) + " / sp2: " + semiprime.toString(2) +
-            "\n\tp10: " + n.factor(0, 10) + " / p2: " + n.factor(0, 2) +
-            "\n\tq10: " + n.factor(1, 10) + " / q2: " + n.factor(1, 2));
-    });
-
-    solver.run();
-
-//    final Server server = new Server();
-//    final ServerGui serverGui = new ServerGui(server);
-//    try
-//    {
-//      while (!server.ready()) { try { Thread.sleep(250); } catch (Throwable t) { Log.e(t); } }
-//      try { new Client(); } catch (Throwable t) { Log.e(t); }
-//      try { Thread.sleep(250); } catch (Throwable t) { Log.e(t); }
-//    }
-//    catch (Throwable t) { Log.e(t); }
-
+    final Server server = new Server();
+    final ServerGui serverGui = new ServerGui(server);
+    try
+    {
+      while (!server.ready()) { try { Thread.sleep(250); } catch (Throwable t) { Log.e(t); } }
+      try { new Client(); } catch (Throwable t) { Log.e(t); }
+      try { Thread.sleep(250); } catch (Throwable t) { Log.e(t); }
+    }
+    catch (Throwable t) { Log.e(t); }
   }
 }

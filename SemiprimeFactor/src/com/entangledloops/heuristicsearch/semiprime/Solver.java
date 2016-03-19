@@ -233,7 +233,7 @@ public class Solver implements Runnable, Serializable
     final String p1 = n.factor(0), p2 = n.factor(1);
 
     // ensure we should bother w/this node at all
-    if (n.product.bitLength() >= semiprimeLen2) return true;
+    if (n.product.bitLength() >= semiprimeLen2-1) return true;
 
     // generate all node combinations
     final int internalBase = internalBase();
