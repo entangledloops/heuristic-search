@@ -38,6 +38,7 @@ public class Node implements Serializable, Comparable
     return hash.get();
   }
 
+  public int depth() { return depth; }
   public String product() { return product.toString(Solver.internalBase()); }
   public String product(int base) { return product.toString(base); }
   public BigInteger factor(int i) { return factors[i]; }
@@ -47,7 +48,7 @@ public class Node implements Serializable, Comparable
    * in the currently fixed digit positions.
    * @return true if everything looks okay
    */
-  boolean validFactors() { return product.testBit(depth) == Solver.semiprime().testBit(depth); }
+  boolean validFactors() { return depth < Solver.length() && product.bitLength() <= Solver.semiprimeBitLen && product.testBit(depth) == Solver.semiprime().testBit(depth); }
 
   /**
    * Ensure that none of the factors is trivial.
@@ -63,7 +64,7 @@ public class Node implements Serializable, Comparable
   private double h()
   {
     double h = Math.max(Solver.prime1Len(), Solver.prime2Len());
-    for (BigInteger factor : factors) h += Math.abs(((double) factor.bitCount() / (double) factor.bitLength()) - Solver.semiprimeSetBitsToLen);
+    for (BigInteger factor : factors) h += Math.abs(((double) factor.bitCount() / (double) factor.bitLength()) - Solver.semiprimeBitsSetToLen);
     return h;
   }
 }

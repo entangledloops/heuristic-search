@@ -27,6 +27,7 @@ public class Solver implements Runnable, Serializable
   private static final TimeUnit checkForWorkTimeUnit = TimeUnit.MILLISECONDS;
 
   // state vars
+  private static final AtomicBoolean recordStats     = new AtomicBoolean(true); ///< if false, fewer sanity checks are performed on values and most statistics will be ignored
   private static final AtomicBoolean safetyConscious = new AtomicBoolean(true); ///< if false, fewer sanity checks are performed on values and most statistics will be ignored
   private static final AtomicBoolean cpuConscious    = new AtomicBoolean(true); ///< if true, will take additional steps to trade memory for more CPU;
   private static final AtomicBoolean memoryConscious = new AtomicBoolean(false); ///< if true, will take additional steps to trade CPU for more memory
@@ -40,20 +41,21 @@ public class Solver implements Runnable, Serializable
   // search state
   private static final List<Thread>                    threads  = Collections.synchronizedList(new ArrayList<>()); ///< worker threads
   private static final PriorityBlockingQueue<Node>     open     = new PriorityBlockingQueue<>(); ///< unbounded queue backed by heap for fast pop() behavior w/o sorting
-  private static final ConcurrentHashMap<Node, Node>   opened   = new ConcurrentHashMap<>(); ///< the opened hash table for faster lookup times
   private static final ConcurrentHashMap<Node, Node>   closed   = new ConcurrentHashMap<>(); ///< closed hash table
   private static final AtomicReference<Node>           goal     = new AtomicReference<>(); ///< set if/when goal is found; if set, search will end
   private static final AtomicReference<Consumer<Node>> callback = new AtomicReference<>(); ///< a function to receive the goal node (or null) upon completion
 
   // some stats tracking
-  private static final AtomicReference<BigInteger> nodesGenerated   = new AtomicReference<>(BigInteger.ZERO);
-  private static final AtomicReference<BigInteger> nodesRegenerated = new AtomicReference<>(BigInteger.ZERO);
-  private static final AtomicReference<BigInteger> nodesIgnored     = new AtomicReference<>(BigInteger.ZERO);
-  private static final AtomicReference<BigInteger> nodesExpanded    = new AtomicReference<>(BigInteger.ZERO);
-  private static final AtomicReference<BigInteger> nodesClosed      = new AtomicReference<>(BigInteger.ZERO);
-  private static final AtomicReference<Timer>      statsTimer       = new AtomicReference<>(); ///< periodic reporting on search
-  private static final AtomicLong startTime = new AtomicLong(); ///< nanoseconds
-  private static final AtomicLong endTime = new AtomicLong(); ///< nanoseconds
+  private static final AtomicReference<Timer> statsTimer       = new AtomicReference<>(); ///< periodic reporting on search
+  private static final AtomicLong             nodesGenerated   = new AtomicLong();
+  private static final AtomicLong             nodesRegenerated = new AtomicLong();
+  private static final AtomicLong             nodesIgnored     = new AtomicLong();
+  private static final AtomicLong             nodesExpanded    = new AtomicLong();
+  private static final AtomicLong             nodesClosed      = new AtomicLong();
+  private static final AtomicLong             startTime        = new AtomicLong(); ///< nanoseconds
+  private static final AtomicLong             endTime          = new AtomicLong(); ///< nanoseconds
+  private static final AtomicLong             totalDepth       = new AtomicLong(); ///< nanoseconds
+  private static final AtomicInteger          maxDepth         = new AtomicInteger(0);
 
   // target info
   private static final AtomicReference<BigInteger> semiprime    = new AtomicReference<>(BigInteger.ZERO); ///< the target semiprime value
@@ -70,9 +72,10 @@ public class Solver implements Runnable, Serializable
   private static int    semiprimeLenInternal; ///< cached internal len
 
   // heuristic cache
-  static int    semiprime0s; ///< cached internal len
+  static int    semiprimeBitLen; ///< cached internal len
   static int    semiprime1s; ///< cached internal len
-  static double semiprimeSetBitsToLen; ///< cached internal len
+  static int    semiprime0s; ///< cached internal len
+  static double semiprimeBitsSetToLen; ///< cached internal len
 
   private Solver(final String semiprime, final int semiprimeBase, final int internalBase)
   {
@@ -90,11 +93,12 @@ public class Solver implements Runnable, Serializable
     Solver.semiprimeString2 = Solver.semiprime().toString(2);
     Solver.semiprimeStringInternal = Solver.semiprime().toString(internalBase);
     Solver.semiprimeLen10 = Solver.semiprimeString10.length();
-    Solver.semiprimeLen2 = semiprime().bitLength();
+    Solver.semiprimeLen2 = semiprimeString2.length();
     Solver.semiprimeLenInternal = semiprimeStringInternal.length();
+    Solver.semiprimeBitLen = semiprime().bitLength();
     Solver.semiprime1s = semiprime().bitCount();
     Solver.semiprime0s = Solver.semiprimeLen2 - Solver.semiprime1s;
-    Solver.semiprimeSetBitsToLen = (double) semiprime1s / (double) semiprimeLen2;
+    Solver.semiprimeBitsSetToLen = (double) semiprime1s / (double) semiprimeBitLen;
   }
 
   @Override public String toString() { return semiprimeString10; }
@@ -102,8 +106,8 @@ public class Solver implements Runnable, Serializable
 
   public static BigInteger semiprime() { return semiprime.get(); }
 
-  public static int length() { return semiprimeLen10; }
-  public static int length(int base) { return 10 == base ? semiprimeLen10 : internalBase() == base ? semiprimeLenInternal : semiprime().toString(base).length(); }
+  public static int length() { return semiprimeLenInternal; }
+  public static int length(int base) { return internalBase() == base ? semiprimeLenInternal : (10 == base ? semiprimeLen10 : (2 == base ? semiprimeLen2 : semiprime().toString(base).length())); }
 
   public static int prime1Len() { return primeLen1.get(); }
   public static void prime1Len(int len) { if (len < 0) Log.e("invalid len: " + len); else primeLen1.set(len); }
@@ -162,20 +166,14 @@ public class Solver implements Runnable, Serializable
     return null == n ? null != goal() : (n.goalFactors() && semiprime().equals(n.product) && (goal.compareAndSet(null, n) || null != goal()));
   }
 
-  @SuppressWarnings("StatementWithEmptyBody")
-  private static void generated() { while (!nodesGenerated.compareAndSet(nodesGenerated.get(), BigInteger.ONE.add(nodesGenerated.get()))); }
-
-  @SuppressWarnings("StatementWithEmptyBody")
-  private static void regenerated() { while (!nodesRegenerated.compareAndSet(nodesRegenerated.get(), BigInteger.ONE.add(nodesRegenerated.get()))); }
-
-  @SuppressWarnings("StatementWithEmptyBody")
-  private static void ignored() { while (!nodesIgnored.compareAndSet(nodesIgnored.get(), BigInteger.ONE.add(nodesIgnored.get()))); }
-
-  @SuppressWarnings("StatementWithEmptyBody")
-  private static void expanded() { while (!nodesExpanded.compareAndSet(nodesExpanded.get(), BigInteger.ONE.add(nodesExpanded.get()))); }
-
-  @SuppressWarnings("StatementWithEmptyBody")
-  private static void closed() { while (!nodesClosed.compareAndSet(nodesClosed.get(), BigInteger.ONE.add(nodesClosed.get()))); }
+  private static long nodesGenerated() { return nodesGenerated.get(); }
+  private static long nodesRegenerated() { return nodesRegenerated.get(); }
+  private static long nodesIgnored() { return nodesIgnored.get(); }
+  private static long nodesExpanded() { return nodesExpanded.get(); }
+  private static long nodesClosed() { return nodesClosed.get(); }
+  private static long maxDepth() { return maxDepth.get(); }
+  private static long totalDepth() { return totalDepth.get(); }
+  private static long avgDepth() { return totalDepth() / nodesExpanded(); }
 
   /**
    * if this node is newly closed, ensure we update the counter in a thread-safe manner
@@ -184,8 +182,9 @@ public class Solver implements Runnable, Serializable
    */
   private static Node close(Node n)
   {
-    if (null == n) return null;
-    if (null == closed.putIfAbsent(n, n)) closed();
+    final Node prev = closed.put(n, n);
+    if (null != prev) { if (!n.equals(prev)) Log.e("hash collision!\n" + n + " != " + prev); return null; }
+    nodesClosed.addAndGet(1);
     return n;
   }
 
@@ -194,27 +193,18 @@ public class Solver implements Runnable, Serializable
    * @param n a node to attempt adding
    * @return false on exception (possible null pointer or out of heap memory)
    */
-  private static boolean push(Node n)
-  {
-    try { if (null != opened.putIfAbsent(n, n) || !open.offer(n)) regenerated(); return true; }
-    catch (Throwable t) { Log.e(t); return false; }
-  }
+  private static boolean push(Node n) { if (!open.offer(n)) nodesRegenerated.addAndGet(1); return true; }
 
   /**
    * pop available node of opened
-   * @return the next available node or null if goal was found
+   * @return the next available node or null if goal was found or error occurred
    */
   @SuppressWarnings("StatementWithEmptyBody")
   private static Node pop()
   {
     Node node;
-    try { while (null == (node = close(open.poll(checkForWorkTimeout, checkForWorkTimeUnit)))) if (null != goal()) return null; } catch (Throwable t) { return null; }
+    try { while (null == (node = open.poll(checkForWorkTimeout, checkForWorkTimeUnit))) if (null != goal()) return null; } catch (Throwable t) { return null; }
     return node;
-  }
-
-  private static boolean contains(Node key)
-  {
-    return key.equals(closed.get(key)) || key.equals(opened.get(key));
   }
 
   /**
@@ -224,10 +214,10 @@ public class Solver implements Runnable, Serializable
    */
   private static boolean expand(final Node n)
   {
-    expanded(); if (printAllNodes()) Log.o("expanding: " + n);
-
-    // ensure we should bother w/this node at all
-    if (n.product.bitLength() >= semiprimeLen2-1) return true;
+    // stats
+    nodesExpanded.addAndGet(1); if (printAllNodes()) Log.o("expanding: " + n);
+    maxDepth.set(Math.max(maxDepth.get(), n.depth()));
+    totalDepth.addAndGet(n.depth());
 
     // generate all node combinations
     final int internalBase = internalBase();
@@ -235,34 +225,25 @@ public class Solver implements Runnable, Serializable
     {
       for (int j = 0; j < internalBase; ++j)
       {
-        // generate new node
-        Node generated = new Node(n, i, j);
-        if (goal(generated)) return false;
-
-        // check if this node already exists or same node w/children in reverse order
-        if (Solver.contains(generated)) continue;
-
-        // try push to open
-        if (!generated.validFactors()) { ignored(); close(generated); }
-        else if (!push(generated)) return false;
-
-        // record new valid node generation
-        generated(); if (printAllNodes()) Log.o("generated: " + generated);
+        Node generated = close(new Node(n, i, j));
+        if (null == generated || !generated.validFactors()) { nodesIgnored.addAndGet(1); continue; }
+        nodesGenerated.addAndGet(1); if (printAllNodes()) Log.o("generated: " + generated);
+        if (goal(generated) || !push(generated)) return false;
       }
     }
 
-    // push all generated nodes simultaneously as an array
     return true;
   }
 
   private static String stats(final long elapsedNanos)
   {
     final long seconds = (elapsedNanos/1000000000L);
-    return "\n\telapsed: " + (seconds/60L) + " minutes, " + (seconds%60L) + " seconds" +
-       "\n\tnodesGenerated: " + nodesGenerated +
-       "\n\tnodesIgnored: " + nodesIgnored +
-       "\n\tnodesExpanded: " + nodesExpanded +
-       "\n\tnodesClosed: " + nodesClosed;
+    return "\n\tnodesGenerated:\t" + nodesGenerated +
+        "\n\tnodesIgnored:\t" + nodesIgnored +
+        "\n\tnodesExpanded:\t" + nodesExpanded +
+        "\n\tnodesClosed:\t" + nodesClosed +
+        "\n\tmaxDepth:\t" + maxDepth() + ", avgDepth: " + avgDepth() +
+        "\n\telapsed:\t" + (seconds/60L) + " minutes, " + (seconds%60L) + " seconds";
   }
 
   // resets the search
@@ -273,14 +254,16 @@ public class Solver implements Runnable, Serializable
     Log.o("preparing solver for new search...");
 
     // wipe previous search info
+    nodesGenerated.set(0);
+    nodesRegenerated.set(0);
+    nodesIgnored.set(0);
+    nodesExpanded.set(0);
+    nodesClosed.set(0);
+
+    maxDepth.set(0);
+    totalDepth.set(0);
     startTime.set(0);
     endTime.set(0);
-
-    nodesGenerated.set(BigInteger.ZERO);
-    nodesRegenerated.set(BigInteger.ZERO);
-    nodesIgnored.set(BigInteger.ZERO);
-    nodesExpanded.set(BigInteger.ZERO);
-    nodesClosed.set(BigInteger.ZERO);
 
     prime1Len(0);
     prime2Len(0);
@@ -289,7 +272,6 @@ public class Solver implements Runnable, Serializable
     callback.set(null);
 
     open.clear();
-    opened.clear();
     closed.clear();
 
     Log.o("solver reset");
@@ -350,27 +332,19 @@ public class Solver implements Runnable, Serializable
     }
 
     // launch all worker threads and wait for completion
-    threads.parallelStream().forEach(Thread::start);
+    threads.stream().forEach(Thread::start);
     try { threads.stream().forEach((thread) -> { try { thread.join(); } catch (Throwable t) { Log.e("searching thread interrupted", t); } }); } catch (Throwable ignored) {}
     threads.clear();
 
     // cancel the timer and record end time
-    if (null != (timer = statsTimer.getAndSet(null)))
-    {
-      timer.cancel();
-      endTime.set(System.nanoTime());
-    }
+    if (null != (timer = statsTimer.getAndSet(null))) { timer.cancel(); endTime.set(System.nanoTime()); }
 
     // print final stats after all work is done
-    Log.o("\nfinal stats:" + stats(elapsed()) +
-            "\n\topen.size(): " + open.size() +
-            "\n\topened.size(): " + opened.size() +
-            "\n\tclosed.size(): " + closed.size());
+    Log.o("\nfinal stats:" + stats(elapsed()) + "\n\topen.size(): " + open.size() + "\n\tclosed.size(): " + closed.size());
 
     // notify waiters that we've completed factoring
     final Consumer<Node> callback = Solver.callback.get();
-    final Node goal = goal();
-    if (null != callback) callback.accept(goal); else Log.o((null != goal ? "factors found:\n" + goal : "factors not found"));
+    if (null != callback) callback.accept(goal()); else { final Node goal = goal(); Log.o(null != goal ? "\nfactors found:\n\n\t" + goal : "factors not found"); }
 
     // print final message and quit
     Log.o("\n***** all threads joined and search is complete *****");
