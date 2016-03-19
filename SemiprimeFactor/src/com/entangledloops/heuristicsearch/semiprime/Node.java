@@ -89,7 +89,7 @@ public class Node implements Serializable, Comparable
     for (String factor : factors)
     {
       int p0s = 0; for (final char c : factor.toCharArray()) { if ('0' == c) ++p0s; }
-      h += Math.abs(((double) p0s / (double) factor.length()) - Solver.semiprimeBinary0sTo1s);
+      h += Math.abs(((double) p0s / (double) factor.length()) - Solver.semiprime0sTo1s);
     }
 
     return h;
@@ -109,6 +109,6 @@ public class Node implements Serializable, Comparable
     for (int i = 0; i < p0s.length; ++i) { for (final char c : p[i].toCharArray()) if ('0' == c) ++p0s[i]; }
 
     final double p0sTo1s = ((double)(IntStream.of(p0s).sum()) / (double)(Stream.of(p).mapToInt(String::length).sum()));
-    return Math.abs(p0sTo1s - Solver.semiprimeBinary0sTo1s);
+    return Math.abs(p0sTo1s - Solver.semiprime0sTo1s);
   }
 }

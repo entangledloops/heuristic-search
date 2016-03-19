@@ -56,50 +56,46 @@ public class Solver implements Runnable, Serializable
   private static final AtomicLong startTime = new AtomicLong(); ///< nanoseconds
   private static final AtomicLong endTime = new AtomicLong(); ///< nanoseconds
 
-  // numerical info
+  // target info
   private static final AtomicReference<BigInteger> semiprime    = new AtomicReference<>(BigInteger.ZERO); ///< the target semiprime value
-  private static final AtomicInteger               internalBase = new AtomicInteger(2); ///< the base that will be used internally for the search representation
   private static final AtomicInteger               primeLen1    = new AtomicInteger(0); ///< optional: if set, only primes w/this len will be searched for
   private static final AtomicInteger               primeLen2    = new AtomicInteger(0); ///< using 0 searches for all length possibilities
-
+  private static final AtomicInteger               internalBase = new AtomicInteger(2); ///< the base that will be used internally for the search representation
 
   // vars cached for performance
   private static String semiprimeString10; ///< cached base 10
+  private static String semiprimeString2; ///< cached base 2
   private static String semiprimeStringInternal; ///< cached internal base
   private static int    semiprimeLen10; ///< cached base 10
+  private static int    semiprimeLen2; ///< cached bit len
   private static int    semiprimeLenInternal; ///< cached internal len
 
-  // heuristic aids
-  static String semiprimeBinary;
-  static int    semiprimeBinaryLen; ///< cached internal len
-  static int    semiprimeBinaryCount0; ///< cached internal len
-  static int    semiprimeBinaryCount1; ///< cached internal len
-  static double semiprimeBinary0sTo1s; ///< cached internal len
+  // heuristic cache
+  static int    semiprime0s; ///< cached internal len
+  static int    semiprime1s; ///< cached internal len
+  static double semiprime0sTo1s; ///< cached internal len
 
   private Solver(final String semiprime, final int semiprimeBase, final int internalBase)
   {
     // check for invalid params
     if (null == semiprime || "".equals(semiprime) || semiprimeBase < 2 || internalBase < 2) throw new NullPointerException("invalid target or base");
 
-    // check for obviously composite values
+    // set and validate + basic checks
     Solver.semiprime.set(new BigInteger(semiprime, semiprimeBase));
-    if (semiprime().compareTo(BigInteger.valueOf(4)) < 0) throw new NullPointerException("input is not a semiprime number");
-    if (semiprime().mod(BigInteger.valueOf(2)).equals(BigInteger.ZERO)) throw new NullPointerException("input is divisible by 2");
+    if (!semiprime().testBit(0)) throw new NullPointerException("input is even");
+    if (semiprime().compareTo(BigInteger.valueOf(9)) < 0) throw new NullPointerException("input is not a semiprime number");
 
-    // setup cache
-    Solver.semiprimeString10 = Solver.semiprime().toString(10);
-    Solver.semiprimeLen10 = Solver.semiprimeString10.length();
-
-    Solver.semiprimeBinary = Solver.semiprime().toString(2);
-    Solver.semiprimeBinaryLen = Solver.semiprimeBinary.length();
-
+    // cache
     Solver.internalBase.set(internalBase);
-    Solver.semiprimeStringInternal = semiprime().toString(internalBase);
-    Solver.semiprimeLenInternal = Solver.semiprimeStringInternal.length();
-
-    // cached heuristics aids
-    for (final char c : semiprimeBinary.toCharArray()) { if ('0' == c) ++semiprimeBinaryCount0; else ++semiprimeBinaryCount1; }
-    semiprimeBinary0sTo1s = (double)semiprimeBinaryCount0/(double)semiprimeBinaryLen;
+    Solver.semiprimeString10 = Solver.semiprime().toString(10);
+    Solver.semiprimeString2 = Solver.semiprime().toString(2);
+    Solver.semiprimeStringInternal = Solver.semiprime().toString(internalBase);
+    Solver.semiprimeLen10 = Solver.semiprimeString10.length();
+    Solver.semiprimeLen2 = semiprime().bitLength();
+    Solver.semiprimeLenInternal = semiprimeStringInternal.length();
+    Solver.semiprime1s = semiprime().bitCount();
+    Solver.semiprime0s = Solver.semiprimeLen2 - Solver.semiprime1s;
+    Solver.semiprime0sTo1s = (double) semiprime0s / (double) semiprimeLen2;
   }
 
   @Override public String toString() { return semiprimeString10; }
@@ -231,10 +227,10 @@ public class Solver implements Runnable, Serializable
     if (goal(n)) return false; else expanded();
 
     // cache some vars
-    final String p1 = n.factor(0, 2), p2 = n.factor(1, 2);
+    final String p1 = n.factor(0), p2 = n.factor(1);
 
     // ensure we should bother w/this node at all
-    if (n.product.compareTo(semiprime()) > 0 || p1.length() >= semiprimeBinaryLen || p2.length() >= semiprimeBinaryLen) return true;
+    if (n.product.bitLength() >= semiprimeLen2) return true;
 
     // generate all node combinations
     final int internalBase = internalBase();
@@ -245,7 +241,7 @@ public class Solver implements Runnable, Serializable
         // generate value and hash of new candidate child
         final String np1 = i + p1, np2 = j + p2;
         final String key = Node.hash(np1, np2);
-        if (null != closed.get(key) || null != opened.get(key)) continue;
+        if (null != closed.get(key) || null != opened.get(key) || np1.equals(np2)) continue;
 
         // prevents the same nodes from occurring w/children in reverse order
         final String keyAlt = Node.hash(np2, np1);
