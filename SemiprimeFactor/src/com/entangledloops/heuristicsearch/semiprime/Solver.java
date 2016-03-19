@@ -164,7 +164,7 @@ public class Solver implements Runnable, Serializable
    */
   private static boolean goal(Node n)
   {
-    return null == n ? null != goal() : (semiprime().equals(n.product) && n.goalFactors() && (goal.compareAndSet(null, n) || null != goal()));
+    return null == n ? null != goal() : (n.goalFactors() && semiprime().equals(n.product) && (goal.compareAndSet(null, n) || null != goal()));
   }
 
   @SuppressWarnings("StatementWithEmptyBody")

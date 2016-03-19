@@ -49,15 +49,11 @@ public class Node implements Serializable, Comparable
    * in the currently fixed digit positions.
    * @return true if everything looks okay
    */
+
   boolean validFactors()
   {
-    final String productString = product.toString(2);
-    final int productLen = productString.length();
     final int depth = factors[0].length();
-    final int targetPos = (Solver.semiprimeBinaryLen - (depth+1)) + 1;
-    final int productPos = productLen - depth;
-    return targetPos >= 0 && (productPos < 0 ? '0' : productString.charAt(productPos)) == Solver.semiprimeBinary.charAt(targetPos);
-    //return targetPos >= 0 && (productPos >= 0 && product.testBit(productPos)) == Solver.semiprime().testBit(targetPos);
+    return product.testBit(depth) == Solver.semiprime().testBit(depth);
   }
 
   /**
