@@ -288,6 +288,7 @@ public class Solver implements Runnable, Serializable
     nodesRegenerated.set(BigInteger.ZERO);
     nodesIgnored.set(BigInteger.ZERO);
     nodesExpanded.set(BigInteger.ZERO);
+    nodesClosed.set(BigInteger.ZERO);
 
     prime1Len(0);
     prime2Len(0);
