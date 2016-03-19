@@ -2,7 +2,7 @@ package com.entangledloops.heuristicsearch.semiprime;
 
 import java.io.Serializable;
 import java.math.BigInteger;
-import java.util.stream.IntStream;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 /**
@@ -11,102 +11,59 @@ import java.util.stream.Stream;
  */
 public class Node implements Serializable, Comparable
 {
-  private final String       key; ///< cached key value for performance
-  private final String[]     factors; ///< the candidate prime factors as strings
-  private final BigInteger[] values; ///< the candidate factors
+  private final int  depth;
+  private final BigInteger[] factors; ///< the candidate factors
   final         BigInteger   product; ///< the partial factors for this node
-  final         double       h; ///< the heuristic search values for this node
+  final         double       h; ///< the heuristic search factors for this node
 
-  Node(final String[] factors) { this(hash(factors), factors); }
-  Node(final String key, final String... factors)
+  Node() { this(null, 1, 1); }
+  Node(final Node parent, int... bits)
   {
-    if (null == factors || 0 == factors.length) throw new NullPointerException("bad prime or base");
-    this.factors = factors;
-    this.key = null != key ? key : hash(factors);
-    this.h = h(factors);
-    this.values = new BigInteger[factors.length];
-
-    for (int i = 0; i < factors.length; ++i)
-    {
-      int pos = 0; for (char c : factors[i].toCharArray()) { if ('0' == c) ++pos; else break; }
-      values[i] = new BigInteger(factors[i].substring(pos), Solver.internalBase());
-    }
-
-    this.product = Stream.of(values).reduce(BigInteger::multiply).orElseThrow(RuntimeException::new);
+    this.depth = null != parent ? parent.depth+1 : 0;
+    this.factors = new BigInteger[bits.length]; for (int i = 0; i < bits.length; ++i) this.factors[i] = null != parent ? (1 == bits[i] ? parent.factors[i].setBit(depth) : BigInteger.ZERO.add(parent.factors[i])) : BigInteger.valueOf(bits[i]);
+    this.product = Stream.of(this.factors).reduce(BigInteger::multiply).orElseThrow(RuntimeException::new);
+    this.h = h();
   }
 
-  @Override public String toString() { return key; }
-  @Override public boolean equals(Object o) { return o instanceof Node && ((Node) o).key.equals(key); }
-  @Override public int compareTo(Object o) { return Double.compare(h, Node.class.cast(o).h); }
+  @Override public String toString() { return product.toString() + ":" + product.toString(Solver.internalBase()) + ":" + depth + ":" + h + ":" + Stream.of(factors).sequential().skip(1).map(Object::toString).reduce(factors[0].toString(), (p1,p2) -> p1 + ":" + p2); }
+  @Override public boolean equals(Object o) { return o instanceof Node && ((Node) o).depth == depth && ((Node) o).product.equals(product) && Stream.of(factors).allMatch(i -> Stream.of(((Node)o).factors).anyMatch(i::equals)); }
+  @Override public int compareTo(Object o) { return Double.compare(h, ((Node) o).h); }
+
+  ///todo try 'magic' 193 and other values >> 2^n
+  @Override public int hashCode()
+  {
+    final AtomicInteger hash = new AtomicInteger(depth);
+    hash.set(37 * hash.get() + product.hashCode());
+    Stream.of(factors).sorted().forEach((i) -> hash.set(37 * hash.get() + i.hashCode()));
+    return hash.get();
+  }
 
   public String product() { return product.toString(Solver.internalBase()); }
   public String product(int base) { return product.toString(base); }
+  public BigInteger factor(int i) { return factors[i]; }
 
   /**
    * This function ensures that the current partial product resembles the target semiprime
    * in the currently fixed digit positions.
    * @return true if everything looks okay
    */
-
-  boolean validFactors()
-  {
-    final int depth = factors[0].length()-1;
-    return product.testBit(depth) == Solver.semiprime().testBit(depth);
-  }
+  boolean validFactors() { return product.testBit(depth) == Solver.semiprime().testBit(depth); }
 
   /**
    * Ensure that none of the factors is trivial.
    * @return true if the factors look okay
    */
-  boolean goalFactors()
-  {
-    for (BigInteger value : values) if (BigInteger.ONE.equals(value)) return false;
-    return true;
-  }
+  boolean goalFactors() { for (BigInteger value : factors) if (BigInteger.ONE.equals(value)) return false; return true; }
 
-  public String factor(int i) { return factors[i]; }
-  public String factor(int i, int base) { return base != Solver.internalBase() ? values[i].toString(base) : factors[i]; }
-
-  /**
-   * Computes a unique lookup key for the node.
-   * @param p
-   * @return
-   */
-  static String hash(String... p) { return Stream.of(p).sequential().skip(1).reduce(p[0], (p1,p2) -> p1 + ":" + p2); }
 
   /**
    * This heuristic takes each prime's difference of binary 0s/(0s+1s) from the target and sums.
-   * @param factors array of strings representing candidate primes
    * @return an estimate of this node's distance to goal, where 0 = goal
    */
-  private static double h(String... factors)
+  private double h()
   {
-    if (null == factors || 0 == factors.length) return Double.POSITIVE_INFINITY;
-
     double h = Math.max(Solver.prime1Len(), Solver.prime2Len());
-    for (String factor : factors)
-    {
-      int p0s = 0; for (final char c : factor.toCharArray()) { if ('0' == c) ++p0s; }
-      h += Math.abs(((double) p0s / (double) factor.length()) - Solver.semiprime0sTo1s);
-    }
-
+    for (BigInteger factor : factors) h += Math.abs(((double) factor.bitCount() / (double) factor.bitLength()) - Solver.semiprimeSetBitsToLen);
     return h;
-  }
-
-  /**
-   * This heuristic sums all prime candidate's 0s and divides the total by (0s+1s),
-   * then returns the difference from the target.
-   * @param p array of strings representing candidate primes
-   * @return an estimate of this node's distance to goal, where 0 = goal
-   */
-  private static double h2(String... p)
-  {
-    if (null == p || 0 == p.length) return Double.POSITIVE_INFINITY;
-
-    int[] p0s = new int[p.length];
-    for (int i = 0; i < p0s.length; ++i) { for (final char c : p[i].toCharArray()) if ('0' == c) ++p0s[i]; }
-
-    final double p0sTo1s = ((double)(IntStream.of(p0s).sum()) / (double)(Stream.of(p).mapToInt(String::length).sum()));
-    return Math.abs(p0sTo1s - Solver.semiprime0sTo1s);
   }
 }

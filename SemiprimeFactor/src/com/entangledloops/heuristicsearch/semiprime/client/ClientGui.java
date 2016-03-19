@@ -52,7 +52,7 @@ public class ClientGui extends JFrame implements DocumentListener
   //////////////////////////////////////////////////////////////////////////////
   // globals
 
-  private static final String VERSION          = "0.4.1a";
+  private static final String VERSION          = "0.4.2a";
   private static final String ICON_NODE_SMALL  = "node16x16.png";
   private static final String ICON_NODE        = "node32x32.png";
   private static final String ICON_CPU         = "cpu32x32.png";
@@ -592,7 +592,7 @@ public class ClientGui extends JFrame implements DocumentListener
         Solver.callback(n ->
         {
           // null == solverThread() -> search was cancelled before completion
-          if (null != n) { pneMain.setSelectedIndex(TAB_CONNECT); Log.o("\nsearch complete:\n\n\tsp:\t" + n.product(10) + " (" + n.product() + ")\n\tp1:\t" + n.factor(0, 10) + " (" + n.factor(0) + ")\n\tp2:\t" + n.factor(1, 10) + " (" + n.factor(1) + ")"); }
+          if (null != n) { pneMain.setSelectedIndex(TAB_CONNECT); Log.o("\nsearch complete:\n\n\tsp:\t" + n.product(10) + " (" + n.product() + ")\n\tp1:\t" + n.factor(0) + " (" + n.factor(0).toString(Solver.internalBase()) + ")\n\tp2:\t" + n.factor(1) + " (" + n.factor(1).toString(Solver.internalBase()) + ")"); }
           else if (null != solverThread()) { pneMain.setSelectedIndex(TAB_CONNECT); Log.e("search complete:\n\n\tno factors could be found, are you sure the input is composite" + (Solver.primeLengthsFixed() ? " and the factors are the specified lengths" : "") + "?"); }
           isSearching.set(false);
           btnSearch.setText("Start Local Search");

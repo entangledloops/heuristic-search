@@ -26,7 +26,6 @@ public class Solver implements Runnable, Serializable
   private static final long     checkForWorkTimeout  = 1L;
   private static final TimeUnit checkForWorkTimeUnit = TimeUnit.MILLISECONDS;
 
-
   // state vars
   private static final AtomicBoolean safetyConscious = new AtomicBoolean(true); ///< if false, fewer sanity checks are performed on values and most statistics will be ignored
   private static final AtomicBoolean cpuConscious    = new AtomicBoolean(true); ///< if true, will take additional steps to trade memory for more CPU;
@@ -41,8 +40,8 @@ public class Solver implements Runnable, Serializable
   // search state
   private static final List<Thread>                    threads  = Collections.synchronizedList(new ArrayList<>()); ///< worker threads
   private static final PriorityBlockingQueue<Node>     open     = new PriorityBlockingQueue<>(); ///< unbounded queue backed by heap for fast pop() behavior w/o sorting
-  private static final ConcurrentHashMap<String, Node> opened   = new ConcurrentHashMap<>(); ///< the opened hash table for faster lookup times
-  private static final ConcurrentHashMap<String, Node> closed   = new ConcurrentHashMap<>(); ///< closed hash table
+  private static final ConcurrentHashMap<Node, Node>   opened   = new ConcurrentHashMap<>(); ///< the opened hash table for faster lookup times
+  private static final ConcurrentHashMap<Node, Node>   closed   = new ConcurrentHashMap<>(); ///< closed hash table
   private static final AtomicReference<Node>           goal     = new AtomicReference<>(); ///< set if/when goal is found; if set, search will end
   private static final AtomicReference<Consumer<Node>> callback = new AtomicReference<>(); ///< a function to receive the goal node (or null) upon completion
 
@@ -73,7 +72,7 @@ public class Solver implements Runnable, Serializable
   // heuristic cache
   static int    semiprime0s; ///< cached internal len
   static int    semiprime1s; ///< cached internal len
-  static double semiprime0sTo1s; ///< cached internal len
+  static double semiprimeSetBitsToLen; ///< cached internal len
 
   private Solver(final String semiprime, final int semiprimeBase, final int internalBase)
   {
@@ -95,7 +94,7 @@ public class Solver implements Runnable, Serializable
     Solver.semiprimeLenInternal = semiprimeStringInternal.length();
     Solver.semiprime1s = semiprime().bitCount();
     Solver.semiprime0s = Solver.semiprimeLen2 - Solver.semiprime1s;
-    Solver.semiprime0sTo1s = (double) semiprime0s / (double) semiprimeLen2;
+    Solver.semiprimeSetBitsToLen = (double) semiprime1s / (double) semiprimeLen2;
   }
 
   @Override public String toString() { return semiprimeString10; }
@@ -186,7 +185,7 @@ public class Solver implements Runnable, Serializable
   private static Node close(Node n)
   {
     if (null == n) return null;
-    if (null == closed.putIfAbsent(n.toString(), n)) closed();
+    if (null == closed.putIfAbsent(n, n)) closed();
     return n;
   }
 
@@ -197,7 +196,7 @@ public class Solver implements Runnable, Serializable
    */
   private static boolean push(Node n)
   {
-    try { if (null != opened.putIfAbsent(n.toString(), n) || !open.offer(n)) regenerated(); return true; }
+    try { if (null != opened.putIfAbsent(n, n) || !open.offer(n)) regenerated(); return true; }
     catch (Throwable t) { Log.e(t); return false; }
   }
 
@@ -213,9 +212,9 @@ public class Solver implements Runnable, Serializable
     return node;
   }
 
-  private static boolean contains(String key)
+  private static boolean contains(Node key)
   {
-    return null != closed.get(key) || null != opened.get(key);
+    return key.equals(closed.get(key)) || key.equals(opened.get(key));
   }
 
   /**
@@ -225,12 +224,7 @@ public class Solver implements Runnable, Serializable
    */
   private static boolean expand(final Node n)
   {
-    //if (nodesGenerated.get().compareTo(BigInteger.valueOf(100)) > 0) System.exit(0);
-    if (printAllNodes()) Log.o("expanding: " + n.product.toString(10) + " / " + n.product.toString(internalBase.get()) + " : [" + n.toString() + ":" + n.h + "]");
-    expanded();
-
-    // cache some vars
-    final String p1 = n.factor(0), p2 = n.factor(1);
+    expanded(); if (printAllNodes()) Log.o("expanding: " + n);
 
     // ensure we should bother w/this node at all
     if (n.product.bitLength() >= semiprimeLen2-1) return true;
@@ -241,24 +235,19 @@ public class Solver implements Runnable, Serializable
     {
       for (int j = 0; j < internalBase; ++j)
       {
-        // generate value and hash of new candidate child
-        final String np1 = i + p1, np2 = j + p2;
+        // generate new node
+        Node generated = new Node(n, i, j);
+        if (goal(generated)) return false;
 
         // check if this node already exists or same node w/children in reverse order
-        final String key = Node.hash(np1, np2);
-        if (Solver.contains(key) || Solver.contains(Node.hash(np2, np1))) continue;
-
-        // generate new node
-        Node generated = new Node(key, np1, np2);
-        if (goal(generated)) return false;
+        if (Solver.contains(generated)) continue;
 
         // try push to open
         if (!generated.validFactors()) { ignored(); close(generated); }
         else if (!push(generated)) return false;
 
         // record new valid node generation
-        generated();
-        if (printAllNodes()) Log.o("generated: " + generated.product.toString(10) + " / " + generated.product.toString(internalBase) + " : [" + generated.toString() + ":" + generated.h + "]");
+        generated(); if (printAllNodes()) Log.o("generated: " + generated);
       }
     }
 
@@ -351,7 +340,7 @@ public class Solver implements Runnable, Serializable
     IntStream.range(0, processors()).forEach((i) -> threads.add(new Thread(() -> { try { Log.o("thread " + i + ": started"); while (expand(pop())); Log.o("thread " + i + ": finished"); } catch (Throwable ignored) {} })));
 
     // safe to assume these are the only valid first 3 roots
-    if (open.isEmpty()) push(new Node(new String[] {"1", "1"}));
+    if (open.isEmpty()) push(new Node());
 
     // properly schedule a new timer
     if (statsTimer.compareAndSet(null, (timer = new Timer())))
