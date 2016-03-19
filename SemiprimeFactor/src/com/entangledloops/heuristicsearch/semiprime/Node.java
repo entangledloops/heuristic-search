@@ -22,19 +22,17 @@ public class Node implements Serializable, Comparable
   {
     if (null == factors || 0 == factors.length) throw new NullPointerException("bad prime or base");
     this.factors = factors;
+    this.key = null != key ? key : hash(factors);
+    this.h = h(factors);
     this.values = new BigInteger[factors.length];
 
     for (int i = 0; i < factors.length; ++i)
     {
-      int pos = 0; for (char c : factors[0].toCharArray()) { if ('0' == c) ++pos; else break; }
-      final String formatted = factors[0].substring(pos);
-      if (Solver.safetyConscious() && "".equals(formatted)) throw new NullPointerException("an empty factor candidate was generated");
-      values[i] = new BigInteger(formatted, Solver.internalBase());
+      int pos = 0; for (char c : factors[i].toCharArray()) { if ('0' == c) ++pos; else break; }
+      values[i] = new BigInteger(factors[i].substring(pos), Solver.internalBase());
     }
 
-    this.product = Stream.of(values).reduce(BigInteger::multiply).get();
-    this.h = h(factors);
-    this.key = null != key ? key : hash(factors);
+    this.product = Stream.of(values).reduce(BigInteger::multiply).orElseThrow(RuntimeException::new);
   }
 
   @Override public String toString() { return key; }
@@ -74,7 +72,7 @@ public class Node implements Serializable, Comparable
    * @param p
    * @return
    */
-  static String hash(String... p) { return Stream.of(p).skip(1).reduce(p[0], (p1,p2) -> p1 + ":" + p2); }
+  static String hash(String... p) { return Stream.of(p).sequential().skip(1).reduce(p[0], (p1,p2) -> p1 + ":" + p2); }
 
   /**
    * This heuristic takes each prime's difference of binary 0s/(0s+1s) from the target and sums.

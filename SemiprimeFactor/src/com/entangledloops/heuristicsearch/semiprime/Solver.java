@@ -213,6 +213,11 @@ public class Solver implements Runnable, Serializable
     return node;
   }
 
+  private static boolean contains(String key)
+  {
+    return null != closed.get(key) || null != opened.get(key);
+  }
+
   /**
    * expands the current node, pushing any generated children
    * @param n
@@ -222,9 +227,7 @@ public class Solver implements Runnable, Serializable
   {
     //if (nodesGenerated.get().compareTo(BigInteger.valueOf(100)) > 0) System.exit(0);
     if (printAllNodes()) Log.o("expanding: " + n.product.toString(10) + " / " + n.product.toString(internalBase.get()) + " : [" + n.toString() + ":" + n.h + "]");
-
-    // check if we found the goal already or this node is the goal
-    if (goal(n)) return false; else expanded();
+    expanded();
 
     // cache some vars
     final String p1 = n.factor(0), p2 = n.factor(1);
@@ -240,18 +243,22 @@ public class Solver implements Runnable, Serializable
       {
         // generate value and hash of new candidate child
         final String np1 = i + p1, np2 = j + p2;
+
+        // check if this node already exists or same node w/children in reverse order
         final String key = Node.hash(np1, np2);
-        if (null != closed.get(key) || null != opened.get(key) || np1.equals(np2)) continue;
+        if (Solver.contains(key) || Solver.contains(Node.hash(np2, np1))) continue;
 
-        // prevents the same nodes from occurring w/children in reverse order
-        final String keyAlt = Node.hash(np2, np1);
-        if (null != closed.get(keyAlt) || null != opened.get(keyAlt)) continue;
+        // generate new node
+        Node generated = new Node(key, np1, np2);
+        if (goal(generated)) return false;
 
-        // try to push the new child
-        Node generated = new Node(key, np1, np2); generated();
-        if (printAllNodes()) Log.o("generated: " + generated.product.toString(10) + " / " + generated.product.toString(internalBase) + " : [" + generated.toString() + ":" + generated.h + "]");
+        // try push to open
         if (!generated.validFactors()) { ignored(); close(generated); }
         else if (!push(generated)) return false;
+
+        // record new valid node generation
+        generated();
+        if (printAllNodes()) Log.o("generated: " + generated.product.toString(10) + " / " + generated.product.toString(internalBase) + " : [" + generated.toString() + ":" + generated.h + "]");
       }
     }
 
@@ -295,8 +302,6 @@ public class Solver implements Runnable, Serializable
     open.clear();
     opened.clear();
     closed.clear();
-
-    push(new Node(new String[] {"1", "1"})); // safe to assume these are valid first 2 semiprime roots
 
     Log.o("solver reset");
   }
@@ -344,6 +349,9 @@ public class Solver implements Runnable, Serializable
 
     // build worker threads to search until goal is found or no nodes left
     IntStream.range(0, processors()).forEach((i) -> threads.add(new Thread(() -> { try { Log.o("thread " + i + ": started"); while (expand(pop())); Log.o("thread " + i + ": finished"); } catch (Throwable ignored) {} })));
+
+    // safe to assume these are the only valid first 3 roots
+    if (open.isEmpty()) push(new Node(new String[] {"1", "1"}));
 
     // properly schedule a new timer
     if (statsTimer.compareAndSet(null, (timer = new Timer())))
