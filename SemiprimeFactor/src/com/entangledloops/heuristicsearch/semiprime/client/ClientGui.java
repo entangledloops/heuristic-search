@@ -490,7 +490,8 @@ public class ClientGui extends JFrame implements DocumentListener
           else txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE);
 
           // further ensure value change and clear old prime lengths
-          if (!prevBase.equals(clean(txtSemiprimeBase.getText()))) { txtP1Len.setText("0"); txtP2Len.setText("0"); updateSemiprimeLabel(); }
+          if (!prevBase.equals(clean(txtSemiprimeBase.getText()))) { txtP1Len.setText("0"); txtP2Len.setText("0"); }
+          updateSemiprimeLabel();
         }
       }
     });
@@ -849,8 +850,11 @@ public class ClientGui extends JFrame implements DocumentListener
         pause.setEnabled(true);
       });
 
-      final MenuItem quit = new MenuItem("Save & Quit");
-      quit.addActionListener(l -> exit());
+      final MenuItem quit = new MenuItem("Quit Discarding Changes");
+      quit.addActionListener(l -> exit(false));
+
+      final MenuItem saveAndQuit = new MenuItem("Save & Quit");
+      saveAndQuit.addActionListener(l -> exit());
 
       trayIcon.addMouseListener(new MouseAdapter() {
         @Override
@@ -867,6 +871,7 @@ public class ClientGui extends JFrame implements DocumentListener
       popup.add(resume);
       popup.addSeparator();
       popup.add(quit);
+      popup.add(saveAndQuit);
 
       trayIcon.setPopupMenu(popup);
 

@@ -48,7 +48,14 @@ public class Node implements Serializable, Comparable
    * in the currently fixed digit positions.
    * @return true if everything looks okay
    */
-  boolean validFactors() { return depth < Solver.length() && product.bitLength() <= Solver.semiprimeBitLen && product.testBit(depth) == Solver.semiprime().testBit(depth); }
+  boolean validFactors()
+  {
+    return depth < Solver.length() &&
+        (0 == Solver.prime1Len() || depth < Solver.prime1Len()) &&
+        (0 == Solver.prime2Len() || depth < Solver.prime2Len()) &&
+        product.bitLength() <= Solver.semiprimeBitLen &&
+        product.testBit(depth) == Solver.semiprime().testBit(depth);
+  }
 
   /**
    * Ensure that none of the factors is trivial.
