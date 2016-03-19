@@ -52,7 +52,7 @@ public class Node implements Serializable, Comparable
 
   boolean validFactors()
   {
-    final int depth = factors[0].length();
+    final int depth = factors[0].length()-1;
     return product.testBit(depth) == Solver.semiprime().testBit(depth);
   }
 
