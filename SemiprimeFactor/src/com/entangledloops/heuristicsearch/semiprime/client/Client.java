@@ -44,7 +44,8 @@ public class Client
 
   /**
    * For accepting a new remote client connecting to the server.
-   * @param socket
+   * @param socket remote socket connection
+   * @param socketEventCallback packet consumer for socket events
    */
   public Client(Socket socket, Consumer<Packet> socketEventCallback)
   {
@@ -67,9 +68,8 @@ public class Client
 
   /**
    * Connects a new local client to a remote server.
-   * @param host
-   * @param port
    */
+  public Client() { this(Server.DEFAULT_HOST, Server.DEFAULT_PORT, null); }
   public Client(String host, int port, Consumer<Packet> socketEventCallback) throws NullPointerException
   {
     Log.o("connecting to " + host + ":" + port + "...");
@@ -85,7 +85,6 @@ public class Client
 
     Log.o("connection with " + ip() + " established");
   }
-  public Client() { this(Server.DEFAULT_HOST, Server.DEFAULT_PORT, null); }
 
   private void init() throws IOException
   {

@@ -66,6 +66,8 @@ public class ServerGui extends JFrame implements DocumentListener
 
   public ServerSocket socket() { return server.socket(); }
 
+  public boolean ready() { return server.ready(); }
+
   public void resetFrame()
   {
     setTitle(DEFAULT_TITLE);

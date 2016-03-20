@@ -115,14 +115,7 @@ public class Server
 
   public static void main(String[] args)
   {
-    final Server server = new Server();
-    final ServerGui serverGui = new ServerGui(server);
-    try
-    {
-      while (!server.ready()) { try { Thread.sleep(250); } catch (Throwable t) { Log.e(t); } }
-      try { new Client(); } catch (Throwable t) { Log.e(t); }
-      try { Thread.sleep(250); } catch (Throwable t) { Log.e(t); }
-    }
-    catch (Throwable t) { Log.e(t); }
+    final ServerGui serverGui = new ServerGui();
+    try { while (!serverGui.ready()) Thread.sleep(250); new Client("127.0.0.1", 12288, (p) -> Log.o(null != p ? p.toString() : "connection closed")); } catch (Throwable t) { Log.e(t); System.exit(-1); }
   }
 }
