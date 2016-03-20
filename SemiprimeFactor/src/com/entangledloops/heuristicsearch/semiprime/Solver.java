@@ -27,16 +27,18 @@ public class Solver implements Runnable, Serializable
   private static final TimeUnit checkForWorkTimeUnit = TimeUnit.MILLISECONDS;
 
   // state vars
-  private static final AtomicBoolean recordStats     = new AtomicBoolean(true); ///< if false, fewer sanity checks are performed on values and most statistics will be ignored
-  private static final AtomicBoolean safetyConscious = new AtomicBoolean(true); ///< if false, fewer sanity checks are performed on values and most statistics will be ignored
-  private static final AtomicBoolean cpuConscious    = new AtomicBoolean(true); ///< if true, will take additional steps to trade memory for more CPU;
-  private static final AtomicBoolean memoryConscious = new AtomicBoolean(false); ///< if true, will take additional steps to trade CPU for more memory
-  private static final AtomicBoolean background      = new AtomicBoolean(false);
-  private static final AtomicBoolean printAllNodes   = new AtomicBoolean(false); ///< if false, fewer sanity checks are performed on values
+  private static final AtomicBoolean periodicStats    = new AtomicBoolean(true); ///< timer prints stats according to user preferences
+  private static final AtomicBoolean detailedStats    = new AtomicBoolean(false); ///< if true---and at great expense---detailed stats will be recorded during search (debug)
+  private static final AtomicBoolean favorPerformance = new AtomicBoolean(true); ///< if true, will take additional steps to trade memory for more CPU;
+  private static final AtomicBoolean compressMemory   = new AtomicBoolean(false); ///< if true, will take additional steps to trade CPU for more memory
+  private static final AtomicBoolean restrictDisk     = new AtomicBoolean(true); ///< should we allow disk i/o during search to cache nodes?
+  private static final AtomicBoolean restrictNetwork  = new AtomicBoolean(false); ///< allow frequent network comm. during search?
+  private static final AtomicBoolean background       = new AtomicBoolean(false); ///< must wait until machine is idle before working
+  private static final AtomicBoolean printAllNodes    = new AtomicBoolean(false); ///< if false, fewer sanity checks are performed on values
   private static final AtomicBoolean writeCsv        = new AtomicBoolean(false); ///< controls outputting csv-formatted node info during search
-  private static final AtomicInteger processors      = new AtomicInteger(Runtime.getRuntime().availableProcessors());
-  private static final AtomicInteger processorCap    = new AtomicInteger(100);
-  private static final AtomicInteger memoryCap       = new AtomicInteger(100);
+  private static final AtomicInteger processors      = new AtomicInteger(Runtime.getRuntime().availableProcessors()); ///< num cores allowed
+  private static final AtomicInteger processorCap    = new AtomicInteger(100); ///< percentage use allowed
+  private static final AtomicInteger memoryCap       = new AtomicInteger(100); ///< percentage use allowed
 
   // search state
   private static final List<Thread>                    threads  = Collections.synchronizedList(new ArrayList<>()); ///< worker threads
@@ -104,8 +106,47 @@ public class Solver implements Runnable, Serializable
   @Override public String toString() { return semiprimeString10; }
   public String toString(int base) { return 10 == base ? semiprimeString10 : internalBase() == base ? semiprimeStringInternal : semiprime().toString(base); }
 
+
+  public static boolean periodicStats() { return Solver.periodicStats.get(); }
+  public static void periodicStats(boolean enabled) { Solver.periodicStats.set(enabled); }
+
+  public static boolean detailedStats() { return Solver.detailedStats.get(); }
+  public static void detailedStats(boolean enabled) { Solver.detailedStats.set(enabled); }
+
+  public static boolean favorPerformance() { return Solver.favorPerformance.get(); }
+  public static void favorPerformance(boolean enabled) { Solver.favorPerformance.set(enabled); }
+
+  public static boolean compressMemory() { return Solver.compressMemory.get(); }
+  public static void compressMemory(boolean enabled) { Solver.compressMemory.set(enabled); }
+
+  public static boolean restrictDisk() { return Solver.restrictDisk.get(); }
+  public static void restrictDisk(boolean enabled) { Solver.restrictDisk.set(enabled); }
+
+  public static boolean restrictNetwork() { return Solver.restrictNetwork.get(); }
+  public static void restrictNetwork(boolean enabled) { Solver.restrictNetwork.set(enabled); }
+
+  public static void background(boolean background) { Solver.background.set(background); }
+  public static boolean background() { return background.get(); }
+
+  public static boolean printAllNodes() { return Solver.printAllNodes.get(); }
+  public static void printAllNodes(boolean enabled) { Solver.printAllNodes.set(enabled); }
+
+  public static boolean writeCsv() { return Solver.writeCsv.get(); }
+  public static void writeCsv(boolean enabled) { Solver.writeCsv.set(enabled); }
+
+  public static void processors(int processors) { Solver.processors.set(processors); }
+  public static int processors() { return processors.get(); }
+
+  public static void processorCap(int cap) { Solver.processorCap.set(cap); }
+  public static int processorCap() { return processorCap.get(); }
+
+  public static void memoryCap(int cap) { Solver.memoryCap.set(cap); }
+  public static int memoryCap() { return memoryCap.get(); }
+
+
   public static BigInteger semiprime() { return semiprime.get(); }
 
+  public static int internalBase() { return internalBase.get(); }
   public static int length() { return semiprimeLenInternal; }
   public static int length(int base) { return internalBase() == base ? semiprimeLenInternal : (10 == base ? semiprimeLen10 : (2 == base ? semiprimeLen2 : semiprime().toString(base).length())); }
 
@@ -121,39 +162,10 @@ public class Solver implements Runnable, Serializable
   public static long endTime() { return endTime.get(); }
   public static long elapsed() { return endTime.get() - startTime.get(); }
 
-  public static void background(boolean background) { Solver.background.set(background); }
-  public static boolean background() { return background.get(); }
-
-  public static void processors(int processors) { Solver.processors.set(processors); }
-  public static int processors() { return processors.get(); }
-
-  public static void processorCap(int cap) { Solver.processorCap.set(cap); }
-  public static int processorCap() { return processorCap.get(); }
-
-  public static void memoryCap(int cap) { Solver.memoryCap.set(cap); }
-  public static int memoryCap() { return memoryCap.get(); }
-
   public static void callback(Consumer<Node> callback) { Solver.callback.set(callback); }
   public static Consumer<Node> callback() { return callback.get(); }
 
   private static Node goal() { return goal.get(); }
-
-  public static boolean safetyConscious() { return Solver.safetyConscious.get(); }
-  public static void safetyConscious(boolean enabled) { Solver.safetyConscious.set(enabled); }
-
-  public static boolean cpuConscious() { return Solver.cpuConscious.get(); }
-  public static void cpuConscious(boolean enabled) { Solver.cpuConscious.set(enabled); }
-
-  public static boolean memoryConscious() { return Solver.memoryConscious.get(); }
-  public static void memoryConscious(boolean enabled) { Solver.memoryConscious.set(enabled); }
-
-  public static boolean printAllNodes() { return Solver.printAllNodes.get(); }
-  public static void printAllNodes(boolean enabled) { Solver.printAllNodes.set(enabled); }
-
-  public static boolean writeCsv() { return Solver.writeCsv.get(); }
-  public static void writeCsv(boolean enabled) { Solver.writeCsv.set(enabled); }
-
-  public static int internalBase() { return internalBase.get(); }
 
   /**
    * goal test w/a somewhat optimized order of comparisons
@@ -289,9 +301,9 @@ public class Solver implements Runnable, Serializable
     final int internalBase = Solver.internalBase();
 
     // ensure user provided valid flags
-    if (safetyConscious() && !cpuConscious() && !memoryConscious())
+    if (restrictDisk() && !favorPerformance() && !compressMemory())
     {
-      cpuConscious(true);
+      favorPerformance(true);
       Log.e("safety checks determined that your configuration is probably ineffective" +
           "\n\t- having all optimizations disabled makes no positive space/time trade-offs" +
           "\n\t- CPU optimizations have been automatically enabled" +
@@ -313,8 +325,8 @@ public class Solver implements Runnable, Serializable
         "\n\tbackground: " + background() +
         "\n\tprocessors: " + processors() +
         "\n\tprocessorCap: " + processorCap() +
-        "\n\tcpuConscious: " + cpuConscious +
-        "\n\tmemoryConscious: " + memoryConscious +
+        "\n\tfavorPerformance: " + favorPerformance +
+        "\n\tcompressMemory: " + compressMemory +
         "\n\tmodifying settings during execution may produce undefined behavior" +
         "\n");
 
