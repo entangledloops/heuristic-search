@@ -500,7 +500,11 @@ public class ClientGui extends JFrame implements DocumentListener
     /////////////////////////////////////
 
     chkHeuristics = new JCheckBox[Heuristic.values().length];
-    for (int i = 0; i < Heuristic.values().length; ++i) { chkHeuristics[i] = getCheckBox(Heuristic.values()[i].toString(), false); }
+    for (int i = 0; i < Heuristic.values().length; ++i)
+    {
+      chkHeuristics[i] = getCheckBox(Heuristic.values()[i].toString(), false);
+      chkHeuristics[i].setToolTipText(Heuristic.values()[i].description());
+    }
     chkHeuristics[0].setSelected(true);
 
     /////////////////////////////////////
@@ -618,9 +622,17 @@ public class ClientGui extends JFrame implements DocumentListener
     btnRsa2048.setToolTipText("Loads a pre-selected benchmark to run against.");
     btnRsa2048.addActionListener((e) -> loadBenchmark(RSA_2048));
 
-    final JButton btnRsaLen = getButton("Calc. N/2 (assumes fixed length primes)");
+    final JButton btnUnknownLen = getButton("Prime Lengths: Unknown");
+    btnUnknownLen.setToolTipText("Prime factor lengths are unknown, so search full space.");
+    btnUnknownLen.addActionListener((e) -> { txtP1Len.setText("0"); txtP2Len.setText("0"); });
+
+    final JButton btnRsaLen = getButton("Prime Lengths: N/2");
     btnRsaLen.setToolTipText("If you know the lengths of your primes in advance, you can greatly aid the search.");
     btnRsaLen.addActionListener((e) -> { try { final int len = getSemiprimeLen(); txtP1Len.setText(""+((len/2)+(0==len%2?0:1))); txtP2Len.setText(""+((len/2)+(0==len%2?0:1))); } catch (Throwable ignored) {} });
+
+    final JPanel pnlLengths = new JPanel(new GridLayout(1,2));
+    pnlLengths.add(btnUnknownLen);
+    pnlLengths.add(btnRsaLen);
 
     /////////////////////////////////////
 
@@ -761,7 +773,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
     final JPanel pnlButtons1 = new JPanel(new GridLayout(1,2));
     pnlButtons1.add(pnlButtons0);
-    pnlButtons1.add(btnRsaLen);
+    pnlButtons1.add(pnlLengths);
 
     final JPanel pnlButtons2 = new JPanel(new GridLayout(1,1));
     pnlButtons2.add(btnSearch);
@@ -876,7 +888,6 @@ public class ClientGui extends JFrame implements DocumentListener
 
     final JPanel pnlChkBoxes = new JPanel(new GridLayout(1, 1, H_GAP, V_GAP));
     pnlChkBoxes.add(chkAutoStart);
-
     pnlCpuRight.add(lblMemory);
     pnlCpuRight.add(sldMemoryCap);
     pnlCpuRight.add(lblIdle);
