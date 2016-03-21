@@ -1,8 +1,20 @@
-**[Download](https://github.com/entangledloops/heuristicSearch/blob/master/SemiprimeFactor/SemiprimeClient.jar?raw=true) the latest [Semiprime Factorization](https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization) Client (currently v0.3a).**
+**[Download the latest stable Semiprime Factorization Client](https://github.com/entangledloops/heuristicSearch/blob/master/SemiprimeFactor/SemiprimeClient.jar?raw=true).**
+
+Build from source if you want the very latest. Use the stable build above if you experience any issues.
+
+## Wiki ##
+
+[Semiprime Factorization Wiki](https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization)
 
 ## Run Requirements ##
 
 You need at least [Java 1.8](https://www.java.com/en/download/) installed.
+
+## Gui Screenshots ##
+
+![Search Tab](http://www.entangledloops.com/img/semiprime/search-0.4.4a.png)
+
+![Connect Tab](http://www.entangledloops.com/img/semiprime/connect-0.4.4a.png)
 
 ## Build Requirements ##
 
@@ -33,7 +45,3 @@ Other gradle tasks available:
 `createWrapper` - updates gradle wrapper 
 
 Note: Be sure to run `createWrapper` from the parent directory so gradle files can be overwritten. A copy of gradle w/only this task is provided in the `heuristicSearch` dir to make this easier for you.
-
-## Wiki ##
-
-[Semiprime Factorization Wiki](https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization)
