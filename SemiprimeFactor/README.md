@@ -1,4 +1,4 @@
-#### [Download Semiprime Factorization Client (v0.4.4a)](https://github.com/entangledloops/heuristicSearch/blob/master/SemiprimeFactor/SemiprimeClient.jar?raw=true) ####
+#### [Download the Semiprime Factorization Client (v0.4.4a)](https://github.com/entangledloops/heuristicSearch/blob/master/SemiprimeFactor/SemiprimeClient.jar?raw=true) ####
 
 Build from source if you want the very latest. Use the stable build above if you experience any issues.
 
