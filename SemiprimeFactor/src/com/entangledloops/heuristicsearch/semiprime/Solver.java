@@ -173,7 +173,7 @@ public class Solver implements Runnable, Serializable
         "\n\tregenerated:\t" + nodesRegenerated +
         "\n\tignored:\t" + nodesIgnored +
         "\n\texpanded:\t" + nodesExpanded +
-        "\n\tclosed:\t" + nodesClosed +
+        "\n\tclosed: \t" + nodesClosed +
         "\n\tmaxDepth:\t" + maxDepth + ", avgDepth: " + avgDepth() +
         (cacheDetailedStats ? "\n\topen.size():\t" + open.size() : "") +
         "\n\telapsed:\t" + (seconds/60L) + " minutes, " + (seconds%60L) + " seconds";
