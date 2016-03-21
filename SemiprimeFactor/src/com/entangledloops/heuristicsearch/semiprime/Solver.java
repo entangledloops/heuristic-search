@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -41,11 +42,12 @@ public class Solver implements Runnable, Serializable
   private static final AtomicInteger memoryCap       = new AtomicInteger(100); ///< percentage use allowed
 
   // search state
-  private static final List<Thread>                    threads  = Collections.synchronizedList(new ArrayList<>()); ///< worker threads
-  private static final PriorityBlockingQueue<Node>     open     = new PriorityBlockingQueue<>(); ///< unbounded queue backed by heap for fast pop() behavior w/o sorting
-  private static final ConcurrentHashMap<Node, Node>   closed   = new ConcurrentHashMap<>(); ///< closed hash table
-  private static final AtomicReference<Node>           goal     = new AtomicReference<>(); ///< set if/when goal is found; if set, search will end
-  private static final AtomicReference<Consumer<Node>> callback = new AtomicReference<>(); ///< a function to receive the goal node (or null) upon completion
+  private static final List<Thread>                    threads    = Collections.synchronizedList(new ArrayList<>()); ///< worker threads
+  private static final List<Heuristic>                 heuristics = new CopyOnWriteArrayList<>(); ///< the list of heuristics to use for this search
+  private static final PriorityBlockingQueue<Node>     open       = new PriorityBlockingQueue<>(); ///< unbounded queue backed by heap for fast pop() behavior w/o sorting
+  private static final ConcurrentHashMap<Node, Node>   closed     = new ConcurrentHashMap<>(); ///< closed hash table
+  private static final AtomicReference<Node>           goal       = new AtomicReference<>(); ///< set if/when goal is found; if set, search will end
+  private static final AtomicReference<Consumer<Node>> callback   = new AtomicReference<>(); ///< a function to receive the goal node (or null) upon completion
 
   // some stats tracking
   private static final AtomicReference<Timer> statsTimer       = new AtomicReference<>(); ///< periodic reporting on search
@@ -77,6 +79,7 @@ public class Solver implements Runnable, Serializable
   static int    semiprimeBitLen; ///< cached internal len
   static int    semiprime1s; ///< cached internal len
   static int    semiprime0s; ///< cached internal len
+  static int    maxFactorLen; ///< max(primeLen1, primeLen2)
   static double semiprimeBitsSetToLen; ///< cached internal len
 
   private Solver(final String semiprime, final int semiprimeBase, final int internalBase)
@@ -143,9 +146,6 @@ public class Solver implements Runnable, Serializable
   public static void memoryCap(int cap) { Solver.memoryCap.set(cap); }
   public static int memoryCap() { return memoryCap.get(); }
 
-
-  public static BigInteger semiprime() { return semiprime.get(); }
-
   public static int internalBase() { return internalBase.get(); }
   public static int length() { return semiprimeLenInternal; }
   public static int length(int base) { return internalBase() == base ? semiprimeLenInternal : (10 == base ? semiprimeLen10 : (2 == base ? semiprimeLen2 : semiprime().toString(base).length())); }
@@ -165,6 +165,21 @@ public class Solver implements Runnable, Serializable
   public static void callback(Consumer<Node> callback) { Solver.callback.set(callback); }
   public static Consumer<Node> callback() { return callback.get(); }
 
+  public static List<Heuristic> heuristics() { return heuristics; }
+  public static void addHeuristic(Heuristic heuristic)
+  {
+    if (null == heuristic) return;
+    for (Heuristic h : heuristics) if (h.name().equals(heuristic.name())) return;
+    heuristics.add(heuristic);
+  }
+  public static void heuristics(Heuristic... heuristics)
+  {
+    if (null == heuristics || 0 == heuristics.length) return;
+    Solver.heuristics().clear();
+    Collections.addAll(Solver.heuristics, heuristics);
+  }
+
+  public static BigInteger semiprime() { return semiprime.get(); }
   private static Node goal() { return goal.get(); }
 
   /**
@@ -300,15 +315,8 @@ public class Solver implements Runnable, Serializable
     Log.o("\n***** searching for factors *****");
     final int internalBase = Solver.internalBase();
 
-    // ensure user provided valid flags
-    if (restrictDisk() && !favorPerformance() && !compressMemory())
-    {
-      favorPerformance(true);
-      Log.e("safety checks determined that your configuration is probably ineffective" +
-          "\n\t- having all optimizations disabled makes no positive space/time trade-offs" +
-          "\n\t- CPU optimizations have been automatically enabled" +
-          "\n\t- you can force the requested behavior by disabling safety checks");
-    }
+    // cache vars for performance (and consistency if changed during search)
+    maxFactorLen = Math.max(prime1Len(), prime2Len());
 
     // atomically cancel and clear any previous timer tasks
     Timer timer = statsTimer.getAndSet(null);
@@ -316,6 +324,7 @@ public class Solver implements Runnable, Serializable
 
     // inform user of contract-bound search parameters
     Log.o("\ninitial parameters:" +
+        "\n\theuristics: " + heuristics().stream().skip(1).map(Object::toString).reduce(heuristics().get(0).toString(), (h1,h2) -> h1 + ", " + h2) +
         "\n\ttarget (base 10): " + semiprimeString10 +
         "\n\ttarget (base " + internalBase + "):  " + semiprimeStringInternal +
         "\n\tlength (base 10): " + semiprimeLen10 +
@@ -337,7 +346,7 @@ public class Solver implements Runnable, Serializable
     if (open.isEmpty()) push(new Node());
 
     // properly schedule a new timer
-    if (statsTimer.compareAndSet(null, (timer = new Timer())))
+    if (periodicStats() && statsTimer.compareAndSet(null, (timer = new Timer())))
     {
       startTime.set(nanoTime());
       timer.schedule(new TimerTask() { @Override public void run() { Log.o("progress:" + stats((nanoTime() - startTime.get()))); } }, statsPeriodMillis, statsPeriodMillis);

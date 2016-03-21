@@ -42,6 +42,7 @@ public class Node implements Serializable, Comparable
   public String product() { return product.toString(Solver.internalBase()); }
   public String product(int base) { return product.toString(base); }
   public BigInteger factor(int i) { return factors[i]; }
+  public BigInteger[] factors() { return factors; }
 
   /**
    * This function ensures that the current partial product resembles the target semiprime
@@ -65,13 +66,22 @@ public class Node implements Serializable, Comparable
 
 
   /**
-   * This heuristic takes each prime's difference of binary 0s/(0s+1s) from the target and sums.
+   * Sums all desired heuristic functions.
    * @return an estimate of this node's distance to goal, where 0 = goal
    */
   private double h()
   {
-    double h = Math.max(Solver.prime1Len(), Solver.prime2Len());
-    for (BigInteger factor : factors) h += Math.abs(((double) factor.bitCount() / (double) factor.bitLength()) - Solver.semiprimeBitsSetToLen);
+    // initialize h to 0 or offset by depth if factor lengths were known in advance ("g-weighting")
+    double h = 0 != Solver.maxFactorLen ? Solver.maxFactorLen - (depth+1) : 0;
+
+    // if h is negative, we must have exceeded the max factor length that known a priori, so set to inf
+    if (h < 0) return Double.POSITIVE_INFINITY;
+
+    // sum desired heuristics
+    for (Heuristic heuristic : Solver.heuristics()) h += heuristic.apply(this);
+
+    ///@todo separate g, h, f properly
     return h;
   }
+
 }

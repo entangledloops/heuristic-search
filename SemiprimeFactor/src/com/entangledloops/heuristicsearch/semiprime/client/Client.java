@@ -4,17 +4,13 @@ import com.entangledloops.heuristicsearch.semiprime.Log;
 import com.entangledloops.heuristicsearch.semiprime.Packet;
 import com.entangledloops.heuristicsearch.semiprime.server.Server;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-
-import static com.entangledloops.heuristicsearch.semiprime.Packet.ERROR;
-import static com.entangledloops.heuristicsearch.semiprime.Packet.valueOf;
 
 /**
  * @author Stephen Dunn
@@ -23,83 +19,95 @@ import static com.entangledloops.heuristicsearch.semiprime.Packet.valueOf;
 public class Client
 {
   // client backend
-  private final AtomicReference<Socket>         socket       = new AtomicReference<>();
-  private final AtomicReference<Thread>         clientThread = new AtomicReference<>();
+  private final AtomicReference<Socket> socket       = new AtomicReference<>();
+  private final AtomicReference<Thread> clientThread = new AtomicReference<>();
 
   // i/o
-  private final AtomicReference<BufferedReader> in  = new AtomicReference<>();
-  private final AtomicReference<PrintWriter>    out = new AtomicReference<>();
+  private final AtomicReference<ObjectInputStream>  in  = new AtomicReference<>();
+  private final AtomicReference<ObjectOutputStream> out = new AtomicReference<>();
   private final Consumer<Packet> callback; ///< called every received packet
 
   // client info
-  private final AtomicReference<String>         username     = new AtomicReference<>();
-  private final AtomicReference<String>         email        = new AtomicReference<>();
-  private final AtomicReference<String>         ip           = new AtomicReference<>();
-  private final AtomicReference<String>         hostname     = new AtomicReference<>();
+  private final AtomicReference<String> username = new AtomicReference<>();
+  private final AtomicReference<String> email    = new AtomicReference<>();
+  private final AtomicReference<String> ip       = new AtomicReference<>();
+  private final AtomicReference<String> hostname = new AtomicReference<>();
 
   // state
-  private final AtomicBoolean isConnected = new AtomicBoolean(false);
-  private final boolean isRemote;
+  private final AtomicBoolean connected = new AtomicBoolean(false);
+  private final boolean inbound;
 
+  //////////////////////////////////////////////////////////////////////////////
+  //
+  // Client (server-side)
+  //
+  //////////////////////////////////////////////////////////////////////////////
 
-  /**
-   * For accepting a new remote client connecting to the server.
-   * @param socket remote socket connection
-   * @param socketEventCallback packet consumer for socket events
-   */
+  public Client(Socket socket) { this(socket, null); }
   public Client(Socket socket, Consumer<Packet> socketEventCallback)
   {
-    Log.o("accepting new client connection...");
+    if (null == socket) throw new NullPointerException("null socket");
+
+    this.callback = null != socketEventCallback ? socketEventCallback : new IncomingPacketHandler();
+    this.inbound = true;
+    this.socket.set(socket);
 
     try
     {
-      this.callback = socketEventCallback;
-      this.isRemote = true;
-      this.socket.set(socket);
+      Log.o("new inbound connection: " + ip + " (" + hostname + ")...");
       init();
-      Log.o("accepted new client connection: " + ip + " (" + hostname + ")");
+      Log.o("inbound connection established: " + toString());
     }
-    catch (Throwable t) { isConnected.set(false); throw new NullPointerException(); }
-
-    Log.o("connection with " + ip() + " established");
+    catch (Throwable t)
+    {
+      this.connected.set(false); this.socket.set(null);
+      Log.e("inbound connection rejected: " + toString(), t);
+      throw new NullPointerException();
+    }
   }
-  public Client(Socket socket) { this(socket, null); }
 
 
-  /**
-   * Connects a new local client to a remote server.
-   */
-  public Client() { this(Server.DEFAULT_HOST, Server.DEFAULT_PORT, null); }
+  //////////////////////////////////////////////////////////////////////////////
+  //
+  // Client (client-side)
+  //
+  //////////////////////////////////////////////////////////////////////////////
+
+  public Client() { this("127.0.0.1"); } ///< @brief self-connect for testing
+  public Client(String host) { this(host, Server.DEFAULT_PORT, null); }
   public Client(String host, int port, Consumer<Packet> socketEventCallback) throws NullPointerException
   {
-    Log.o("connecting to " + host + ":" + port + "...");
+    if (null == host || "".equals(host.trim())) throw new NullPointerException("invalid hostname: " + host);
+    if (port < 1 || port > 65535) throw new NullPointerException("invalid port: " + port);
+
+    this.callback = null != socketEventCallback ? socketEventCallback : new IncomingPacketHandler();
+    this.inbound = false;
 
     try
     {
-      this.callback = socketEventCallback;
-      this.isRemote = false;
+      Log.o("connecting to " + host + ":" + port + "...");
       this.socket.set(new Socket(host, port));
       init();
+      Log.o("outbound connection established: " + toString());
     }
-    catch (Throwable t) { isConnected.set(false); throw new NullPointerException(); }
-
-    Log.o("connection with " + ip() + " established");
+    catch (Throwable t)
+    {
+      this.connected.set(false); this.socket.set(null);
+      Log.e("outbound connection failed: " + toString(), t);
+      throw new NullPointerException();
+    }
   }
 
-  private void init() throws IOException
+  @Override public String toString()
   {
-    if (!isConnected.compareAndSet(false, true))
-    {
-      Log.o("duplicate connection error");
-      return;
-    }
-
-    this.ip.set( socket().getInetAddress().getHostAddress() );
-    this.hostname.set( socket().getInetAddress().getCanonicalHostName() );
-    this.in.set(new BufferedReader( new InputStreamReader(socket().getInputStream())) );
-    this.out.set(new PrintWriter( socket().getOutputStream()) );
-    this.clientThread.set(new Thread( new ClientThread() ));
-    this.clientThread.get().start();
+    final String ip = ip();
+    final String hostname = hostname();
+    final String username = username();
+    final String email = email();
+    return (null != ip ? ip : "ip unknown") +
+        (null != hostname && !hostname.equals(ip) ? " (" + hostname() + ")" : "") +
+        (null != username ? " : [" + username + (null != email ? " : " : "") : "") +
+        (null != email ? email + (null != username ? "]" : "") : "");
   }
 
   /**
@@ -107,262 +115,90 @@ public class Client
    */
   public void close()
   {
-    if (!isConnected.compareAndSet(true, false)) return;
-    Log.o("closing connection: " + toString() + "...");
+    if (!connected.compareAndSet(true, false)) return;
 
-    try { socket().close(); }
-    catch (Throwable t) { Log.e(t); }
+    Log.o("closing " + (outbound() ? "outbound" : "inbound") + " connection: " + toString());
+    try { socket().close(); } catch (Throwable t) { Log.e(t); }
 
-    if (Thread.currentThread() != clientThread.get())
+    final Thread thread = clientThread.getAndSet(null);
+    if (null != thread && Thread.currentThread() != thread)
     {
-      try
-      {
-        clientThread.get().interrupt();
-        clientThread.get().join();
-      }
+      try { thread.interrupt(); thread.join(); }
       catch (Throwable t) { Log.e(t); }
     }
     else if (null != callback) callback.accept(null);
   }
 
-  private Socket socket() { return socket.get(); }
-  private BufferedReader in() { return in.get(); }
-  private PrintWriter out() { return out.get(); }
-  private String readln() throws IOException { return in().readLine(); }
-  private void println(String s) throws IOException { out().println(s); out().flush(); }
+  private String readln() { return read(String.class); }
+  public Packet read() { return read(Packet.class); }
+  private <T> T read(Class<T> klass) { try { return klass.cast(in().readObject()); } catch (Throwable t) { return null; } }
 
-  public boolean connected() { return isConnected.get(); }
+  public boolean write(Packet.Type type, Object... data) { return write(new Packet(type, data)); }
+  private boolean write(Object obj) { try { out().writeObject(obj); return true; } catch (Throwable t) { return false; } }
+
+  private ObjectInputStream in() { return in.get(); }
+  private ObjectOutputStream out() { return out.get(); }
+
   public String ip() { return ip.get(); }
   public String hostname() { return hostname.get(); }
-  public String username() { return username.get(); }
+
   public String email() { return email.get(); }
-  public void setEmail(String email) { this.email.set(email); }
-  public void setUsername(String username) { this.username.set(username); }
+  public String email(String email) { return this.email.getAndSet(email); }
 
-  /**
-   * Receive a packet over the socket.
-   * @return
-   */
-  private Packet recvPacket()
+  public String username() { return username.get(); }
+  public String username(String username) { return this.username.getAndSet(username); }
+
+  private Socket socket() { return socket.get(); }
+  public boolean connected() { return connected.get(); }
+
+  private void init() throws IOException
   {
-    Packet packet = ERROR;
-    if (!isConnected.get()) return packet;
-    try { packet = valueOf( readln() ); }
-    catch (Throwable t) {} // connection was closed
-    return packet;
+    if (!connected.compareAndSet(false, true)) { Log.e((outbound() ? "outbound" : "inbound") + " client already connected: " + toString()); return; }
+
+    this.ip.set( socket().getInetAddress().getHostAddress() );
+    this.hostname.set( socket().getInetAddress().getCanonicalHostName() );
+    this.in.set(new ObjectInputStream( socket().getInputStream() ));
+    this.out.set(new ObjectOutputStream( socket().getOutputStream() ));
+
+    final Thread thread = new Thread( new ClientThread() );
+    this.clientThread.set(thread); thread.start();
   }
 
-  /**
-   * Send a packet over the socket.
-   * @param packet
-   * @return
-   */
-  public boolean sendPacket(Packet packet)
-  {
-    try { println(packet.name()); }
-    catch (Throwable t) { Log.e(t); return false; }
+  private boolean inbound() { return inbound; }
+  private boolean outbound() { return !inbound(); }
 
-    switch (packet)
+  private class IncomingPacketHandler implements Consumer<Packet>
+  {
+    @Override public void accept(Packet p)
     {
-      case NEW_TARGET: { sendTarget(); break; }
-      case USERNAME_UPDATE: { sendUsername(); break; }
-      case EMAIL_UPDATE: { sendEmail(); break; }
-      case OPEN_UPDATE: { sendOpenUpdate(); break; }
-      case OPEN_CHECK: { sendOpenCheck(); break; }
-      case OPEN_MERGE: { sendOpenMerge(); break; }
-      case CLOSED_UPDATE: { sendClosedUpdate(); break; }
-      case CLOSED_CHECK: { sendClosedCheck(); break; }
-      case CLOSED_MERGE: { sendClosedMerge(); break; }
-      case SOLVED: { sendSolved(); break; }
-      case ERROR:
-      default: close();
+      if (null == p) { close(); return; }
+      switch (p.type())
+      {
+        case TARGET_UPDATE: { break; }
+        case USERNAME_UPDATE: { username( p.string() ); break; }
+        case EMAIL_UPDATE: { email( p.string() ); break; }
+        case OPEN_UPDATE: { break; }
+        case OPEN_CHECK: { break; }
+        case CLOSED_UPDATE: { break; }
+        case CLOSED_CHECK: { break; }
+        case SOLUTION_UPDATE: { break; }
+        case ERROR: { break; }
+        default: Log.e("unhandled packet type received: " + p.type().name());
+      }
     }
-    return true;
-  }
-
-  @Override
-  public String toString() { return username + " (" + email() + " / " + ip() + ")"; }
-
-  private void recvTarget()
-  {
-    Log.o("receiving a new semiprime target request from " + toString() + "...");
-
-    Log.o("semiprime target sent to " + toString());
-  }
-
-  private void sendTarget()
-  {
-    Log.o("sending a new semiprime target...");
-
-    Log.o("semiprime target sent");
-  }
-
-  private void recvUsername()
-  {
-    try
-    {
-      final String prev = username();
-      username.set( readln() );
-      Log.o("client updated username from \"" + prev + "\" to \"" + username + "\"");
-    }
-    catch (Throwable t) { Log.e(t); }
-  }
-
-  private void sendUsername()
-  {
-    try { println( username() ); }
-    catch (Throwable t) { Log.e(t); }
-  }
-
-  private void recvEmail()
-  {
-    try
-    {
-      final String prev = email();
-      email.set( readln() );
-      Log.o("client updated email from \"" + prev + "\" to \"" + email + "\"");
-    }
-    catch (Throwable t) { Log.e(t); }
-  }
-
-  private void sendEmail()
-  {
-    try { println( email() ); }
-    catch (Throwable t) { Log.e(t); }
-  }
-
-  private void recvOpenUpdate()
-  {
-    Log.o("receiving open list update from " + toString() + "...");
-
-    Log.o("open list updated by " + toString());
-  }
-
-  private void sendOpenUpdate()
-  {
-    Log.o("sending open list update...");
-
-    Log.o("open list update sent");
-  }
-
-  private void recvOpenCheck()
-  {
-    Log.o(toString() + " requested open list check...");
-
-    Log.o("open list checked and response sent to " + toString());
-  }
-
-  private void sendOpenCheck()
-  {
-    Log.o("requesting open list check...");
-
-    Log.o("open list checked and response received");
-  }
-
-  private void recvOpenMerge()
-  {
-    Log.o("merging open list with " + toString() + "...");
-
-    Log.o("open list merged with " + toString());
-  }
-
-  private void sendOpenMerge()
-  {
-    Log.o("merging open list...");
-
-    Log.o("open list merged");
-  }
-
-  private void recvClosedUpdate()
-  {
-    Log.o("receiving closed list update from " + toString() + "...");
-
-    Log.o("closed list update received from " + toString());
-  }
-
-  private void sendClosedUpdate()
-  {
-    Log.o("sending closed list update from " + toString() + "...");
-
-    Log.o("closed list update sent");
-  }
-
-  private void recvClosedCheck()
-  {
-    Log.o(toString() + " requested closed list check...");
-
-    Log.o("closed list checked and response sent to " + toString());
-  }
-
-  private void sendClosedCheck()
-  {
-    Log.o("requesting closed list check...");
-
-    Log.o("closed list checked and response received");
-  }
-
-  private void recvClosedMerge()
-  {
-    Log.o("merging closed list with " + toString() + "...");
-
-    Log.o("closed list merged with " + toString());
-  }
-
-  private void sendClosedMerge()
-  {
-    Log.o("merging closed list...");
-
-    Log.o("closed list merged");
-  }
-
-  private void recvSolved()
-  {
-    Log.o(toString() + " claims to have found a solution!");
-  }
-
-  private void sendSolved()
-  {
-    Log.o("sending solution to server...");
-
-    Log.o("solution sent!");
   }
 
   /**
-   * Thread that waits for incoming packets and handles them for both local and remote clients.
+   * Thread that waits for inbound packets and handles them for both local and remote clients.
    */
   private class ClientThread implements Runnable
   {
-    @Override
-    public void run()
+    @Override public void run()
     {
-      try
-      {
-        while (connected() && !Thread.interrupted())
-        {
-          final Packet packet = recvPacket();
-
-          switch (packet)
-          {
-            case NEW_TARGET: { recvTarget(); break; }
-            case USERNAME_UPDATE: { recvUsername(); break; }
-            case EMAIL_UPDATE: { recvEmail(); break; }
-            case OPEN_UPDATE: { recvOpenUpdate(); break; }
-            case OPEN_CHECK: { recvOpenCheck(); break; }
-            case OPEN_MERGE: { recvOpenMerge(); break; }
-            case CLOSED_UPDATE: { recvClosedUpdate(); break; }
-            case CLOSED_CHECK: { recvClosedCheck(); break; }
-            case CLOSED_MERGE: { recvClosedMerge(); break; }
-            case SOLVED: { recvSolved(); break; }
-            case ERROR:
-            default: close();
-          }
-
-          if (null != callback) callback.accept(packet);
-        }
-      }
-      catch (Throwable t) { if (!Thread.interrupted()) Log.e(t); }
-
-      Log.o("client connection closed");
+      Log.o("connection established");
+      try { while (connected() && !Thread.interrupted()) callback.accept( read() ); }
+      catch (Throwable t) { if (connected() && !Thread.interrupted()) Log.e(t); }
+      Log.o("connection closed");
     }
   }
 

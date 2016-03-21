@@ -1,14 +1,13 @@
 package com.entangledloops.heuristicsearch.semiprime.client;
 
-import com.entangledloops.heuristicsearch.semiprime.Log;
-import com.entangledloops.heuristicsearch.semiprime.Packet;
-import com.entangledloops.heuristicsearch.semiprime.Solver;
-import com.entangledloops.heuristicsearch.semiprime.Utils;
+import com.entangledloops.heuristicsearch.semiprime.*;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
+import javax.swing.border.TitledBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.table.DefaultTableModel;
 import javax.swing.text.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -20,6 +19,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.prefs.Preferences;
 import java.util.regex.Pattern;
+
+import static javax.swing.JTable.AUTO_RESIZE_ALL_COLUMNS;
 
 /**
  * @author Stephen Dunn
@@ -70,7 +71,7 @@ public class ClientGui extends JFrame implements DocumentListener
   //////////////////////////////////////////////////////////////////////////////
   // globals
 
-  private static final String VERSION          = "0.4.2a";
+  private static final String VERSION          = "0.4.3a";
   private static final String ICON_NODE_SMALL  = "node16x16.png";
   private static final String ICON_NODE        = "node32x32.png";
   private static final String ICON_CPU         = "cpu32x32.png";
@@ -174,6 +175,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private JCheckBox  chkBackground;
   private JCheckBox  chkPrintAllNodes;
   private JCheckBox  chkWriteCsv;
+  private JTable     tblHeuristics;
   private JButton    btnSearch;
   private JLabel     lblSemiprime;
   private JTextArea  txtSemiprime;
@@ -211,8 +213,6 @@ public class ClientGui extends JFrame implements DocumentListener
 
     setVisible(true);
     toFront();
-
-    //connect();
   }
 
   private void resetFrame()
@@ -403,10 +403,10 @@ public class ClientGui extends JFrame implements DocumentListener
     Log.o("If you're computer cracks a target number, you will be credited in the publication (assuming you provided an email I can reach you at).");
     Log.o("If you're interested in learning exactly what this software does and why, checkout the \"About\" menu.\n");
 
-    final JScrollPane scrollPaneHistory = new JScrollPane(txtHistory);
+    final JScrollPane pneHistory = new JScrollPane(txtHistory);
     txtHistory.setHighlighter(new DefaultHighlighter());
-    scrollPaneHistory.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-    scrollPaneHistory.setVisible(true);
+    pneHistory.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+    pneHistory.setVisible(true);
 
     // username
     final JLabel lblUsername = getLabel("Optional username:");
@@ -454,7 +454,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
     // organize them and add them to the panel
     final JPanel pnlNet = new JPanel(new GridLayout(2, 1));
-    pnlNet.add(scrollPaneHistory);
+    pnlNet.add(pneHistory);
     pnlNet.add(pnlConnect);
 
     ////////////////////////////////////////////////////////////////////////////
@@ -502,6 +502,23 @@ public class ClientGui extends JFrame implements DocumentListener
 
     /////////////////////////////////////
 
+    final int tblWidth = Math.min(3, Heuristic.values().length);
+
+    final Object[][] table = new Object[Math.max(1,Heuristic.values().length/tblWidth)][tblWidth];
+    int row=0, col=0;
+    for (Heuristic h : Heuristic.values())
+    {
+      table[row][col] = h.toString();
+      ++col; if (0 == col%tblWidth) { ++row; col=0; }
+    }
+
+    tblHeuristics = new JTable(new DefaultTableModel(table,new String[tblWidth]) { @Override public boolean isCellEditable(int r, int c) { return false; } });
+    tblHeuristics.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+    tblHeuristics.setAutoResizeMode(AUTO_RESIZE_ALL_COLUMNS);
+    tblHeuristics.setRowSelectionInterval(0, tblHeuristics.getRowCount()-1);
+    tblHeuristics.setColumnSelectionInterval(0, tblHeuristics.getColumnCount()-1);
+    //tblHeuristics.getSelectionModel().addListSelectionListener((e) -> tblHeuristics.getSelectionModel().clearSelection());//removeIndexInterval(tblHeuristics.getSelectedRow(), tblHeuristics.getSelectedColumn()));
+
     lblSemiprime = getLabel("Local Semiprime Target");
     lblSemiprime.setIcon(icnNodeSmall);
 
@@ -543,9 +560,9 @@ public class ClientGui extends JFrame implements DocumentListener
       }
     });
 
-    final JScrollPane scrollPaneSemiprime = new JScrollPane(txtSemiprime);
-    scrollPaneSemiprime.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-    scrollPaneSemiprime.setVisible(true);
+    final JScrollPane pneSemirpime = new JScrollPane(txtSemiprime);
+    pneSemirpime.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+    pneSemirpime.setVisible(true);
 
     /////////////////////////////////////
 
@@ -653,6 +670,14 @@ public class ClientGui extends JFrame implements DocumentListener
         Solver.processors(sldProcessors.getValue());
         Solver.processorCap(sldProcessorCap.getValue());
         Solver.memoryCap(sldMemoryCap.getValue());
+
+        // set heuristics
+        Solver.heuristics().clear();
+        for (int i : tblHeuristics.getSelectedRows())
+            for (int j : tblHeuristics.getSelectedColumns())
+                Solver.addHeuristic(Heuristic.byName((String) table[i][j]));
+
+        // set callback for search completion
         Solver.callback(n ->
         {
           // null == solverThread() -> search was cancelled before completion
@@ -700,7 +725,12 @@ public class ClientGui extends JFrame implements DocumentListener
     /////////////////////////////////////
 
     final JPanel pnlSearchOptions = new JPanel(new GridLayout(3,3));
-    //pnlSearchOptions.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+    pnlSearchOptions.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(Color.BLACK),
+            "Search Options",
+            TitledBorder.CENTER,
+            TitledBorder.TOP
+    ));
     pnlSearchOptions.add(chkFavorPerformance);
     pnlSearchOptions.add(chkCompressMemory);
     pnlSearchOptions.add(chkRestrictDisk);
@@ -711,16 +741,27 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlSearchOptions.add(chkWriteCsv);
     pnlSearchOptions.add(chkBackground);
 
-    final JLabel lblSearchOptions = getLabel("Search Options");
-    lblSearchOptions.setIcon(icnNodeSmall);
+    final JPanel pnlHeuristics = new JPanel(new GridLayout(1,1));
+    pnlHeuristics.add(tblHeuristics);
+    pnlHeuristics.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createEmptyBorder(),
+            "Select Heuristics",
+            TitledBorder.CENTER,
+            TitledBorder.TOP
+    ));
 
-    final JPanel pnlSearchOptionsHeader = new JPanel(new GridLayout(2,1));
-    pnlSearchOptionsHeader.add(lblSearchOptions);
-    pnlSearchOptionsHeader.add(pnlSearchOptions);
+    final JPanel pnlHeader = new JPanel(new GridLayout(2,1,H_GAP,V_GAP));
+    pnlHeader.add(pnlSearchOptions);
+    pnlHeader.add(pnlHeuristics);
 
-    final JPanel pnlHeader = new JPanel(new GridLayout(2,1));
-    pnlHeader.add(pnlSearchOptionsHeader);
-    pnlHeader.add(lblSemiprime);
+    final JPanel pnlSemiprime = new JPanel(new GridLayout(1,1));
+    pnlSemiprime.add(pneSemirpime);
+    pnlSemiprime.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createEmptyBorder(),
+            "Local Semiprime Target",
+            TitledBorder.CENTER,
+            TitledBorder.TOP
+    ));
 
     final JPanel pnlSemiprimeOptions = new JPanel(new GridLayout(4,2));
     pnlSemiprimeOptions.add(lblSemiprimeBase);
@@ -753,14 +794,14 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlButtons.add(pnlButtons1);
     pnlButtons.add(pnlButtons2);
 
-    final JPanel pnlLocalSearch = new JPanel(new GridLayout(2,1));
-    pnlLocalSearch.add(pnlSemiprimeOptions);
-    pnlLocalSearch.add(pnlButtons);
+    final JPanel pnlFooter = new JPanel(new GridLayout(2,1));
+    pnlFooter.add(pnlSemiprimeOptions);
+    pnlFooter.add(pnlButtons);
 
-    final JPanel pnlSearch = new JPanel(new GridLayout(3,1));
+    final JPanel pnlSearch = new JPanel(new GridLayout(3,1, H_GAP, V_GAP));
     pnlSearch.add(pnlHeader);
-    pnlSearch.add(scrollPaneSemiprime);
-    pnlSearch.add(pnlLocalSearch);
+    pnlSearch.add(pnlSemiprime);
+    pnlSearch.add(pnlFooter);
 
     ////////////////////////////////////////////////////////////////////////////
     // cpu tab
@@ -1140,8 +1181,11 @@ public class ClientGui extends JFrame implements DocumentListener
     txtEmail.setText(email);
 
     // attempt to send each piece of client info to the server
-    client.setUsername(username); if (!client.sendPacket(Packet.USERNAME_UPDATE)) { Log.e("failed to send username, try reconnecting"); return; }
-    client.setEmail(email); if (!client.sendPacket(Packet.EMAIL_UPDATE)) { Log.e("failed to send email, try reconnecting"); return; }
+    client.username(username);
+    if (!client.write(Packet.Type.USERNAME_UPDATE, username)) { Log.e("failed to send username, try reconnecting"); return; }
+
+    client.email(email);
+    if (!client.write(Packet.Type.EMAIL_UPDATE, email)) { Log.e("failed to send email, try reconnecting"); return; }
 
     // if all went all, update our state
     txtEmail.setEnabled(true);
