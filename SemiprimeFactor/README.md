@@ -10,15 +10,15 @@ You can read about how this works on the [Semiprime Factorization Wiki](https://
 
 You can also host your own server by running the latest [Semiprime Factorization Server](https://github.com/entangledloops/heuristicSearch/blob/master/SemiprimeFactor/SemiprimeServer.jar?raw=true) ####
 
-## Run Requirements ##
-
-You need at least [Java 1.8](https://www.java.com/en/download/) installed.
-
 ## Gui Screenshots ##
 
 ![Search Tab](http://www.entangledloops.com/img/semiprime/search-0.4.4a.png)
 
 ![Connect Tab](http://www.entangledloops.com/img/semiprime/connect-0.4.4a.png)
+
+## Run Requirements ##
+
+You need at least [Java 1.8](https://www.java.com/en/download/) installed.
 
 ## Build Requirements ##
 
