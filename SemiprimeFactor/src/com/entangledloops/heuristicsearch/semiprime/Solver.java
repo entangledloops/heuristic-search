@@ -36,10 +36,10 @@ public class Solver implements Runnable, Serializable
   private static final AtomicBoolean restrictNetwork  = new AtomicBoolean(false); ///< allow frequent network comm. during search?
   private static final AtomicBoolean background       = new AtomicBoolean(false); ///< must wait until machine is idle before working
   private static final AtomicBoolean printAllNodes    = new AtomicBoolean(false); ///< if false, fewer sanity checks are performed on values
-  private static final AtomicBoolean writeCsv        = new AtomicBoolean(false); ///< controls outputting csv-formatted node info during search
-  private static final AtomicInteger processors      = new AtomicInteger(Runtime.getRuntime().availableProcessors()); ///< num cores allowed
-  private static final AtomicInteger processorCap    = new AtomicInteger(100); ///< percentage use allowed
-  private static final AtomicInteger memoryCap       = new AtomicInteger(100); ///< percentage use allowed
+  private static final AtomicBoolean writeCsv         = new AtomicBoolean(false); ///< controls outputting csv-formatted node info during search
+  private static final AtomicInteger processors       = new AtomicInteger(Runtime.getRuntime().availableProcessors()); ///< num cores allowed
+  private static final AtomicInteger processorCap     = new AtomicInteger(100); ///< percentage use allowed
+  private static final AtomicInteger memoryCap        = new AtomicInteger(100); ///< percentage use allowed
 
   // search state
   private static final List<Thread>                    threads    = Collections.synchronizedList(new ArrayList<>()); ///< worker threads
@@ -210,7 +210,7 @@ public class Solver implements Runnable, Serializable
   private static Node close(Node n)
   {
     final Node prev = closed.put(n, n);
-    if (null != prev) { if (!n.equals(prev)) Log.e("hash collision!\n" + n + " != " + prev); return null; }
+    if (null != prev) {  nodesRegenerated.addAndGet(1); return null; }
     nodesClosed.addAndGet(1);
     return n;
   }
@@ -242,9 +242,13 @@ public class Solver implements Runnable, Serializable
   private static boolean expand(final Node n)
   {
     // stats
-    nodesExpanded.addAndGet(1); if (printAllNodes()) Log.o("expanding: " + n);
-    maxDepth.set(Math.max(maxDepth.get(), n.depth()));
-    totalDepth.addAndGet(n.depth());
+    nodesExpanded.addAndGet(1);
+    if (printAllNodes()) Log.o("expanding: " + n);
+    if (periodicStats())
+    {
+      maxDepth.set(Math.max(maxDepth.get(), n.depth()));
+      totalDepth.addAndGet(n.depth());
+    }
 
     // generate all node combinations
     final int internalBase = internalBase();
@@ -254,7 +258,8 @@ public class Solver implements Runnable, Serializable
       {
         Node generated = close(new Node(n, i, j));
         if (null == generated || !generated.validFactors()) { nodesIgnored.addAndGet(1); continue; }
-        nodesGenerated.addAndGet(1); if (printAllNodes()) Log.o("generated: " + generated);
+        nodesGenerated.addAndGet(1);
+        if (printAllNodes()) Log.o("generated: " + generated);
         if (goal(generated) || !push(generated)) return false;
       }
     }
@@ -266,6 +271,7 @@ public class Solver implements Runnable, Serializable
   {
     final long seconds = (elapsedNanos/1000000000L);
     return "\n\tnodesGenerated:\t" + nodesGenerated +
+        "\n\tnodesRegenerated:\t" + nodesRegenerated +
         "\n\tnodesIgnored:\t" + nodesIgnored +
         "\n\tnodesExpanded:\t" + nodesExpanded +
         "\n\tnodesClosed:\t" + nodesClosed +

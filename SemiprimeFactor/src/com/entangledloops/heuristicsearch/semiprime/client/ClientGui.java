@@ -675,8 +675,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
         // set heuristics
         Solver.heuristics().clear();
-        for (JCheckBox h : chkHeuristics)
-            if (h.isSelected()) Solver.addHeuristic(Heuristic.byName(h.getText()));
+        for (JCheckBox h : chkHeuristics) if (h.isSelected()) Solver.addHeuristic(Heuristic.byName(h.getText()));
 
         // set callback for search completion
         Solver.callback(n ->

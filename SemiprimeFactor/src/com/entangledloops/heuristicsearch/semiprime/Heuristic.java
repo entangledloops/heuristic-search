@@ -46,7 +46,7 @@ public enum Heuristic
       (n) ->
       {
         double h = 0;
-
+        for (BigInteger factor : n.factors()) h += Math.abs(0.5 - (double)factor.bitCount()/(double)factor.bitLength());
         return h;
       }
   ),
