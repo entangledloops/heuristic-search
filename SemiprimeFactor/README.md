@@ -10,7 +10,7 @@ You can read about how this works on the [Semiprime Factorization Wiki](https://
 
 You can also host your own server by running the latest [Semiprime Factorization Server](https://github.com/entangledloops/heuristicSearch/blob/master/SemiprimeFactor/SemiprimeServer.jar?raw=true) ####
 
-## Gui Screenshots ##
+## Screenshots ##
 
 ![Search Tab](http://www.entangledloops.com/img/semiprime/search-0.4.4a.png)
 
