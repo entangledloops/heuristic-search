@@ -8,7 +8,7 @@ This software attempts to factor semiprimes into their prime factors via heurist
 
 You can read about how this works on the [Semiprime Factorization Wiki](https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization).
 
-You can also host your own server by running the latest [Semiprime Factorization Server](https://github.com/entangledloops/heuristicSearch/blob/master/SemiprimeFactor/SemiprimeServer.jar?raw=true) ####
+You can also host your own server by running the latest [Semiprime Factorization Server](https://github.com/entangledloops/heuristicSearch/blob/master/SemiprimeFactor/SemiprimeServer.jar?raw=true).
 
 ## Screenshots ##
 
