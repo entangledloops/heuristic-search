@@ -1,10 +1,18 @@
-**[Download the latest stable Semiprime Factorization Client](https://github.com/entangledloops/heuristicSearch/blob/master/SemiprimeFactor/SemiprimeClient.jar?raw=true)**
+#### [Download Semiprime Factorization Client (v0.4.4a)](https://github.com/entangledloops/heuristicSearch/blob/master/SemiprimeFactor/SemiprimeClient.jar?raw=true) ####
 
 Build from source if you want the very latest. Use the stable build above if you experience any issues.
 
-## Wiki ##
+## What is this? ##
 
-[Semiprime Factorization Wiki](https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization)
+This software attempts to factor semiprimes into their prime factors via heuristic search. 
+
+You can read about how this works on the [Semiprime Factorization Wiki](https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization).
+
+The client is for contributing to the current search being hosted on my personal server or running a local search on your own machine.
+
+The server address is currently: **http://semiprime.servebeer.com** and is already configured in the client.
+
+You can also host your own server by running the latest [Semiprime Factorization Server](https://github.com/entangledloops/heuristicSearch/blob/master/SemiprimeFactor/SemiprimeServer.jar?raw=true) ####
 
 ## Run Requirements ##
 
