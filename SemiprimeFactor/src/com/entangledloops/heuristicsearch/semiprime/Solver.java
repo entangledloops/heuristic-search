@@ -324,7 +324,7 @@ public class Solver implements Runnable, Serializable
 
     // inform user of contract-bound search parameters
     Log.o("\ninitial parameters:" +
-        "\n\theuristics: " + heuristics().stream().skip(1).map(Object::toString).reduce(heuristics().get(0).toString(), (h1,h2) -> h1 + ", " + h2) +
+        "\n\theuristics: " + (heuristics().size() > 0 ? heuristics().stream().skip(1).map(Object::toString).reduce(heuristics().get(0).toString(), (h1,h2) -> h1 + ", " + h2) : "(none)") +
         "\n\ttarget (base 10): " + semiprimeString10 +
         "\n\ttarget (base " + internalBase + "):  " + semiprimeStringInternal +
         "\n\tlength (base 10): " + semiprimeLen10 +
