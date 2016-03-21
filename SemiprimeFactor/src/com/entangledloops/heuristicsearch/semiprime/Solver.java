@@ -55,7 +55,6 @@ public class Solver implements Runnable, Serializable
   private static final AtomicLong             nodesRegenerated = new AtomicLong();
   private static final AtomicLong             nodesIgnored     = new AtomicLong();
   private static final AtomicLong             nodesExpanded    = new AtomicLong();
-  private static final AtomicLong             nodesClosed      = new AtomicLong();
   private static final AtomicLong             startTime        = new AtomicLong(); ///< nanoseconds
   private static final AtomicLong             endTime          = new AtomicLong(); ///< nanoseconds
   private static final AtomicLong             totalDepth       = new AtomicLong(); ///< nanoseconds
@@ -197,7 +196,6 @@ public class Solver implements Runnable, Serializable
   private static long nodesRegenerated() { return nodesRegenerated.get(); }
   private static long nodesIgnored() { return nodesIgnored.get(); }
   private static long nodesExpanded() { return nodesExpanded.get(); }
-  private static long nodesClosed() { return nodesClosed.get(); }
   private static long maxDepth() { return maxDepth.get(); }
   private static long totalDepth() { return totalDepth.get(); }
   private static long avgDepth() { return totalDepth() / nodesExpanded(); }
@@ -211,16 +209,20 @@ public class Solver implements Runnable, Serializable
   {
     final Node prev = closed.put(n, n);
     if (null != prev) {  nodesRegenerated.addAndGet(1); return null; }
-    nodesClosed.addAndGet(1);
     return n;
   }
 
   /**
-   * if this node is already known, record that we wasted effort to aid in future improvements
+   * tests if goal node
    * @param n a node to attempt adding
-   * @return false on exception (possible null pointer or out of heap memory)
+   * @return false on goal or fatal exception, true indicates successful push
    */
-  private static boolean push(Node n) { if (!open.offer(n)) nodesRegenerated.addAndGet(1); return true; }
+  private static boolean push(Node n)
+  {
+    if (goal(n)) return false;
+    if (!open.offer(n)) { nodesRegenerated.addAndGet(1); return false; }
+    return true;
+  }
 
   /**
    * pop available node of opened
@@ -256,11 +258,14 @@ public class Solver implements Runnable, Serializable
     {
       for (int j = 0; j < internalBase; ++j)
       {
-        Node generated = close(new Node(n, i, j));
-        if (null == generated || !generated.validFactors()) { nodesIgnored.addAndGet(1); continue; }
-        nodesGenerated.addAndGet(1);
-        if (printAllNodes()) Log.o("generated: " + generated);
-        if (goal(generated) || !push(generated)) return false;
+        final Node generated = close(new Node(n, i, j));
+        if (null != generated && generated.validFactors())
+        {
+          nodesGenerated.addAndGet(1);
+          if (printAllNodes()) Log.o("generated: " + generated);
+          if (!push(generated)) return false;
+        }
+        else nodesIgnored.addAndGet(1);
       }
     }
 
@@ -274,7 +279,6 @@ public class Solver implements Runnable, Serializable
         "\n\tnodesRegenerated:\t" + nodesRegenerated +
         "\n\tnodesIgnored:\t" + nodesIgnored +
         "\n\tnodesExpanded:\t" + nodesExpanded +
-        "\n\tnodesClosed:\t" + nodesClosed +
         "\n\tmaxDepth:\t" + maxDepth() + ", avgDepth: " + avgDepth() +
         "\n\telapsed:\t" + (seconds/60L) + " minutes, " + (seconds%60L) + " seconds";
   }
@@ -291,7 +295,6 @@ public class Solver implements Runnable, Serializable
     nodesRegenerated.set(0);
     nodesIgnored.set(0);
     nodesExpanded.set(0);
-    nodesClosed.set(0);
 
     maxDepth.set(0);
     totalDepth.set(0);
