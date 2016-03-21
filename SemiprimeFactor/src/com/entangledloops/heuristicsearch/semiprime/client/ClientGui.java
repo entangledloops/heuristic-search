@@ -102,7 +102,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final String BACKGROUND_NAME        = "background";
   private static final String COMPRESS_MEMORY_NAME   = "compress memory";
   private static final String PRINT_ALL_NODES_NAME   = "print all nodes";
-  private static final String WRITE_CSV_NAME         = "write nodes csv";
+  private static final String WRITE_CSV_NAME         = "write search csv";
   private static final String PROCESSORS_NAME        = "processors";
   private static final String PROCESSOR_CAP_NAME     = "processor cap";
   private static final String MEMORY_CAP_NAME        = "memory cap";
@@ -174,9 +174,9 @@ public class ClientGui extends JFrame implements DocumentListener
   private JCheckBox   chkWriteCsv;
   private JCheckBox[] chkHeuristics;
   private JButton     btnSearch;
-  private JLabel      lblSemiprime;
   private JTextArea   txtSemiprime;
   private JTextField  txtSemiprimeBase, txtInternalBase, txtP1Len, txtP2Len;
+  private JPanel pnlSemiprimeFooter;
 
   // cpu tab
   private JSlider sldProcessors, sldProcessorCap, sldMemoryCap, sldIdle;
@@ -509,50 +509,54 @@ public class ClientGui extends JFrame implements DocumentListener
 
     /////////////////////////////////////
 
-    lblSemiprime = getLabel("Local Semiprime Target");
-    lblSemiprime.setIcon(icnNodeSmall);
+    final Runnable semiprimeFormatter = () ->
+    {
+      // grab the inputted target value and strip formatting
+      final String s = clean(txtSemiprime.getText()).toLowerCase();
+
+      // the assumptions made here regarding base are just to help speed up selecting settings,
+      // they are by *no means* meant to account for all "base-cases", which wouldn't be possible
+      // to do correctly in all cases w/o user-input anyway
+      boolean allBinaryDigits = true, containsHex = false, whitespaceChange = true;
+      for (char c : s.toCharArray())
+      {
+        if (Character.isWhitespace(c)) continue; else whitespaceChange = false;
+        if ('a' == c || 'b' == c || 'c' == c || 'd' == c || 'e' == c || 'f' == c) { containsHex = true; break; }
+        else if (c != '0' && c != '1') { allBinaryDigits = false; }
+      }
+
+      // if the change wasn't trivial...
+      if (!whitespaceChange)
+      {
+        // try to guess the base
+        final String prevBase = clean(txtSemiprimeBase.getText());
+        if (containsHex) txtSemiprimeBase.setText("16");
+        else if (allBinaryDigits) txtSemiprimeBase.setText("2");
+        else txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE);
+
+        // further ensure value change and clear old prime lengths
+        if (!prevBase.equals(clean(txtSemiprimeBase.getText()))) { txtP1Len.setText("0"); txtP2Len.setText("0"); }
+        updateSemiprimeInfo();
+      }
+    };
 
     txtSemiprime = new JTextArea(HISTORY_ROWS, HISTORY_COLS);
     txtSemiprime.setHighlighter(new DefaultHighlighter());
+    txtSemiprime.addInputMethodListener(new InputMethodListener()
+    {
+      @Override public void inputMethodTextChanged(InputMethodEvent event) { semiprimeFormatter.run(); }
+      @Override public void caretPositionChanged(InputMethodEvent event) { semiprimeFormatter.run(); }
+    });
     txtSemiprime.addKeyListener(new KeyListener()
     {
-      @Override public void keyTyped(KeyEvent e) {}
-      @Override public void keyPressed(KeyEvent e) {}
-      @Override public void keyReleased(KeyEvent e)
-      {
-        // grab the inputted target value and strip formatting
-        final String s = clean(txtSemiprime.getText()).toLowerCase();
-
-        // the assumptions made here regarding base are just to help speed up selecting settings,
-        // they are by *no means* meant to account for all "base-cases", which wouldn't be possible
-        // to do correctly in all cases w/o user-input anyway
-        boolean allBinaryDigits = true, containsHex = false, whitespaceChange = true;
-        for (char c : s.toCharArray())
-        {
-          if (Character.isWhitespace(c)) continue; else whitespaceChange = false;
-          if ('a' == c || 'b' == c || 'c' == c || 'd' == c || 'e' == c || 'f' == c) { containsHex = true; break; }
-          else if (c != '0' && c != '1') { allBinaryDigits = false; }
-        }
-
-        // if the change wasn't trivial...
-        if (!whitespaceChange)
-        {
-          // try to guess the base
-          final String prevBase = clean(txtSemiprimeBase.getText());
-          if (containsHex) txtSemiprimeBase.setText("16");
-          else if (allBinaryDigits) txtSemiprimeBase.setText("2");
-          else txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE);
-
-          // further ensure value change and clear old prime lengths
-          if (!prevBase.equals(clean(txtSemiprimeBase.getText()))) { txtP1Len.setText("0"); txtP2Len.setText("0"); }
-          updateSemiprimeHeader();
-        }
-      }
+      @Override public void keyTyped(KeyEvent e) { semiprimeFormatter.run(); }
+      @Override public void keyPressed(KeyEvent e) { semiprimeFormatter.run(); }
+      @Override public void keyReleased(KeyEvent e) { semiprimeFormatter.run(); }
     });
 
-    final JScrollPane pneSemirpime = new JScrollPane(txtSemiprime);
-    pneSemirpime.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-    pneSemirpime.setVisible(true);
+    final JScrollPane pneSemiprime = new JScrollPane(txtSemiprime);
+    pneSemiprime.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+    pneSemiprime.setVisible(true);
 
     /////////////////////////////////////
 
@@ -778,7 +782,7 @@ public class ClientGui extends JFrame implements DocumentListener
     final JPanel pnlButtons2 = new JPanel(new GridLayout(1,1));
     pnlButtons2.add(btnSearch);
 
-    final JPanel pnlButtons = new JPanel(new GridLayout(2,1));
+    final JPanel pnlButtons = new JPanel(new GridLayout(2,1,H_GAP,V_GAP/2));
     pnlButtons.add(pnlButtons1);
     pnlButtons.add(pnlButtons2);
 
@@ -786,19 +790,19 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlSemiprime.add(pnlSemiprimeOptions);
     pnlSemiprime.add(pnlButtons);
 
-    final JPanel pnlFooter = new JPanel(new GridLayout(2,1));
-    pnlFooter.add(pneSemirpime);
-    pnlFooter.add(pnlSemiprime);
-    pnlFooter.setBorder(BorderFactory.createTitledBorder(
+    pnlSemiprimeFooter = new JPanel(new GridLayout(2,1));
+    pnlSemiprimeFooter.add(pneSemiprime);
+    pnlSemiprimeFooter.add(pnlSemiprime);
+    pnlSemiprimeFooter.setBorder(BorderFactory.createTitledBorder(
             BorderFactory.createEmptyBorder(),
-            "Local Semiprime Target",
+            "<html><center>Semiprime Target<h5>(enter a value to factor)</h5></center></html>",
             TitledBorder.CENTER,
             TitledBorder.TOP
     ));
 
     final JPanel pnlSearch = new JPanel(new GridLayout(2,1, H_GAP, V_GAP));
     pnlSearch.add(pnlHeader);
-    pnlSearch.add(pnlFooter);
+    pnlSearch.add(pnlSemiprimeFooter);
 
     ////////////////////////////////////////////////////////////////////////////
     // cpu tab
@@ -1032,9 +1036,10 @@ public class ClientGui extends JFrame implements DocumentListener
     catch (Throwable t) { return 0; }
   }
 
-  private void updateSemiprimeHeader()
+  private void updateSemiprimeInfo()
   {
-    lblSemiprime.setText("Local Semiprime Target (len: " + clean(txtSemiprime.getText()).length() + ", internal len: " + getSemiprimeLen() + ")");
+    TitledBorder.class.cast(pnlSemiprimeFooter.getBorder()).setTitle("<html><center>Semiprime Target<h5>base<sub>" + txtSemiprimeBase.getText() + "</sub> len: " + clean(txtSemiprime.getText()).length() + " digits&nbsp;&nbsp;/&nbsp;&nbsp;base<sub>" + txtInternalBase.getText() + "</sub> len: " + getSemiprimeLen() + " digits</h5></center></html>");
+    pnlSemiprimeFooter.repaint();
   }
 
   private void loadBenchmark(String benchmark)
@@ -1044,7 +1049,7 @@ public class ClientGui extends JFrame implements DocumentListener
     txtInternalBase.setText("2");
     final String len = ""+((getSemiprimeLen()/2)+(0==getSemiprimeLen()%2?0:1));
     txtP1Len.setText(len); txtP2Len.setText(len);
-    updateSemiprimeHeader();
+    updateSemiprimeInfo();
   }
 
   private Thread solverThread(Thread solver) { return this.solver.getAndSet(solver); }
@@ -1275,7 +1280,7 @@ public class ClientGui extends JFrame implements DocumentListener
     final byte[] semiprime = new byte[parts.length];
     int i = -1; for (String s : parts) semiprime[++i] = Byte.parseByte(s.trim());
     txtSemiprime.setText(new String(semiprime));
-    updateSemiprimeHeader();
+    updateSemiprimeInfo();
 
     txtSemiprimeBase.setText(""+prefs.getInt(SEMIPRIME_BASE_NAME, DEFAULT_SEMIPRIME_BASE));
     txtInternalBase.setText(""+prefs.getInt(INTERNAL_BASE_NAME, DEFAULT_INTERNAL_BASE));
@@ -1338,7 +1343,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private void resetSearchSettings()
   {
     txtSemiprime.setText("");
-    updateSemiprimeHeader();
+    updateSemiprimeInfo();
 
     txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE);
     txtInternalBase.setText(""+DEFAULT_INTERNAL_BASE);
