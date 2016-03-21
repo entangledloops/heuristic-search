@@ -553,7 +553,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
           // further ensure value change and clear old prime lengths
           if (!prevBase.equals(clean(txtSemiprimeBase.getText()))) { txtP1Len.setText("0"); txtP2Len.setText("0"); }
-          updateSemiprimeLabel();
+          updateSemiprimeHeader();
         }
       }
     });
@@ -1034,9 +1034,9 @@ public class ClientGui extends JFrame implements DocumentListener
     catch (Throwable t) { return 0; }
   }
 
-  private void updateSemiprimeLabel()
+  private void updateSemiprimeHeader()
   {
-    lblSemiprime.setText("Local Semiprime Target (len: " + clean(txtSemiprime.getText()).length() + ", internal len: " + getSemiprimeLen() + ")");
+    tblHeuristics.getTableHeader().setName("Local Semiprime Target (len: " + clean(txtSemiprime.getText()).length() + ", internal len: " + getSemiprimeLen() + ")");
   }
 
   private void loadBenchmark(String benchmark)
@@ -1046,7 +1046,7 @@ public class ClientGui extends JFrame implements DocumentListener
     txtInternalBase.setText("2");
     final String len = ""+((getSemiprimeLen()/2)+(0==getSemiprimeLen()%2?0:1));
     txtP1Len.setText(len); txtP2Len.setText(len);
-    updateSemiprimeLabel();
+    updateSemiprimeHeader();
   }
 
   private Thread solverThread(Thread solver) { return this.solver.getAndSet(solver); }
@@ -1277,7 +1277,7 @@ public class ClientGui extends JFrame implements DocumentListener
     final byte[] semiprime = new byte[parts.length];
     int i = -1; for (String s : parts) semiprime[++i] = Byte.parseByte(s.trim());
     txtSemiprime.setText(new String(semiprime));
-    updateSemiprimeLabel();
+    updateSemiprimeHeader();
 
     txtSemiprimeBase.setText(""+prefs.getInt(SEMIPRIME_BASE_NAME, DEFAULT_SEMIPRIME_BASE));
     txtInternalBase.setText(""+prefs.getInt(INTERNAL_BASE_NAME, DEFAULT_INTERNAL_BASE));
@@ -1340,7 +1340,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private void resetSearchSettings()
   {
     txtSemiprime.setText("");
-    updateSemiprimeLabel();
+    updateSemiprimeHeader();
 
     txtSemiprimeBase.setText(""+DEFAULT_SEMIPRIME_BASE);
     txtInternalBase.setText(""+DEFAULT_INTERNAL_BASE);
