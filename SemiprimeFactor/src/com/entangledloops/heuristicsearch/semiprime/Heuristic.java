@@ -12,15 +12,39 @@ public enum Heuristic
   /**
    * Calculate distribution difference from target.
    *
-   * abs( [ sum(factor[i].bitCount()) / sum(factor[i].bitLength()) ]
-   *       - [targetBitCount / targetBitLen] )
+   * abs( sum(factor[i].bitCount() / factor[i].bitLength()) - (targetBitCount / targetBitLen) )
    */
-  DISTRIBUTION_DIFF("Distribution Difference",
+  DIST_DIFF_BY_LEN("Distribution Difference by Length",
       (n) ->
       {
         double h = 0;
         for (BigInteger factor : n.factors()) h += ((double)factor.bitCount() / (double)factor.bitLength());
-        return Math.abs(h - Solver.semiprimeBitsSetToLen);
+        return Math.abs(h - Solver.semiprime1sToLen);
+      }
+  ),
+  /**
+   * Calculate distribution difference from target.
+   *
+   * abs( [ sum(factor[i].bitCount()) / (numFactors * (depth+1)) ] - (targetBitCount / targetBitLen) )
+   */
+  DIST_DIFF_BY_DEPTH("Distribution Difference by Depth",
+      (n) ->
+      {
+        double h = 0;
+        for (BigInteger factor : n.factors()) h += factor.bitCount();
+        return Math.abs((h / (double)(n.factors().length * (1+n.depth()))) - Solver.semiprime1sToLen);
+      }
+  ),
+  /**
+   * Calculate h based upon the likelihood that the current factor bit distribution
+   * reflects expectations based upon objective experimental results w/semiprime numbers.
+   */
+  DIST_EXPECTED("Expected Distribution",
+      (n) ->
+      {
+        double h = 0;
+
+        return h;
       }
   ),
   /**

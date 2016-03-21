@@ -7,7 +7,6 @@ import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.table.DefaultTableModel;
 import javax.swing.text.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -19,8 +18,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.prefs.Preferences;
 import java.util.regex.Pattern;
-
-import static javax.swing.JTable.AUTO_RESIZE_ALL_COLUMNS;
 
 /**
  * @author Stephen Dunn
@@ -166,20 +163,20 @@ public class ClientGui extends JFrame implements DocumentListener
   private JButton    btnUpdate;
 
   // search tab
-  private JCheckBox  chkPeriodicStats;
-  private JCheckBox  chkDetailedStats;
-  private JCheckBox  chkFavorPerformance;
-  private JCheckBox  chkCompressMemory;
-  private JCheckBox  chkRestrictDisk;
-  private JCheckBox  chkRestrictNetwork;
-  private JCheckBox  chkBackground;
-  private JCheckBox  chkPrintAllNodes;
-  private JCheckBox  chkWriteCsv;
-  private JTable     tblHeuristics;
-  private JButton    btnSearch;
-  private JLabel     lblSemiprime;
-  private JTextArea  txtSemiprime;
-  private JTextField txtSemiprimeBase, txtInternalBase, txtP1Len, txtP2Len;
+  private JCheckBox   chkPeriodicStats;
+  private JCheckBox   chkDetailedStats;
+  private JCheckBox   chkFavorPerformance;
+  private JCheckBox   chkCompressMemory;
+  private JCheckBox   chkRestrictDisk;
+  private JCheckBox   chkRestrictNetwork;
+  private JCheckBox   chkBackground;
+  private JCheckBox   chkPrintAllNodes;
+  private JCheckBox   chkWriteCsv;
+  private JCheckBox[] chkHeuristics;
+  private JButton     btnSearch;
+  private JLabel      lblSemiprime;
+  private JTextArea   txtSemiprime;
+  private JTextField  txtSemiprimeBase, txtInternalBase, txtP1Len, txtP2Len;
 
   // cpu tab
   private JSlider sldProcessors, sldProcessorCap, sldMemoryCap, sldIdle;
@@ -502,20 +499,11 @@ public class ClientGui extends JFrame implements DocumentListener
 
     /////////////////////////////////////
 
-    final int tblWidth = Math.min(3, Heuristic.values().length);
+    chkHeuristics = new JCheckBox[Heuristic.values().length];
+    for (int i = 0; i < Heuristic.values().length; ++i) { chkHeuristics[i] = getCheckBox(Heuristic.values()[i].toString(), false); }
+    chkHeuristics[0].setSelected(true);
 
-    final Object[][] table = new Object[Math.max(1,Heuristic.values().length/tblWidth)][tblWidth];
-    int row=0, col=0;
-    for (Heuristic h : Heuristic.values())
-    {
-      table[row][col] = h.toString();
-      ++col; if (0 == col%tblWidth) { ++row; col=0; }
-    }
-
-    tblHeuristics = new JTable(new DefaultTableModel(table,new String[tblWidth]) { @Override public boolean isCellEditable(int r, int c) { return false; } });
-    tblHeuristics.setAutoResizeMode(AUTO_RESIZE_ALL_COLUMNS);
-    tblHeuristics.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
-    tblHeuristics.setCellSelectionEnabled(true);
+    /////////////////////////////////////
 
     lblSemiprime = getLabel("Local Semiprime Target");
     lblSemiprime.setIcon(icnNodeSmall);
@@ -671,9 +659,8 @@ public class ClientGui extends JFrame implements DocumentListener
 
         // set heuristics
         Solver.heuristics().clear();
-        for (int i : tblHeuristics.getSelectedRows())
-            for (int j : tblHeuristics.getSelectedColumns())
-                Solver.addHeuristic(Heuristic.byName((String) table[i][j]));
+        for (JCheckBox h : chkHeuristics)
+            if (h.isSelected()) Solver.addHeuristic(Heuristic.byName(h.getText()));
 
         // set callback for search completion
         Solver.callback(n ->
@@ -711,7 +698,7 @@ public class ClientGui extends JFrame implements DocumentListener
         // prevent multiple searches
         btnSearch.setText("Cancel Search");
       }
-      catch (Throwable t) { Log.e(t); }
+      catch (Throwable t) { Log.e(t.getMessage()); }
       finally
       {
         final Thread thread = solverThread();
@@ -739,10 +726,10 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlSearchOptions.add(chkWriteCsv);
     pnlSearchOptions.add(chkBackground);
 
-    final JPanel pnlHeuristics = new JPanel(new GridLayout(1,1));
-    pnlHeuristics.add(tblHeuristics);
+    final JPanel pnlHeuristics = new JPanel(new GridLayout(1+(chkHeuristics.length/3),3));
+    for (JCheckBox h : chkHeuristics) pnlHeuristics.add(h);
     pnlHeuristics.setBorder(BorderFactory.createTitledBorder(
-            BorderFactory.createEmptyBorder(),
+            BorderFactory.createLineBorder(Color.BLACK),
             "Select Heuristics",
             TitledBorder.CENTER,
             TitledBorder.TOP
@@ -751,15 +738,6 @@ public class ClientGui extends JFrame implements DocumentListener
     final JPanel pnlHeader = new JPanel(new GridLayout(2,1,H_GAP,V_GAP));
     pnlHeader.add(pnlSearchOptions);
     pnlHeader.add(pnlHeuristics);
-
-    final JPanel pnlSemiprime = new JPanel(new GridLayout(1,1));
-    pnlSemiprime.add(pneSemirpime);
-    pnlSemiprime.setBorder(BorderFactory.createTitledBorder(
-            BorderFactory.createEmptyBorder(),
-            "Local Semiprime Target",
-            TitledBorder.CENTER,
-            TitledBorder.TOP
-    ));
 
     final JPanel pnlSemiprimeOptions = new JPanel(new GridLayout(4,2));
     pnlSemiprimeOptions.add(lblSemiprimeBase);
@@ -792,13 +770,22 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlButtons.add(pnlButtons1);
     pnlButtons.add(pnlButtons2);
 
-    final JPanel pnlFooter = new JPanel(new GridLayout(2,1));
-    pnlFooter.add(pnlSemiprimeOptions);
-    pnlFooter.add(pnlButtons);
+    final JPanel pnlSemiprime = new JPanel(new GridLayout(2,1));
+    pnlSemiprime.add(pnlSemiprimeOptions);
+    pnlSemiprime.add(pnlButtons);
 
-    final JPanel pnlSearch = new JPanel(new GridLayout(3,1, H_GAP, V_GAP));
+    final JPanel pnlFooter = new JPanel(new GridLayout(2,1));
+    pnlFooter.add(pneSemirpime);
+    pnlFooter.add(pnlSemiprime);
+    pnlFooter.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createEmptyBorder(),
+            "Local Semiprime Target",
+            TitledBorder.CENTER,
+            TitledBorder.TOP
+    ));
+
+    final JPanel pnlSearch = new JPanel(new GridLayout(2,1, H_GAP, V_GAP));
     pnlSearch.add(pnlHeader);
-    pnlSearch.add(pnlSemiprime);
     pnlSearch.add(pnlFooter);
 
     ////////////////////////////////////////////////////////////////////////////
@@ -1036,7 +1023,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private void updateSemiprimeHeader()
   {
-    tblHeuristics.getTableHeader().setName("Local Semiprime Target (len: " + clean(txtSemiprime.getText()).length() + ", internal len: " + getSemiprimeLen() + ")");
+    lblSemiprime.setText("Local Semiprime Target (len: " + clean(txtSemiprime.getText()).length() + ", internal len: " + getSemiprimeLen() + ")");
   }
 
   private void loadBenchmark(String benchmark)

@@ -80,7 +80,7 @@ public class Solver implements Runnable, Serializable
   static int    semiprime1s; ///< cached internal len
   static int    semiprime0s; ///< cached internal len
   static int    maxFactorLen; ///< max(primeLen1, primeLen2)
-  static double semiprimeBitsSetToLen; ///< cached internal len
+  static double semiprime1sToLen; ///< cached internal len
 
   private Solver(final String semiprime, final int semiprimeBase, final int internalBase)
   {
@@ -103,7 +103,7 @@ public class Solver implements Runnable, Serializable
     Solver.semiprimeBitLen = semiprime().bitLength();
     Solver.semiprime1s = semiprime().bitCount();
     Solver.semiprime0s = Solver.semiprimeLen2 - Solver.semiprime1s;
-    Solver.semiprimeBitsSetToLen = (double) semiprime1s / (double) semiprimeBitLen;
+    Solver.semiprime1sToLen = (double) semiprime1s / (double) semiprimeBitLen;
   }
 
   @Override public String toString() { return semiprimeString10; }
