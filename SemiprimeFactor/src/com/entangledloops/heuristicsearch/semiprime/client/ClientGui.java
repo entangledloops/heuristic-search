@@ -513,11 +513,9 @@ public class ClientGui extends JFrame implements DocumentListener
     }
 
     tblHeuristics = new JTable(new DefaultTableModel(table,new String[tblWidth]) { @Override public boolean isCellEditable(int r, int c) { return false; } });
-    tblHeuristics.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
     tblHeuristics.setAutoResizeMode(AUTO_RESIZE_ALL_COLUMNS);
-    tblHeuristics.setRowSelectionInterval(0, tblHeuristics.getRowCount()-1);
-    tblHeuristics.setColumnSelectionInterval(0, tblHeuristics.getColumnCount()-1);
-    //tblHeuristics.getSelectionModel().addListSelectionListener((e) -> tblHeuristics.getSelectionModel().clearSelection());//removeIndexInterval(tblHeuristics.getSelectedRow(), tblHeuristics.getSelectedColumn()));
+    tblHeuristics.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+    tblHeuristics.setCellSelectionEnabled(true);
 
     lblSemiprime = getLabel("Local Semiprime Target");
     lblSemiprime.setIcon(icnNodeSmall);
