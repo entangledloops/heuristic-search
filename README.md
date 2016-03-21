@@ -1,4 +1,4 @@
-**[Download](https://github.com/entangledloops/heuristicSearch/blob/master/SemiprimeFactor/SemiprimeFactor.jar?raw=true) the latest [Semiprime Factorization](https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization) Client (currently v0.3a).**
+**Currently, I am actively developing the [Semiprime Factorization](https://github.com/entangledloops/heuristicSearch/tree/master/SemiprimeFactor) subproject in this repo. Take a look!**
 
 ## What is Heuristic Search? ##
 
