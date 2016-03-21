@@ -46,8 +46,11 @@ To run the client:
 Other gradle tasks available:
 
 `runServer` - run a local server
+
 `dist` - build the client jar
+
 `distServer` - build the server jar
+
 `createWrapper` - updates gradle wrapper 
 
 Be sure to run `createWrapper` from the parent directory so gradle files can be overwritten. A copy of gradle w/only this task is provided in the `heuristicSearch` dir to make this easier for you.
