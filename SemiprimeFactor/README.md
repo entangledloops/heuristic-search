@@ -41,8 +41,6 @@ To run the client:
 
 `gradlew run`
 
-## Notes ##
-
 Other gradle tasks available:
 
 `runServer` - run a local server
