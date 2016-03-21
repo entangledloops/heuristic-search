@@ -68,7 +68,7 @@ public class ClientGui extends JFrame implements DocumentListener
   //////////////////////////////////////////////////////////////////////////////
   // globals
 
-  private static final String VERSION          = "0.4.4a";
+  private static final String VERSION          = "0.4.5a";
   private static final String ICON_NODE_SMALL  = "node16x16.png";
   private static final String ICON_NODE        = "node32x32.png";
   private static final String ICON_CPU         = "cpu32x32.png";
