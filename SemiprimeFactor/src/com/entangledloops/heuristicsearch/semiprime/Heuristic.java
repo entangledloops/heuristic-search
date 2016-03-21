@@ -1,6 +1,5 @@
 package com.entangledloops.heuristicsearch.semiprime;
 
-import java.math.BigInteger;
 import java.util.function.Function;
 
 /**
@@ -9,61 +8,24 @@ import java.util.function.Function;
  */
 public enum Heuristic
 {
-  /**
-   * Calculate distribution difference from target.
-   *
-   * abs( sum(factor[i].bitCount() / factor[i].bitLength()) - (targetBitCount / targetBitLen) )
-   */
   DIST_DIFF_BY_LEN("Distribution Difference by Length",
       "Calculate distribution difference from target.\nabs( sum(factor[i].bitCount() / factor[i].bitLength()) - (targetBitCount / targetBitLen) )",
-      (n) ->
-      {
-        double h = 0;
-        for (BigInteger factor : n.factors()) h += ((double)factor.bitCount() / (double)factor.bitLength());
-        return Math.abs(h - Solver.semiprime1sToLen);
-      }
+      (n) -> Math.abs((((double)n.p.bitCount() / (double)n.p.bitLength()) + ((double)n.q.bitCount() / (double)n.q.bitLength())) - Solver.cacheSemiprimeBitCountOverBitLen)
   ),
-  /**
-   * Calculate distribution difference from target.
-   *
-   * abs( [ sum(factor[i].bitCount()) / (numFactors * (depth+1)) ] - (targetBitCount / targetBitLen) )
-   */
+
   DIST_DIFF_BY_DEPTH("Distribution Difference by Depth",
       "Calculate distribution difference from target.\nabs( [ sum(factor[i].bitCount()) / (numFactors * (depth+1)) ] - (targetBitCount / targetBitLen) )",
-      (n) ->
-      {
-        double h = 0;
-        for (BigInteger factor : n.factors()) h += factor.bitCount();
-        return Math.abs((h / (2.0 * (1.0+n.depth()))) - Solver.semiprime1sToLen);
-      }
+      (n) -> Math.abs(((n.p.bitCount() + n.q.bitCount()) / (2.0 * (1.0+n.depth))) - Solver.cacheSemiprimeBitCountOverBitLen)
   ),
-  /**
-   * Calculate h based upon the likelihood that the current factor bit distribution
-   * reflects expectations based upon objective experimental results w/semiprime numbers.
-   */
+
   DIST_EXPECTED("Expected Distribution",
       "Calculate h based upon the likelihood that the current factor bit distribution reflects\nexpectations based upon objective experimental results w/semiprime numbers.",
-      (n) ->
-      {
-        double h = 0;
-        for (BigInteger factor : n.factors()) h += Math.abs(0.5 - (double)factor.bitCount()/(double)factor.bitLength());
-        return h;
-      }
+      (n) -> Math.abs(0.5 - (double)n.p.bitCount()/(double)n.p.bitLength()) + Math.abs(0.5 - (double)n.q.bitCount()/(double)n.q.bitLength())
   ),
-  /**
-   * Hamming distance to goal.
-   *
-   * for each bit i in target:
-   *   sum( n.product[i] != target[i] )
-   */
+
   HAMMING("Hamming Distance",
       "<a href=\"https://en.wikipedia.org/wiki/Hamming_distance\">Hamming distance</a> to goal.\nfor each bit i in target:\n\tsum( n.product[i] != target[i] )",
-      (n) ->
-      {
-        double h = 0;
-        for (int i = 0; i < Solver.semiprimeBitLen; ++i) if (Solver.semiprime().testBit(i) != n.product.testBit(i)) ++h;
-        return h;
-      }
+      (n) -> (double)Solver.semiprime().and(n.product).bitCount()
   ),
   ;
 

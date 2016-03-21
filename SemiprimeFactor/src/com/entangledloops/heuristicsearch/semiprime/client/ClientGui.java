@@ -68,7 +68,7 @@ public class ClientGui extends JFrame implements DocumentListener
   //////////////////////////////////////////////////////////////////////////////
   // globals
 
-  private static final String VERSION          = "0.4.4a";
+  private static final String VERSION          = "0.4.5a";
   private static final String ICON_NODE_SMALL  = "node16x16.png";
   private static final String ICON_NODE        = "node32x32.png";
   private static final String ICON_CPU         = "cpu32x32.png";
@@ -131,7 +131,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final int DEFAULT_HEIGHT         = 768;
 
   private static final boolean DEFAULT_AUTOSTART         = false;
-  private static final boolean DEFAULT_PERIODIC_STATS    = Solver.periodicStats();
+  private static final boolean DEFAULT_PERIODIC_STATS    = Solver.stats();
   private static final boolean DEFAULT_DETAILED_STATS    = Solver.detailedStats();
   private static final boolean DEFAULT_FAVOR_PERFORMANCE = Solver.favorPerformance();
   private static final boolean DEFAULT_COMPRESS_MEMORY   = Solver.compressMemory();
@@ -459,11 +459,11 @@ public class ClientGui extends JFrame implements DocumentListener
 
     chkFavorPerformance = getCheckBox(FAVOR_PERFORMANCE_NAME, DEFAULT_FAVOR_PERFORMANCE);
     chkFavorPerformance.setToolTipText("<html>CPU performance will be favored, but (possibly lots) more memory will be consumed.<br>Watch caching if you have a solid state drive.</html>");
-    chkFavorPerformance.addActionListener((e) -> { Solver.favorPerformance(chkFavorPerformance.isSelected()); });
+    chkFavorPerformance.addActionListener((e) -> Solver.favorPerformance(chkFavorPerformance.isSelected()));
 
     chkCompressMemory = getCheckBox(COMPRESS_MEMORY_NAME, DEFAULT_COMPRESS_MEMORY);
     chkCompressMemory.setToolTipText("Memory will be spared, but possibly at great cost to CPU time.");
-    chkCompressMemory.addActionListener((e) -> { Solver.compressMemory(chkCompressMemory.isSelected()); });
+    chkCompressMemory.addActionListener((e) -> Solver.compressMemory(chkCompressMemory.isSelected()));
 
     chkRestrictDisk = getCheckBox(RESTRICT_DISK_NAME, DEFAULT_RESTRICT_DISK);
     chkRestrictDisk.setToolTipText("Disk I/O enabled or disabled for caching search if/when memory runs low.");
@@ -473,11 +473,11 @@ public class ClientGui extends JFrame implements DocumentListener
 
     chkRestrictNetwork = getCheckBox(RESTRICT_NETWORK_NAME, DEFAULT_RESTRICT_NETWORK);
     chkRestrictNetwork.setToolTipText("Memory will be spared, but possibly at great cost to CPU time.");
-    chkRestrictNetwork.addActionListener((e) -> { Solver.restrictNetwork(chkRestrictNetwork.isSelected()); });
+    chkRestrictNetwork.addActionListener((e) -> Solver.restrictNetwork(chkRestrictNetwork.isSelected()));
 
     chkPeriodicStats = getCheckBox(PERIODIC_STATS_NAME, DEFAULT_PERIODIC_STATS);
     chkPeriodicStats.setToolTipText("Print stats reflecting search status every so often.");
-    chkPeriodicStats.addActionListener((e) -> Solver.periodicStats(chkPeriodicStats.isSelected()));
+    chkPeriodicStats.addActionListener((e) -> Solver.stats(chkPeriodicStats.isSelected()));
 
     chkDetailedStats = getCheckBox(DETAILED_STATS_NAME, DEFAULT_DETAILED_STATS);
     chkDetailedStats.setToolTipText("Calculated detailed stats at great performance and memory cost (use to debug).");
@@ -660,7 +660,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
         // reset the solver for a new search
         Solver.reset();
-        Solver.periodicStats(chkPeriodicStats.isSelected());
+        Solver.stats(chkPeriodicStats.isSelected());
         Solver.detailedStats(chkDetailedStats.isSelected());
         Solver.favorPerformance(chkFavorPerformance.isSelected());
         Solver.compressMemory(chkCompressMemory.isSelected());
@@ -681,7 +681,7 @@ public class ClientGui extends JFrame implements DocumentListener
         Solver.callback(n ->
         {
           // null == solverThread() -> search was cancelled before completion
-          if (null != n) { pneMain.setSelectedIndex(TAB_CONNECT); Log.o("\nsearch complete:\n\n\tsp:\t" + n.product(10) + " (" + n.product() + ")\n\tp1:\t" + n.factor(0) + " (" + n.factor(0).toString(Solver.internalBase()) + ")\n\tp2:\t" + n.factor(1) + " (" + n.factor(1).toString(Solver.internalBase()) + ")"); }
+          if (null != n) { pneMain.setSelectedIndex(TAB_CONNECT); Log.o("\nsearch complete:\n\n\tsp:\t" + n.product(10) + " (" + n.product() + ")\n\tp:\t" + n.p + " (" + n.p.toString(Solver.internalBase()) + ")\n\tq:\t" + n.q + " (" + n.q.toString(Solver.internalBase()) + ")"); }
           else if (null != solverThread()) { pneMain.setSelectedIndex(TAB_CONNECT); Log.e("search complete:\n\n\tno factors could be found, are you sure the input is composite" + (Solver.primeLengthsFixed() ? " and the factors are the specified lengths" : "") + "?"); }
           isSearching.set(false);
           btnSearch.setText("Start Local Search");
@@ -1305,7 +1305,7 @@ public class ClientGui extends JFrame implements DocumentListener
       loadSearchSettings();
       Log.o("all settings loaded successfully");
     }
-    catch (Throwable t) { Log.e("failed to load settings. make sure app has read permissions"); return; }
+    catch (Throwable t) { Log.e("failed to load settings. make sure app has read permissions"); }
   }
 
   private void updateSearchSettings()

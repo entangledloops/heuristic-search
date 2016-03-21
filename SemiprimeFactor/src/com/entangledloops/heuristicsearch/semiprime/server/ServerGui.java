@@ -22,7 +22,7 @@ public class ServerGui extends JFrame implements DocumentListener
   //
   //////////////////////////////////////////////////////////////////////////////
 
-  private static final String VERSION        = "0.3.1a";
+  private static final String VERSION        = "0.3.2a";
   private static final String DEFAULT_TITLE  = "Semiprime Factorization Server - " + VERSION;
   private static final int    DEFAULT_WIDTH  = 800;
   private static final int    DEFAULT_HEIGHT = 600;
