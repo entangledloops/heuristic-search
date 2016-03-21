@@ -169,11 +169,11 @@ public class Solver implements Runnable, Serializable
   private static String stats(final long elapsedNanos)
   {
     final long seconds = (elapsedNanos/1000000000L);
-    return "\n\tnodesGenerated:\t" + nodesGenerated +
-        "\n\tnodesRegenerated:\t" + nodesRegenerated +
-        "\n\tnodesIgnored:\t" + nodesIgnored +
-        "\n\tnodesExpanded:\t" + nodesExpanded +
-        "\n\tnodesClosed:\t" + nodesClosed +
+    return "\n\tgenerated:\t" + nodesGenerated +
+        "\n\tregenerated:\t" + nodesRegenerated +
+        "\n\tignored:\t" + nodesIgnored +
+        "\n\texpanded:\t" + nodesExpanded +
+        "\n\tclosed:\t" + nodesClosed +
         "\n\tmaxDepth:\t" + maxDepth + ", avgDepth: " + avgDepth() +
         (cacheDetailedStats ? "\n\topen.size():\t" + open.size() : "") +
         "\n\telapsed:\t" + (seconds/60L) + " minutes, " + (seconds%60L) + " seconds";
