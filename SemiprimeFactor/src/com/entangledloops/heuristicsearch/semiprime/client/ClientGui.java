@@ -799,10 +799,12 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlButtons1.add(pnlButtons0);
     pnlButtons1.add(pnlLengths);
 
-    final JPanel pnlButtons2 = new JPanel(new GridLayout(1,3));
+    final JPanel pnlButtons2 = new JPanel(new GridLayout(1,5));
     pnlButtons2.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEmptyBorder(), "", TitledBorder.CENTER, TitledBorder.TOP));
     pnlButtons2.add( Box.createHorizontalBox() ); // placeholder
+    pnlButtons2.add( Box.createHorizontalBox() ); // placeholder
     pnlButtons2.add(btnSearch);
+    pnlButtons2.add( Box.createHorizontalBox() ); // placeholder
     pnlButtons2.add( Box.createHorizontalBox() ); // placeholder
 
     final JPanel pnlButtons = new JPanel(new GridLayout(2,1,H_GAP,V_GAP));
