@@ -2,7 +2,9 @@ package com.entangledloops.heuristicsearch.semiprime.server;
 
 import com.entangledloops.heuristicsearch.semiprime.Log;
 import com.entangledloops.heuristicsearch.semiprime.Packet;
+import com.entangledloops.heuristicsearch.semiprime.Solver;
 import com.entangledloops.heuristicsearch.semiprime.client.Client;
+import com.entangledloops.heuristicsearch.semiprime.client.ClientGui;
 
 import java.net.ServerSocket;
 import java.util.Queue;
@@ -50,7 +52,7 @@ public class Server
 
     try
     {
-      Log.o("launching new socket server..."); // 'launched' msg printed in new thread
+      Log.o("launching new socket server..."); // 'launched' msg printed in new get
       socket = new ServerSocket(port, Integer.MAX_VALUE);
       serverThread.set(new Thread(new ServerThread()));
       serverThread.get().start();
@@ -101,14 +103,14 @@ public class Server
   {
     @Override public void run()
     {
-      if (!ready.compareAndSet(false, true) || exiting()) { Log.e("duplicate server thread launch?"); return; }
+      if (!ready.compareAndSet(false, true) || exiting()) { Log.e("duplicate server get launch?"); return; }
 
       try
       {
         Log.o("server launched and ready to accept clients");
         while (!exiting() && !Thread.interrupted())
         {
-          try { clients.add(new Client(socket.accept())); }
+          try { clients.add(new Client( socket.accept() )); }
           catch (Throwable t) { if (!exiting() && !Thread.interrupted()) Log.e("client accept failure: " + t); }
         }
       }
@@ -127,7 +129,15 @@ public class Server
 
   public static void main(String[] args)
   {
+    final String[] semiprimes = new String[] { ClientGui.RSA_220, ClientGui.RSA_300, ClientGui.RSA_2048 };
     final ServerGui serverGui = new ServerGui();
-    try { while (!serverGui.ready()) Thread.sleep(250); new Client(); } catch (Throwable t) { Log.e(t); System.exit(-1); }
+
+    Solver.networkHost(true);
+    for (final String semiprime : semiprimes)
+    {
+      Solver.get(semiprime.trim().replace("\n","")).start();
+      try { Thread.sleep(250); } catch (Throwable ignored) {}
+      Solver.join();
+    }
   }
 }

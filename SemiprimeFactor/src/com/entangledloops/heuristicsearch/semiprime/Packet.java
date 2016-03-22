@@ -1,6 +1,8 @@
 package com.entangledloops.heuristicsearch.semiprime;
 
 import java.io.Serializable;
+import java.util.Collection;
+import java.util.List;
 
 /**
  * @author Stephen Dunn
@@ -10,6 +12,7 @@ public class Packet implements Serializable
 {
   public enum Type
   {
+    UPDATE,
     TARGET_UPDATE,
     USERNAME_UPDATE,
     EMAIL_UPDATE,
@@ -30,15 +33,20 @@ public class Packet implements Serializable
     this.data = data;
   }
 
-  public Type type() { return type; }
+  @Override public String toString() { return type.name() + " : " + size(); }
 
-  // raw packet data
+  public Type type() { return type; }
+  public int size() { return null != data ? data.length : 0; }
 
   public Object[] data() { return data; }
   public <T> T data(int i, Class<T> klass) { return klass.cast(data[i]); }
 
-  // some packet-parsing helpers
+  public String asString() { return asString(0); }
+  public String asString(int i) { return data(i, String.class); }
 
-  public int size() { return null != data ? data.length : 0; }
-  public String string() { return data(0, String.class); }
+  public <T> Collection<T> asCollection() { return asCollection(0); }
+  public <T> Collection<T> asCollection(int i) { return (Collection<T>) data[i]; }
+
+  public <T> List<T> asList() { return asList(0); }
+  public <T> List<T> asList(int i) { return (List<T>) data[i]; }
 }

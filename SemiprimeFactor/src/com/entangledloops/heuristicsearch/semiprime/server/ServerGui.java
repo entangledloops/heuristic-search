@@ -1,6 +1,7 @@
 package com.entangledloops.heuristicsearch.semiprime.server;
 
 import com.entangledloops.heuristicsearch.semiprime.Log;
+import com.entangledloops.heuristicsearch.semiprime.Solver;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -22,10 +23,9 @@ public class ServerGui extends JFrame implements DocumentListener
   //
   //////////////////////////////////////////////////////////////////////////////
 
-  private static final String VERSION        = "0.3.2a";
-  private static final String DEFAULT_TITLE  = "Semiprime Factorization Server - " + VERSION;
-  private static final int    DEFAULT_WIDTH  = 800;
-  private static final int    DEFAULT_HEIGHT = 600;
+  private static final String DEFAULT_TITLE  = "Semiprime Factorization Server - " + Solver.VERSION;
+  private static final int    DEFAULT_WIDTH  = 1024;
+  private static final int    DEFAULT_HEIGHT = 768;
   private static final int    HISTORY_ROWS   = 10;
   private static final int    HISTORY_COLS   = 20;
 

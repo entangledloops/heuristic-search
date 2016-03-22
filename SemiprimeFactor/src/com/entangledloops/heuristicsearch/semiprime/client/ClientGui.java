@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.prefs.Preferences;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * @author Stephen Dunn
@@ -32,13 +33,13 @@ public class ClientGui extends JFrame implements DocumentListener
   // RSA-100 = 37975227936943673922808872755445627854565536638199
   //         × 40094690950920881030683735292761468389214899724061
   //
-  private static final String RSA_100 = "15226050279225333605356183781326374297180681" +
+  public static final String RSA_100 = "15226050279225333605356183781326374297180681" +
       "14961380688657908494580122963258\n952897654000350692006139";
 
   //
   // RSA-220 = unsolved
   //
-  private static final String RSA_220 = "22601385262034057849416540486101975135080389" +
+  public static final String RSA_220 = "22601385262034057849416540486101975135080389" +
       "15719776718321197768109445641817\n96667660859312130658257725063156288667697044" +
       "80700018111497118630021124879281\n99487482066070131066586646083327982803560379" +
       "205391980139946496955261";
@@ -46,7 +47,7 @@ public class ClientGui extends JFrame implements DocumentListener
   //
   // RSA-300 = unsolved
   //
-  private static final String RSA_300 = "27693155678034421390286890616472330922376083" +
+  public static final String RSA_300 = "27693155678034421390286890616472330922376083" +
       "63983953254005036722809375824714\n94739461900602187562551243171865731050750745" +
       "46238828817121274630072161346956\n43967418363899790869043044724760018390159830" +
       "33451909174663464663867829125664\n45989557515717881690022879271126747195835757" +
@@ -55,7 +56,7 @@ public class ClientGui extends JFrame implements DocumentListener
   //
   // RSA-2048 = unsolved
   //
-  private static final String RSA_2048 = "2519590847565789349402718324004839857142928" +
+  public static final String RSA_2048 = "2519590847565789349402718324004839857142928" +
       "212620403202777713783604366202070\n7595556264018525880784406918290641249515082" +
       "189298559149176184502808489120072\n8449926873928072877767359714183472702618963" +
       "750149718246911650776133798590957\n0009733045974880842840179742910064245869181" +
@@ -68,31 +69,33 @@ public class ClientGui extends JFrame implements DocumentListener
   //////////////////////////////////////////////////////////////////////////////
   // globals
 
-  private static final String VERSION          = "0.4.5a";
   private static final String ICON_NODE_SMALL  = "node16x16.png";
   private static final String ICON_NODE        = "node32x32.png";
   private static final String ICON_CPU         = "cpu32x32.png";
   private static final String ICON_NET         = "net32x32.png";
   private static final String ICON_SETTINGS    = "settings32x32.png";
-  private static final String DEFAULT_TITLE    = "Semiprime Factorization Client v" + VERSION;
-  private static final String DEFAULT_EMAIL    = "nope@take-all-the-credit.com";
   private static final String ABOUT_URL        = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
   private static final String NO_MATH_URL      = ABOUT_URL + "---%22I-don't-math%22-edition";
   private static final String SOURCE_URL       = "https://github.com/entangledloops/heuristicSearch/tree/master";
   private static final String HOMEPAGE_URL     = "http://www.entangledloops.com";
-  private static final String DEFAULT_HOST     = "semiprime.servebeer.com";
   private static final String OS               = System.getProperty("os.name");
 
 
   //////////////////////////////////////////////////////////////////////////////
   // user prefs
 
+  // interface w/OS settings container
   private Preferences prefs;
 
-  private static final String WIDTH_NAME            = "width";
-  private static final String HEIGHT_NAME           = "height";
+  // these are the default keys for the various stored prefs
+  private static final String WIDTH_NAME             = "width";
+  private static final String HEIGHT_NAME            = "height";
+  private static final String USERNAME_NAME          = "username";
+  private static final String EMAIL_NAME             = "email";
+  private static final String HOST_NAME              = "server";
+  private static final String PORT_NAME              = "port";
   private static final String IDLE_MINUTES_NAME      = "idle minutes";
-  private static final String AUTOSTART_NAME         = "start search immediately";
+  private static final String AUTOSTART_NAME         = "get search immediately";
   private static final String SEMIPRIME_NAME         = "semiprime";
   private static final String PERIODIC_STATS_NAME    = "periodic stats";
   private static final String DETAILED_STATS_NAME    = "detailed stats";
@@ -111,17 +114,19 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final String P1_LEN_NAME            = "p1 len";
   private static final String P2_LEN_NAME            = "p2 len";
 
-  private static final int TAB_CONNECT  = 0;
-  private static final int TAB_SEARCH   = 1;
-  private static final int TAB_CPU      = 2;
-  private static final int TAB_MISC     = 3;
-  private static final int HISTORY_ROWS = 5;
-  private static final int HISTORY_COLS = 20;
+  // default preferences settings
+  private static final int DEFAULT_HISTORY_ROWS = 5;
+  private static final int DEFAULT_HISTORY_COLS = 20;
+
+  private static final String DEFAULT_TITLE    = "Semiprime Factorization Client v" + Solver.VERSION;
+  private static final String DEFAULT_USERNAME = System.getProperty("user.name");
+  private static final String DEFAULT_EMAIL    = "nope@take-all-the-credit.com";
+  private static final String DEFAULT_HOST     = "semiprime.servebeer.com";
 
   private static final int DEFAULT_SEMIPRIME_BASE = 10;
   private static final int DEFAULT_INTERNAL_BASE  = Solver.internalBase();
-  private static final int DEFAULT_P1_LEN         = Solver.prime1Len();
-  private static final int DEFAULT_P2_LEN         = Solver.prime2Len();
+  private static final int DEFAULT_P1_LEN         = Solver.pLength();
+  private static final int DEFAULT_P2_LEN         = Solver.qLength();
   private static final int DEFAULT_PROCESSORS     = Solver.processors();
   private static final int DEFAULT_PROCESSOR_CAP  = Solver.processorCap();
   private static final int DEFAULT_MEMORY_CAP     = Solver.memoryCap();
@@ -144,6 +149,13 @@ public class ClientGui extends JFrame implements DocumentListener
   //////////////////////////////////////////////////////////////////////////////
   // gui
 
+  // named indexes for tabs
+  private static final int TAB_CONNECT  = 0;
+  private static final int TAB_SEARCH   = 1;
+  private static final int TAB_CPU      = 2;
+  private static final int TAB_MISC     = 3;
+
+  // consistent spacing
   private static final int H_GAP = 10;
   private static final int V_GAP = 10;
 
@@ -156,7 +168,7 @@ public class ClientGui extends JFrame implements DocumentListener
   // connect tab
   private JTextField txtUsername;
   private JTextField txtEmail;
-  private JTextField txtAddress;
+  private JTextField txtHost;
   private JTextArea  txtHistory;
   private JTextField txtPort;
   private JButton    btnConnect;
@@ -373,8 +385,8 @@ public class ClientGui extends JFrame implements DocumentListener
 
     // initialize all components to default settings
     txtHistory = new JTextArea();
-    txtHistory.setRows(HISTORY_ROWS);
-    txtHistory.setColumns(HISTORY_COLS);
+    txtHistory.setRows(DEFAULT_HISTORY_ROWS);
+    txtHistory.setColumns(DEFAULT_HISTORY_COLS);
     txtHistory.setLineWrap(true);
     txtHistory.setWrapStyleWord(true);
     txtHistory.setEditable(false);
@@ -407,7 +419,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
     // username
     final JLabel lblUsername = getLabel("Optional username:");
-    txtUsername = getTextField(System.getProperty("user.name"));
+    txtUsername = getTextField(DEFAULT_USERNAME);
 
     // email
     final JLabel lblEmail = getLabel("Optional email (in case you crack a number\u2014will never share):");
@@ -415,8 +427,8 @@ public class ClientGui extends JFrame implements DocumentListener
 
     // host address label and text box
     final JLabel lblAddress = getLabel("Server address:");
-    txtAddress = getTextField(DEFAULT_HOST);
-    txtAddress.setColumns(DEFAULT_HOST.length());
+    txtHost = getTextField(DEFAULT_HOST);
+    txtHost.setColumns(DEFAULT_HOST.length());
 
     // port box and restrict to numbers
     final JLabel lblPort = getLabel("Server port:");
@@ -443,7 +455,7 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlConnect.add(lblEmail);
     pnlConnect.add(txtEmail);
     pnlConnect.add(lblAddress);
-    pnlConnect.add(txtAddress);
+    pnlConnect.add(txtHost);
     pnlConnect.add(lblPort);
     pnlConnect.add(txtPort);
     pnlConnect.add(lblConnectNow);
@@ -540,7 +552,7 @@ public class ClientGui extends JFrame implements DocumentListener
       }
     };
 
-    txtSemiprime = new JTextArea(HISTORY_ROWS, HISTORY_COLS);
+    txtSemiprime = new JTextArea(DEFAULT_HISTORY_ROWS, DEFAULT_HISTORY_COLS);
     txtSemiprime.setHighlighter(new DefaultHighlighter());
     txtSemiprime.addInputMethodListener(new InputMethodListener()
     {
@@ -576,9 +588,9 @@ public class ClientGui extends JFrame implements DocumentListener
     txtInternalBase.setEnabled(false);
     txtInternalBase.setToolTipText(internalBaseHelp);
 
-    final JLabel lblP1Len = getLabel("Prime 1 Length");
+    final JLabel lblP1Len = getLabel("Prime 1 (p) Length");
     lblP1Len.setToolTipText(primeLengthHelp);
-    final JLabel lblP2Len = getLabel("Prime 2 Length");
+    final JLabel lblP2Len = getLabel("Prime 2 (q) Length");
     lblP2Len.setToolTipText(primeLengthHelp);
 
     txtP1Len = getNumberTextField("0");
@@ -594,8 +606,8 @@ public class ClientGui extends JFrame implements DocumentListener
           final int len1 = Integer.parseInt(txtP1Len.getText().trim());
           if (len1 >= 0)
           {
-            Solver.prime1Len(len1); Solver.prime2Len(0 != len1 ? getSemiprimeLen() - len1 : 0);
-            txtP2Len.setText(""+Solver.prime2Len());
+            Solver.pLength(len1); Solver.qLength(0 != len1 ? getSemiprimeLen() - len1 : 0);
+            txtP2Len.setText(""+Solver.qLength());
           }
         }
         catch (Throwable ignored) {}
@@ -604,7 +616,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
     txtP2Len = getNumberTextField("0");
     txtP2Len.setToolTipText(primeLengthHelp);
-    txtP2Len.addActionListener((e) -> { try { Solver.prime2Len(Integer.parseInt(txtP2Len.getText().trim())); } catch (Throwable ignored) {} });
+    txtP2Len.addActionListener((e) -> { try { Solver.qLength(Integer.parseInt(txtP2Len.getText().trim())); } catch (Throwable ignored) {} });
 
     final JButton btnReset = getButton("Reset to Defaults");
     btnReset.setToolTipText("This will reset the search settings to defaults (w/o clearing the current semiprime value).");
@@ -651,8 +663,10 @@ public class ClientGui extends JFrame implements DocumentListener
         // interrupt any previous solver and wait for termination
         if (!isSearching.compareAndSet(false, true))
         {
-          final Thread prev = solverThread(null);
-          if (null != prev) { Log.o("interrupting search..."); Solver.interrupt(); prev.join(); return; }
+          final Thread thread = solver(null);
+          if (Solver.solving()) { Log.o("interrupting search..."); Solver.interruptAndJoin(); }
+          try { thread.join(); } catch (Throwable ignored) {}
+          return;
         }
 
         // move to main screen to view search progress or init errors
@@ -660,6 +674,9 @@ public class ClientGui extends JFrame implements DocumentListener
 
         // reset the solver for a new search
         Solver.reset();
+
+        // set the solver according to user prefs
+        Solver.heuristics(Stream.of(chkHeuristics).filter(JCheckBox::isSelected).map(c -> Heuristic.fromFormattedName(c.getText())).toArray(Heuristic[]::new));
         Solver.stats(chkPeriodicStats.isSelected());
         Solver.detailedStats(chkDetailedStats.isSelected());
         Solver.favorPerformance(chkFavorPerformance.isSelected());
@@ -672,24 +689,20 @@ public class ClientGui extends JFrame implements DocumentListener
         Solver.processors(sldProcessors.getValue());
         Solver.processorCap(sldProcessorCap.getValue());
         Solver.memoryCap(sldMemoryCap.getValue());
+        Solver.networkHost(false);
+        Solver.networkSearch(false);
 
-        // set heuristics
-        Solver.heuristics().clear();
-        for (JCheckBox h : chkHeuristics) if (h.isSelected()) Solver.addHeuristic(Heuristic.byName(h.getText()));
-
-        // set callback for search completion
+        // set the default callback for search completion (null = solver() -> search was cancelled before completion)
         Solver.callback(n ->
         {
-          // null == solverThread() -> search was cancelled before completion
-          if (null != n) { pneMain.setSelectedIndex(TAB_CONNECT); Log.o("\nsearch complete:\n\n\tsp:\t" + n.product(10) + " (" + n.product() + ")\n\tp:\t" + n.p + " (" + n.p.toString(Solver.internalBase()) + ")\n\tq:\t" + n.q + " (" + n.q.toString(Solver.internalBase()) + ")"); }
-          else if (null != solverThread()) { pneMain.setSelectedIndex(TAB_CONNECT); Log.e("search complete:\n\n\tno factors could be found, are you sure the input is composite" + (Solver.primeLengthsFixed() ? " and the factors are the specified lengths" : "") + "?"); }
-          isSearching.set(false);
-          btnSearch.setText("Start Local Search");
+          if (null != n) { pneMain.setSelectedIndex(TAB_CONNECT); Log.o("\n********** results **********\n\n\ts:\t" + n.product + "\n\tp:\t" + n.p + "\n\tq:\t" + n.q); }
+          else if (null != solver()) { pneMain.setSelectedIndex(TAB_CONNECT); Log.e("\n********** results **********\n\n\tno factors could be found, are you sure the input is semiprime" + (Solver.primeLengthsFixed() ? " and the factors are the specified lengths?" : "?")); }
+          isSearching.set(false); btnSearch.setText("Start Local Search");
         });
 
         // try to parse any fixed prime lengths
-        try { Solver.prime1Len(Integer.parseInt(clean(txtP1Len.getText()))); } catch (Throwable t) { Log.e("prime 1 len invalid"); return; }
-        try { Solver.prime2Len(Integer.parseInt(clean(txtP2Len.getText()))); } catch (Throwable t) { Log.e("prime 2 len invalid"); return; }
+        try { Solver.pLength(Integer.parseInt(clean(txtP1Len.getText()))); } catch (Throwable t) { Log.e("prime 1 len invalid"); return; }
+        try { Solver.qLength(Integer.parseInt(clean(txtP2Len.getText()))); } catch (Throwable t) { Log.e("prime 2 len invalid"); return; }
 
         // grab the semiprime options
         int spBase = DEFAULT_SEMIPRIME_BASE;
@@ -702,7 +715,7 @@ public class ClientGui extends JFrame implements DocumentListener
         if (internalBase < 2) { Log.e("internal base cannot be < 2, defaulting to " + DEFAULT_INTERNAL_BASE); txtInternalBase.setText(""+DEFAULT_INTERNAL_BASE); return; }
 
         // create a new solver based upon user request and launch it
-        solverThread(new Thread(Solver.newInstance(clean(txtSemiprime.getText()), spBase, internalBase)));
+        solver( Solver.get(clean(txtSemiprime.getText()), spBase) );
 
         // ensure gui values reflect underlying state
         updateSettings();
@@ -716,7 +729,7 @@ public class ClientGui extends JFrame implements DocumentListener
       catch (Throwable t) { Log.e(t.getMessage()); }
       finally
       {
-        final Thread thread = solverThread();
+        final Thread thread = solver();
         if (null != thread) thread.start(); else isSearching.set(false);
         btnSearch.setEnabled(true);
       }
@@ -885,8 +898,8 @@ public class ClientGui extends JFrame implements DocumentListener
     // setup the right-side:
     final JPanel pnlCpuRight = new JPanel(new GridLayout(7, 1, H_GAP, V_GAP));
 
-    // auto start with system?
-    chkAutoStart = getCheckBox("auto-start with system", prefs.getBoolean(AUTOSTART_NAME, DEFAULT_AUTOSTART));
+    // auto get with system?
+    chkAutoStart = getCheckBox("auto-get with system", prefs.getBoolean(AUTOSTART_NAME, DEFAULT_AUTOSTART));
     chkAutoStart.addActionListener(l -> Log.o("autostart: " + (chkAutoStart.isSelected() ? "yes" : "no")));
 
     final JPanel pnlChkBoxes = new JPanel(new GridLayout(1, 1, H_GAP, V_GAP));
@@ -907,8 +920,33 @@ public class ClientGui extends JFrame implements DocumentListener
     ////////////////////////////////////////////////////////////////////////////
     // miscellaneous tab
 
-    final JPanel pnlMisc = new JPanel(new GridLayout(1,1));
-    pnlMisc.add(getLabel("You will find additional settings here when they become available."));
+    final JButton btnResetAll = getButton("Reset all settings to defaults");
+    btnResetAll.addActionListener((e) -> { resetSettings(); pneMain.setSelectedIndex(TAB_CONNECT); });
+
+    final JButton btnSaveAll = getButton("Save all current settings");
+    btnSaveAll.addActionListener((e) -> { saveSettings(); pneMain.setSelectedIndex(TAB_CONNECT); });
+
+    final JButton btnLoadAll = getButton("Load all stored settings");
+    btnLoadAll.addActionListener((e) -> { loadSettings(); pneMain.setSelectedIndex(TAB_CONNECT); });
+
+    final JPanel pnlMiscBtns = new JPanel(new GridLayout(4,3));
+    pnlMiscBtns.add( Box.createHorizontalBox() ); // placeholder
+    pnlMiscBtns.add(btnSaveAll);
+    pnlMiscBtns.add( Box.createHorizontalBox() ); // placeholder
+    pnlMiscBtns.add( Box.createHorizontalBox() ); // placeholder
+    pnlMiscBtns.add(btnLoadAll);
+    pnlMiscBtns.add( Box.createHorizontalBox() ); // placeholder
+    pnlMiscBtns.add( Box.createHorizontalBox() ); // placeholder
+    pnlMiscBtns.add(btnResetAll);
+    pnlMiscBtns.add( Box.createHorizontalBox() ); // placeholder
+    pnlMiscBtns.add( Box.createHorizontalBox() ); // placeholder
+    pnlMiscBtns.add( Box.createHorizontalBox() ); // placeholder
+    pnlMiscBtns.add( Box.createHorizontalBox() ); // placeholder
+
+
+    final JPanel pnlMisc = new JPanel(new GridLayout(2,1));
+    pnlMisc.add(getLabel("You will find additional settings in this tab as they become available."));
+    pnlMisc.add(pnlMiscBtns);
 
     ////////////////////////////////////////////////////////////////////////////
     // add tabs to frame
@@ -935,7 +973,7 @@ public class ClientGui extends JFrame implements DocumentListener
       setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
 
       systemTray = SystemTray.getSystemTray();
-      trayIcon = new TrayIcon(icnNodeSmall.getImage(), "Semiprime Factorization v" + VERSION);
+      trayIcon = new TrayIcon(icnNodeSmall.getImage(), "Semiprime Factorization v" + Solver.VERSION);
       final PopupMenu popup = new PopupMenu();
 
       final MenuItem show = new MenuItem("Hide App");
@@ -1046,13 +1084,14 @@ public class ClientGui extends JFrame implements DocumentListener
     txtSemiprime.setText(benchmark);
     txtSemiprimeBase.setText("10");
     txtInternalBase.setText("2");
-    final String len = ""+((getSemiprimeLen()/2)+(0==getSemiprimeLen()%2?0:1));
+    final int semiprimeLen = getSemiprimeLen();
+    final String len = ""+((semiprimeLen/2)+(0==semiprimeLen%2?0:1));
     txtP1Len.setText(len); txtP2Len.setText(len);
     updateSemiprimeInfo();
   }
 
-  private Thread solverThread(Thread solver) { return this.solver.getAndSet(solver); }
-  private Thread solverThread() { return solver.get(); }
+  private Thread solver(Thread solver) { return this.solver.getAndSet(solver); }
+  private Thread solver() { return solver.get(); }
 
   private Client client(Client client) { this.client.set(client); return this.client.get(); }
   private Client client() { return client.get(); }
@@ -1113,7 +1152,7 @@ public class ClientGui extends JFrame implements DocumentListener
         isConnecting.set(true);
         updateNetworkComponents();
 
-        final String address = txtAddress.getText().trim();
+        final String address = txtHost.getText().trim();
         if ("".equals(address))
         {
           JOptionPane.showMessageDialog(this, "Please enter a valid server address.");
@@ -1165,7 +1204,7 @@ public class ClientGui extends JFrame implements DocumentListener
     final Client client = client();
     if (null == client || !client.connected()) { Log.e("you need to be connected before updating"); return; }
 
-    // ensure we aren't overlapping w/another thread
+    // ensure we aren't overlapping w/another get
     if (!isUpdatePending.compareAndSet(false, true)) { Log.e("already working on an update, hang tight..."); return; }
     btnUpdate.setEnabled(false);
     txtUsername.setEnabled(false);
@@ -1196,6 +1235,19 @@ public class ClientGui extends JFrame implements DocumentListener
     Log.o("the server has acknowledged your settings");
   }
 
+  private void saveConnectionSettings()
+  {
+    prefs.putByteArray(USERNAME_NAME, clean(txtUsername.getText()).getBytes());
+    prefs.putByteArray(EMAIL_NAME, clean(txtEmail.getText()).getBytes());
+    prefs.putByteArray(HOST_NAME, clean(txtHost.getText()).getBytes());
+
+    int port = DEFAULT_PORT;
+    try { port = Integer.parseInt(clean(txtPort.getText())); } catch (Throwable ignored) {}
+    prefs.putInt(PORT_NAME, port);
+
+    Log.o("connection settings saved");
+  }
+
   private void saveCpuSettings()
   {
     prefs.putInt(PROCESSORS_NAME, sldProcessors.getValue());
@@ -1211,7 +1263,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private void saveSearchSettings()
   {
-    prefs.putByteArray(SEMIPRIME_NAME, txtSemiprime.getText().trim().getBytes());
+    prefs.putByteArray(SEMIPRIME_NAME, clean(txtSemiprime.getText()).getBytes());
 
     int spBase = prefs.getInt(SEMIPRIME_BASE_NAME, DEFAULT_SEMIPRIME_BASE);
     try { spBase = Integer.parseInt(txtSemiprimeBase.getText().trim()); } catch (Throwable ignored) {}
@@ -1234,18 +1286,55 @@ public class ClientGui extends JFrame implements DocumentListener
     prefs.putBoolean(RESTRICT_DISK_NAME, chkRestrictDisk.isSelected());
     prefs.putBoolean(PRINT_ALL_NODES_NAME, chkPrintAllNodes.isSelected());
     prefs.putBoolean(WRITE_CSV_NAME, chkWriteCsv.isSelected());
+
+    Log.o("search settings saved");
   }
 
 
   private void saveSettings()
   {
-    Log.o("saving settings...");
+    try
+    {
+      Log.o("saving settings...");
 
-    saveSearchSettings();
-    saveCpuSettings();
-    try { prefs.flush(); } catch (Throwable ignored) {} // this always generates an error on windows, but works
+      saveConnectionSettings();
+      saveSearchSettings();
+      saveCpuSettings();
+      try { prefs.flush(); } catch (Throwable ignored) {} // this always generates an error on windows, but works
 
-    Log.o("all settings saved");
+      Log.o("settings saved");
+    }
+    catch (Throwable t) { Log.e("failed to save settings", t); }
+  }
+
+  private void loadConnectionSettings()
+  {
+    txtUsername.setText(getPrefString(USERNAME_NAME, DEFAULT_USERNAME));
+    txtEmail.setText(getPrefString(EMAIL_NAME, DEFAULT_EMAIL));
+    txtHost.setText(getPrefString(HOST_NAME, DEFAULT_HOST));
+    txtPort.setText("" + prefs.getInt(PORT_NAME, DEFAULT_PORT));
+
+    Log.o("connection settings loaded");
+  }
+
+  private void loadSearchSettings()
+  {
+    // parse semiprime stored bytes -> asString
+    txtSemiprime.setText(getPrefString(SEMIPRIME_NAME, null));
+    txtSemiprimeBase.setText(""+prefs.getInt(SEMIPRIME_BASE_NAME, DEFAULT_SEMIPRIME_BASE));
+    txtInternalBase.setText(""+prefs.getInt(INTERNAL_BASE_NAME, DEFAULT_INTERNAL_BASE));
+    txtP1Len.setText(""+prefs.getInt(P1_LEN_NAME, DEFAULT_P1_LEN));
+    txtP2Len.setText(""+prefs.getInt(P2_LEN_NAME, DEFAULT_P2_LEN));
+
+    chkFavorPerformance.setSelected(prefs.getBoolean(FAVOR_PERFORMANCE_NAME, DEFAULT_FAVOR_PERFORMANCE));
+    chkCompressMemory.setSelected(prefs.getBoolean(COMPRESS_MEMORY_NAME, DEFAULT_COMPRESS_MEMORY));
+    chkRestrictDisk.setSelected(prefs.getBoolean(RESTRICT_DISK_NAME, DEFAULT_RESTRICT_DISK));
+    chkPrintAllNodes.setSelected(prefs.getBoolean(PRINT_ALL_NODES_NAME, DEFAULT_PRINT_ALL_NODES));
+    chkWriteCsv.setSelected(prefs.getBoolean(WRITE_CSV_NAME, DEFAULT_WRITE_CSV));
+
+    updateSemiprimeInfo();
+
+    Log.o("search settings loaded");
   }
 
   private void loadCpuSettings()
@@ -1270,42 +1359,21 @@ public class ClientGui extends JFrame implements DocumentListener
     Log.o("cpu settings loaded");
   }
 
-  private void loadSearchSettings()
-  {
-    // parse semiprime stored bytes -> string
-    final byte[] sp = prefs.getByteArray(SEMIPRIME_NAME, null);
-    final String temp = null != sp ? Arrays.toString(sp) : "[]";
-    final String[] parts = temp.substring(1, temp.length()-1).split(",");
-    final byte[] semiprime = new byte[parts.length];
-    int i = -1; for (String s : parts) semiprime[++i] = Byte.parseByte(s.trim());
-    txtSemiprime.setText(new String(semiprime));
-    updateSemiprimeInfo();
-
-    txtSemiprimeBase.setText(""+prefs.getInt(SEMIPRIME_BASE_NAME, DEFAULT_SEMIPRIME_BASE));
-    txtInternalBase.setText(""+prefs.getInt(INTERNAL_BASE_NAME, DEFAULT_INTERNAL_BASE));
-    txtP1Len.setText(""+prefs.getInt(P1_LEN_NAME, DEFAULT_P1_LEN));
-    txtP2Len.setText(""+prefs.getInt(P2_LEN_NAME, DEFAULT_P2_LEN));
-
-    chkFavorPerformance.setSelected(prefs.getBoolean(FAVOR_PERFORMANCE_NAME, DEFAULT_FAVOR_PERFORMANCE));
-    chkCompressMemory.setSelected(prefs.getBoolean(COMPRESS_MEMORY_NAME, DEFAULT_COMPRESS_MEMORY));
-    chkRestrictDisk.setSelected(prefs.getBoolean(RESTRICT_DISK_NAME, DEFAULT_RESTRICT_DISK));
-    chkPrintAllNodes.setSelected(prefs.getBoolean(PRINT_ALL_NODES_NAME, DEFAULT_PRINT_ALL_NODES));
-    chkWriteCsv.setSelected(prefs.getBoolean(WRITE_CSV_NAME, DEFAULT_WRITE_CSV));
-
-    Log.o("search settings loaded");
-  }
 
   private void loadSettings()
   {
     try
     {
       Log.o("loading settings...");
+
       prefs = Preferences.userNodeForPackage(getClass());
-      loadCpuSettings();
+      loadConnectionSettings();
       loadSearchSettings();
-      Log.o("all settings loaded successfully");
+      loadCpuSettings();
+
+      Log.o("settings loaded successfully");
     }
-    catch (Throwable t) { Log.e("failed to load settings. make sure app has read permissions"); }
+    catch (Throwable t) { Log.e("failed to load settings, make sure app has read permissions"); }
   }
 
   private void updateSearchSettings()
@@ -1317,13 +1385,23 @@ public class ClientGui extends JFrame implements DocumentListener
     chkWriteCsv.setSelected(Solver.writeCsv());
 
     txtInternalBase.setText(""+Solver.internalBase());
-    txtP1Len.setText(""+Solver.prime1Len());
-    txtP2Len.setText(""+Solver.prime2Len());
+    txtP1Len.setText(""+Solver.pLength());
+    txtP2Len.setText(""+Solver.qLength());
   }
 
   private void updateSettings()
   {
     updateSearchSettings();
+  }
+
+  private void resetConnectionSettings()
+  {
+    txtUsername.setText(DEFAULT_USERNAME);
+    txtEmail.setText(DEFAULT_EMAIL);
+    txtHost.setText(DEFAULT_HOST);
+    txtPort.setText(""+DEFAULT_PORT);
+
+    Log.o("connection settings reset");
   }
 
   private void resetCpuSettings()
@@ -1360,8 +1438,9 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private void resetSettings()
   {
-    Log.o("resetting all settings to defaults...");
+    Log.o("\nresetting all settings to defaults...");
 
+    resetConnectionSettings();
     resetSearchSettings();
     resetCpuSettings();
 
@@ -1449,5 +1528,15 @@ public class ClientGui extends JFrame implements DocumentListener
     ((AbstractDocument)txtNumberField.getDocument()).setDocumentFilter(numberFilter);
     txtNumberField.setColumns(columns);
     return txtNumberField;
+  }
+
+  private String getPrefString(String name, String defaultValue)
+  {
+    byte[] bytes = prefs.getByteArray(name, defaultValue.getBytes());
+    String temp = null != bytes ? Arrays.toString(bytes) : "[]";
+    String[] parts = temp.substring(1, temp.length()-1).split(",");
+    byte[] value = new byte[parts.length];
+    int i = -1; for (String s : parts) value[++i] = Byte.parseByte(s.trim());
+    return new String(value);
   }
 }

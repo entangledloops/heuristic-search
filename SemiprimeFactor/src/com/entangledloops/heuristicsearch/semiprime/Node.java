@@ -11,7 +11,7 @@ public class Node implements Serializable, Comparable
 {
   public final BigInteger p, q; ///< the candidate factors
   public final BigInteger product; ///< the partial factors for this node
-  public final int        depth;
+  final        int        depth;
   private      double     h; ///< the heuristic search factors for this node
 
   Node() { this(null, 1, 1); }
@@ -28,7 +28,7 @@ public class Node implements Serializable, Comparable
     this.product = p.multiply(q);
   }
 
-  @Override public String toString() { return product.toString() + ":" + product.toString(Solver.cacheInternalBase) + ":" + depth + ":" + h + ":" + p.toString() + ":" + q.toString(); }
+  @Override public String toString() { return product.toString() + ":" + product.toString(Solver.cacheInternalBase) + ":depth[" + depth + "]:p[" + p.toString() + "]:q[" + q.toString() + "]:h[" + h + "]"; }
   @Override public boolean equals(Object o) { return o instanceof Node && ((Node) o).depth == depth && p.equals(((Node) o).p) && q.equals(((Node) o).q); }
   @Override public int compareTo(Object o) { return Double.compare(h(), ((Node) o).h()); }
 
@@ -41,9 +41,6 @@ public class Node implements Serializable, Comparable
     return hash;
   }
 
-  public String product() { return product.toString(Solver.internalBase()); }
-  public String product(int base) { return product.toString(base); }
-
   /**
    * This function ensures that the current partial product resembles the target semiprime
    * in the currently fixed digit positions.
@@ -52,8 +49,8 @@ public class Node implements Serializable, Comparable
   boolean validFactors()
   {
     return product.testBit(depth) == Solver.cacheSemiprime.testBit(depth) &&
-        (0 == Solver.cachePrimeLen1 || p.bitLength() <= Solver.cachePrimeLen1) &&
-        (0 == Solver.cachePrimeLen2 || q.bitLength() <= Solver.cachePrimeLen2) &&
+        (0 == Solver.cachePLength || p.bitLength() <= Solver.cachePLength) &&
+        (0 == Solver.cacheQLength || q.bitLength() <= Solver.cacheQLength) &&
         product.bitLength() <= Solver.cacheSemiprimeBitLen;
   }
 

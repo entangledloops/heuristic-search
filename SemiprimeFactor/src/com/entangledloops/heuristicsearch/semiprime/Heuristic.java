@@ -40,9 +40,9 @@ public enum Heuristic
 
   @Override public String toString() { return name; }
   public String description() { return desc; }
-  public Double apply(Node n) { return function.apply(n); }
+  public double apply(Node n) { return function.apply(n); }
 
-  public static Heuristic byName(String name)
+  public static Heuristic fromFormattedName(String name)
   {
     for (Heuristic h : Heuristic.values()) if (h.toString().equals(name)) return h;
     return null;

@@ -2,6 +2,7 @@ package com.entangledloops.heuristicsearch.semiprime.client;
 
 import com.entangledloops.heuristicsearch.semiprime.Log;
 import com.entangledloops.heuristicsearch.semiprime.Packet;
+import com.entangledloops.heuristicsearch.semiprime.Solver;
 import com.entangledloops.heuristicsearch.semiprime.server.Server;
 
 import java.io.IOException;
@@ -11,6 +12,8 @@ import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+
+import static com.entangledloops.heuristicsearch.semiprime.Log.o;
 
 /**
  * @author Stephen Dunn
@@ -36,6 +39,7 @@ public class Client
   // state
   private final AtomicBoolean connected = new AtomicBoolean(false);
   private final boolean inbound;
+  private final int port;
 
   //////////////////////////////////////////////////////////////////////////////
   //
@@ -50,14 +54,10 @@ public class Client
 
     this.callback = null != socketEventCallback ? socketEventCallback : new IncomingPacketHandler();
     this.inbound = true;
+    this.port = socket.getPort();
     this.socket.set(socket);
 
-    try
-    {
-      Log.o("new inbound connection: " + ip + " (" + hostname + ")...");
-      init();
-      Log.o("inbound connection established: " + toString());
-    }
+    try { init(); }
     catch (Throwable t)
     {
       this.connected.set(false); this.socket.set(null);
@@ -82,13 +82,13 @@ public class Client
 
     this.callback = null != socketEventCallback ? socketEventCallback : new IncomingPacketHandler();
     this.inbound = false;
+    this.port = port;
 
     try
     {
-      Log.o("connecting to " + host + ":" + port + "...");
+      o("connecting to " + host + ":" + port + "...");
       this.socket.set(new Socket(host, port));
       init();
-      Log.o("outbound connection established: " + toString());
     }
     catch (Throwable t)
     {
@@ -104,10 +104,10 @@ public class Client
     final String hostname = hostname();
     final String username = username();
     final String email = email();
-    return (null != ip ? ip : "ip unknown") +
+    return (null != ip ? ip : "unknown") + ":" + port +
         (null != hostname && !hostname.equals(ip) ? " (" + hostname() + ")" : "") +
-        (null != username ? " : [" + username + (null != email ? " : " : "") : "") +
-        (null != email ? email + (null != username ? "]" : "") : "");
+        " : " + (null != username ? username : "anonymous") +
+        (null != email ? " : " + email : "");
   }
 
   /**
@@ -117,7 +117,7 @@ public class Client
   {
     if (!connected.compareAndSet(true, false)) return;
 
-    Log.o("closing " + (outbound() ? "outbound" : "inbound") + " connection: " + toString());
+    o("closing " + (outbound() ? "outbound" : "inbound") + " connection: " + toString());
     try { socket().close(); } catch (Throwable t) { Log.e(t); }
 
     final Thread thread = clientThread.getAndSet(null);
@@ -143,25 +143,33 @@ public class Client
   public String hostname() { return hostname.get(); }
 
   public String email() { return email.get(); }
-  public String email(String email) { return this.email.getAndSet(email); }
+  public String email(String email) { Log.o("email updated: " + email() + " -> " + email); return this.email.getAndSet(email); }
 
   public String username() { return username.get(); }
-  public String username(String username) { return this.username.getAndSet(username); }
+  public String username(String username) { Log.o("username updated: " + username() + " -> " + username); return this.username.getAndSet(username); }
 
   private Socket socket() { return socket.get(); }
   public boolean connected() { return connected.get(); }
+  public boolean disconnected() { return !connected(); }
 
   private void init() throws IOException
   {
-    if (!connected.compareAndSet(false, true)) { Log.e((outbound() ? "outbound" : "inbound") + " client already connected: " + toString()); return; }
+    final String bound = (outbound() ? "outbound" : "inbound");
+    if (!connected.compareAndSet(false, true)) { Log.e(bound + " client already connected: " + toString()); return; }
+    o("new " + bound + " connection...");
+
+    this.out.set(new ObjectOutputStream( socket().getOutputStream() ));
+    out().flush();
+    this.in.set(new ObjectInputStream( socket().getInputStream() ));
+
+    final Thread thread = new Thread( new ClientThread() );
+    this.clientThread.set(thread);
+    thread.start();
 
     this.ip.set( socket().getInetAddress().getHostAddress() );
     this.hostname.set( socket().getInetAddress().getCanonicalHostName() );
-    this.in.set(new ObjectInputStream( socket().getInputStream() ));
-    this.out.set(new ObjectOutputStream( socket().getOutputStream() ));
 
-    final Thread thread = new Thread( new ClientThread() );
-    this.clientThread.set(thread); thread.start();
+    o(bound + " connection established: " + toString());
   }
 
   private boolean inbound() { return inbound; }
@@ -174,9 +182,13 @@ public class Client
       if (null == p) { close(); return; }
       switch (p.type())
       {
+        case UPDATE:
+        {
+
+        }
         case TARGET_UPDATE: { break; }
-        case USERNAME_UPDATE: { username( p.string() ); break; }
-        case EMAIL_UPDATE: { email( p.string() ); break; }
+        case USERNAME_UPDATE: { username( p.asString() ); break; }
+        case EMAIL_UPDATE: { email( p.asString() ); break; }
         case OPEN_UPDATE: { break; }
         case OPEN_CHECK: { break; }
         case CLOSED_UPDATE: { break; }
@@ -189,16 +201,29 @@ public class Client
   }
 
   /**
-   * Thread that waits for inbound packets and handles them for both local and remote clients.
+   * Thread that handles incoming packets for both local and remote clients.
    */
   private class ClientThread implements Runnable
   {
+    private boolean handshake()
+    {
+      if (outbound()) write(Packet.Type.USERNAME_UPDATE, System.getProperty("user.name"));
+      else username(read().asString());
+
+      return true;
+    }
+
     @Override public void run()
     {
-      Log.o("connection established");
+      if (!handshake()) { Log.e(toString() + ": handshake failure"); return; }
+      o(Client.this.toString() + ": connection established");
+
+      Solver.client(Client.this);
       try { while (connected() && !Thread.interrupted()) callback.accept( read() ); }
       catch (Throwable t) { if (connected() && !Thread.interrupted()) Log.e(t); }
-      Log.o("connection closed");
+
+      connected.set(false);
+      o(Client.this.toString() + ": connection closed");
     }
   }
 
