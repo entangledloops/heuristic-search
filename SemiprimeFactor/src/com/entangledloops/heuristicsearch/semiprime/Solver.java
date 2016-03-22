@@ -522,8 +522,9 @@ public class Solver implements Runnable, Serializable
     {
       Solver solver = instance.getAndSet(null);
       if (null != solver && Solver.solving()) return null;
-      if (!instance.compareAndSet(solver, new Solver(semiprime, semiprimeBase))) return null;
-      return new Thread(instance.get());
+      solver = new Solver(semiprime, semiprimeBase);
+      if (!instance.compareAndSet(null, solver)) return null;
+      return new Thread(solver);
     }
     catch (Throwable t) { Log.e(t); return null; }
   }
