@@ -20,7 +20,7 @@ public enum Heuristic
 
   DIST_EXPECTED("Expected Distribution",
       "Calculate h based upon the likelihood that the current factor bit distribution reflects\nexpectations based upon objective experimental results w/semiprime numbers.",
-      (n) -> Math.abs(0.5 - (double)n.p.bitCount()/(double)n.p.bitLength()) + Math.abs(0.5 - (double)n.q.bitCount()/(double)n.q.bitLength())
+      (n) -> Math.abs(0.5 - (((double)n.p.bitCount()/(double)n.p.bitLength()) + (double)n.q.bitCount()/(double)n.q.bitLength()))
   ),
 
   HAMMING("Hamming Distance",

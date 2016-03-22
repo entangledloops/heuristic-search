@@ -182,10 +182,7 @@ public class Client
       if (null == p) { close(); return; }
       switch (p.type())
       {
-        case UPDATE:
-        {
-
-        }
+        case UPDATE: { break; }
         case TARGET_UPDATE: { break; }
         case USERNAME_UPDATE: { username( p.asString() ); break; }
         case EMAIL_UPDATE: { email( p.asString() ); break; }

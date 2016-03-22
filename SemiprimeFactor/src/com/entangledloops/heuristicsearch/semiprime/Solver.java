@@ -135,6 +135,7 @@ public class Solver implements Runnable, Serializable
         "\nprocessorCap: " + processorCap() +
         "\nfavorPerformance: " + favorPerformance +
         "\ncompressMemory: " + compressMemory +
+        "\nmaxDepth: " + cacheMaxDepth +
         "\nopen.size(): " + open.size() +
         "\nclosed.size(): " + closed.size() +
         "\nthreads.size(): " + threads.size() +
@@ -190,8 +191,6 @@ public class Solver implements Runnable, Serializable
       }
       catch (Throwable t) { Log.e("cache preparation failure", t); return; }
 
-
-
       // build worker threads to search until goal is found or no nodes left
       if (cacheNetworkHost)
       {
@@ -206,7 +205,7 @@ public class Solver implements Runnable, Serializable
           try
           {
             Log.o("thread " + i + ": started");
-            while (expand( pop() )) ;
+            while (expand( pop() )) { while (cachePaused) Thread.sleep(1); }
             Log.o("thread " + i + ": finished");
           }
           catch (Throwable ignored) {}
@@ -278,8 +277,8 @@ public class Solver implements Runnable, Serializable
   public static boolean solving() { return solving.get(); }
 
   public static boolean paused() { return paused.get(); }
-  public static boolean pause() { cachePaused = true; return paused.getAndSet(true); }
-  public static boolean resume() { cachePaused = false; return paused.getAndSet(false); }
+  public static boolean pause() { Log.o("search paused"); cachePaused = true; return paused.getAndSet(true); }
+  public static boolean resume() { Log.o("search resumed"); cachePaused = false; return paused.getAndSet(false); }
 
   public static boolean networkSearch() { return Solver.networkSearch.get(); }
   public static void networkSearch(boolean enabled) { Solver.networkSearch.set(enabled); }

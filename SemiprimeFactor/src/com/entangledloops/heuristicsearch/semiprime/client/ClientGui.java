@@ -412,7 +412,7 @@ public class ClientGui extends JFrame implements DocumentListener
       catch (Throwable ignored) {} // don't care what went wrong with gui update, it's been logged anyway
     });
 
-    Log.o("\"Thank you\" raised to the 101st power for helping my semiprime research!");
+    Log.o("\"Thank you\" for helping my research!");
     Log.o("If you're computer cracks a target number, you will be credited in the publication (assuming you provided an email I can reach you at).");
     Log.o("If you're interested in learning exactly what this software does and why, checkout the \"About\" menu.\n");
 
@@ -523,6 +523,17 @@ public class ClientGui extends JFrame implements DocumentListener
       chkHeuristics[i].setToolTipText(Heuristic.values()[i].description());
     }
     chkHeuristics[0].setSelected(true);
+
+    /////////////////////////////////////
+
+    final JButton btnPause = getButton("Pause");
+    btnPause.setEnabled(false);
+
+    final JButton btnResume = getButton("Resume");
+    btnResume.setEnabled(false);
+
+    btnPause.addActionListener((e) -> { btnPause.setEnabled(false); Solver.pause(); btnResume.setEnabled(true); });
+    btnResume.addActionListener((e) -> { btnResume.setEnabled(false); Solver.resume(); btnPause.setEnabled(true); });
 
     /////////////////////////////////////
 
@@ -670,6 +681,7 @@ public class ClientGui extends JFrame implements DocumentListener
         if (!isSearching.compareAndSet(false, true))
         {
           final Thread thread = solver(null);
+          btnPause.setEnabled(false); btnResume.setEnabled(false);
           if (Solver.solving()) { Log.o("interrupting search..."); Solver.interruptAndJoin(); }
           try { thread.join(); } catch (Throwable ignored) {}
           return;
@@ -738,7 +750,8 @@ public class ClientGui extends JFrame implements DocumentListener
       finally
       {
         final Thread thread = solver();
-        if (null != thread) thread.start(); else { isSearching.set(false); btnSearch.setText("Start Local Search"); }
+        if (null != thread) { thread.start(); btnPause.setEnabled(true); btnResume.setEnabled(false); pneMain.setSelectedIndex(TAB_CONNECT); }
+        else { isSearching.set(false); btnPause.setEnabled(false); btnResume.setEnabled(false); btnSearch.setText("Start Local Search"); }
         btnSearch.setEnabled(true);
       }
     });
@@ -799,13 +812,20 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlButtons1.add(pnlButtons0);
     pnlButtons1.add(pnlLengths);
 
-    final JPanel pnlButtons2 = new JPanel(new GridLayout(1,5));
+    ////////////////////
+
+    final JPanel pnlButtons3 = new JPanel(new GridLayout(1,2));
+    final JPanel pnlButtons4 = new JPanel(new GridLayout(1,1));
+    pnlButtons3.add(btnPause); // placeholder
+    pnlButtons3.add(btnResume);
+    pnlButtons4.add( btnSearch ); // placeholder
+
+    final JPanel pnlButtons2 = new JPanel(new GridLayout(1,2));
     pnlButtons2.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEmptyBorder(), "", TitledBorder.CENTER, TitledBorder.TOP));
-    pnlButtons2.add( Box.createHorizontalBox() ); // placeholder
-    pnlButtons2.add( Box.createHorizontalBox() ); // placeholder
-    pnlButtons2.add(btnSearch);
-    pnlButtons2.add( Box.createHorizontalBox() ); // placeholder
-    pnlButtons2.add( Box.createHorizontalBox() ); // placeholder
+    pnlButtons2.add(pnlButtons3);
+    pnlButtons2.add(pnlButtons4);
+
+    ////////////////////
 
     final JPanel pnlButtons = new JPanel(new GridLayout(2,1,H_GAP,V_GAP));
     pnlButtons.add(pnlButtons1);
@@ -1250,9 +1270,9 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private void saveConnectionSettings()
   {
-    prefs.putByteArray(USERNAME_NAME, clean(txtUsername.getText()).getBytes());
-    prefs.putByteArray(EMAIL_NAME, clean(txtEmail.getText()).getBytes());
-    prefs.putByteArray(HOST_NAME, clean(txtHost.getText()).getBytes());
+    prefs.putByteArray(USERNAME_NAME, txtUsername.getText().getBytes());
+    prefs.putByteArray(EMAIL_NAME, txtEmail.getText().getBytes());
+    prefs.putByteArray(HOST_NAME, txtHost.getText().getBytes());
 
     int port = DEFAULT_PORT;
     try { port = Integer.parseInt(clean(txtPort.getText())); } catch (Throwable ignored) {}
@@ -1276,7 +1296,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private void saveSearchSettings()
   {
-    prefs.putByteArray(SEMIPRIME_NAME, clean(txtSemiprime.getText()).getBytes());
+    prefs.putByteArray(SEMIPRIME_NAME, txtSemiprime.getText().getBytes());
 
     int spBase = prefs.getInt(SEMIPRIME_BASE_NAME, DEFAULT_SEMIPRIME_BASE);
     try { spBase = Integer.parseInt(txtSemiprimeBase.getText().trim()); } catch (Throwable ignored) {}
@@ -1545,7 +1565,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private String getPrefString(String name, String defaultValue)
   {
-    byte[] bytes = prefs.getByteArray(name, defaultValue.getBytes());
+    byte[] bytes = prefs.getByteArray(name, null != defaultValue ? defaultValue.getBytes() : null);
     String temp = null != bytes ? Arrays.toString(bytes) : "[]";
     String[] parts = temp.substring(1, temp.length()-1).split(",");
     byte[] value = new byte[parts.length];
