@@ -8,6 +8,8 @@ import javax.swing.border.TitledBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.*;
+import javax.swing.text.html.HTMLDocument;
+import javax.swing.text.html.HTMLEditorKit;
 import java.awt.*;
 import java.awt.event.*;
 import java.math.BigInteger;
@@ -171,7 +173,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private JTextField txtUsername;
   private JTextField txtEmail;
   private JTextField txtHost;
-  private JTextArea  txtHistory;
+  private JTextPane  txtLog;
   private JTextField txtPort;
   private JButton    btnConnect;
   private JButton    btnUpdate;
@@ -388,21 +390,26 @@ public class ClientGui extends JFrame implements DocumentListener
     final int processors = runtime.availableProcessors();
 
     // initialize all components to default settings
-    txtHistory = new JTextArea();
-    txtHistory.setRows(DEFAULT_HISTORY_ROWS);
-    txtHistory.setColumns(DEFAULT_HISTORY_COLS);
-    txtHistory.setLineWrap(true);
-    txtHistory.setWrapStyleWord(true);
-    txtHistory.setEditable(false);
-    txtHistory.setVisible(true);
-    txtHistory.setEnabled(true);
+    txtLog = new JTextPane();//JTextArea();
+    txtLog.setContentType("text/html");
+    //txtLog.setRows(DEFAULT_HISTORY_ROWS);
+    //txtLog.setColumns(DEFAULT_HISTORY_COLS);
+    //txtLog.setLineWrap(true);
+    ///txtLog.setWrapStyleWord(true);
+    txtLog.setEditable(false);
+    txtLog.setVisible(true);
+    txtLog.setEnabled(true);
+
 
     Log.init(s ->
     {
       final Runnable append = () ->
       {
-        txtHistory.append(s + "\n");
-        txtHistory.setCaretPosition(txtHistory.getText().length()-1);
+        HTMLDocument document = (HTMLDocument) txtLog.getDocument();
+        HTMLEditorKit editorKit = (HTMLEditorKit)txtLog.getEditorKit();
+        try { editorKit.insertHTML(document, document.getLength(), html(s) + "<br>", 0, 0, null); } catch (Throwable ignored) {}
+        final int pos = document.getLength();
+        txtLog.setCaretPosition(pos < 0 ? 0 : pos);
       };
       try
       {
@@ -412,12 +419,12 @@ public class ClientGui extends JFrame implements DocumentListener
       catch (Throwable ignored) {} // don't care what went wrong with gui update, it's been logged anyway
     });
 
-    Log.o("\"Thank you\" for helping my research!");
-    Log.o("If you're computer cracks a target number, you will be credited in the publication (assuming you provided an email I can reach you at).");
-    Log.o("If you're interested in learning exactly what this software does and why, checkout the \"About\" menu.\n");
+    Log.o("<pre>(Thank you)<sup>2048</sup> for helping my research!</pre>" +
+        "<br>If you're computer cracks a target number, you will be credited in the publication (assuming you provided an email I can reach you at)." +
+        "<br>If you're interested in learning exactly what this software does and why, checkout the \"About\" menu.");
 
-    final JScrollPane pneHistory = new JScrollPane(txtHistory);
-    txtHistory.setHighlighter(new DefaultHighlighter());
+    final JScrollPane pneHistory = new JScrollPane(txtLog);
+    txtLog.setHighlighter(new DefaultHighlighter());
     pneHistory.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
     pneHistory.setVisible(true);
 
@@ -1561,6 +1568,11 @@ public class ClientGui extends JFrame implements DocumentListener
     ((AbstractDocument)txtNumberField.getDocument()).setDocumentFilter(numberFilter);
     txtNumberField.setColumns(columns);
     return txtNumberField;
+  }
+
+  private static String html(String s)
+  {
+    return s.replace("\n","<br>").replace("\r","").replace("\t","    ").replace(" ","&nbsp;");
   }
 
   private String getPrefString(String name, String defaultValue)

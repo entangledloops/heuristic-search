@@ -9,37 +9,38 @@ import java.math.BigInteger;
  */
 public class Node implements Serializable, Comparable
 {
+  private final int       hashCode;
+  final        int        depth;
   public final BigInteger p, q; ///< the candidate factors
   public final BigInteger product; ///< the partial factors for this node
-  final        int        depth;
   private      double     h; ///< the heuristic search factors for this node
 
+  int hashcount=0;
   Node() { this(null, 1, 1); }
-  Node(final Node parent, int... bits)
+  Node(final Node parent, int pBit, int qBit)
   {
     this.depth = null != parent ? parent.depth+1 : 0;
 
-    final BigInteger f1 = null != parent ? (1 == bits[0] ? parent.p.setBit(depth) : parent.p) : BigInteger.valueOf(bits[0]);
-    final BigInteger f2 = null != parent ? (1 == bits[1] ? parent.q.setBit(depth) : parent.q) : BigInteger.valueOf(bits[1]);
-    boolean larger = f1.compareTo(f2) < 0;
+    final BigInteger f1 = null != parent ? (0 != pBit ? parent.p.setBit(depth) : parent.p) : BigInteger.valueOf(pBit);
+    final BigInteger f2 = null != parent ? (0 != qBit ? parent.q.setBit(depth) : parent.q) : BigInteger.valueOf(qBit);
 
+    boolean larger = f1.compareTo(f2) < 0;
     this.p = larger ? f1 : f2;
     this.q = larger ? f2 : f1;
+
     this.product = p.multiply(q);
+
+    // cache the hash for performance during table lookups
+    int hash = 37 * depth + product.hashCode();
+    hash = 37 * hash + p.hashCode();
+    hash = 37 * hash + q.hashCode();
+    hashCode = hash;
   }
 
-  @Override public String toString() { return product.toString() + ":" + product.toString(Solver.cacheInternalBase) + ":depth[" + depth + "]:p[" + p.toString() + "]:q[" + q.toString() + "]:h[" + h + "]"; }
+  @Override public String toString() { return product + "<sub>10</sub>:" + product.toString(Solver.cacheInternalBase) + "<sub>" + Solver.cacheInternalBase + "</sub>:" + depth + ":depth:" + p + ":p:" + q + ":q:" + h  + ":h:" + hashCode + ":hash"; }
   @Override public boolean equals(Object o) { return o instanceof Node && ((Node) o).depth == depth && p.equals(((Node) o).p) && q.equals(((Node) o).q); }
   @Override public int compareTo(Object o) { return Double.compare(h(), ((Node) o).h()); }
-
-  ///todo try 'magic' 193 and other values >> 2^n
-  @Override public int hashCode()
-  {
-    int hash = 37 * depth + product.hashCode();
-    hash = (37 * hash + p.hashCode());
-    hash = (37 * hash + q.hashCode());
-    return hash;
-  }
+  @Override public int hashCode() { if (++hashcount > 1) Log.o(hashcount + " : " + toString()); return hashCode; }
 
   /**
    * This function ensures that the current partial product resembles the target semiprime
@@ -48,17 +49,26 @@ public class Node implements Serializable, Comparable
    */
   boolean validFactors()
   {
-    return product.testBit(depth) == Solver.cacheSemiprime.testBit(depth) &&
-        (0 == Solver.cachePLength || p.bitLength() <= Solver.cachePLength) &&
-        (0 == Solver.cacheQLength || q.bitLength() <= Solver.cacheQLength) &&
+    return
+        product.testBit(depth) == Solver.cacheSemiprime.testBit(depth) &&
+        (0 == Solver.cachePLength || (1+depth) <= Solver.cachePLength) &&
+        (0 == Solver.cacheQLength || (1+depth) <= Solver.cacheQLength) &&
         product.bitLength() <= Solver.cacheSemiprimeBitLen;
   }
 
   /**
    * Ensure that none of the factors is trivial.
-   * @return true if the factors look okay
+   * @return true if this node is the goal
    */
-  boolean goal() { return Solver.cacheSemiprime.equals(product) && !BigInteger.ONE.equals(p) && !BigInteger.ONE.equals(q); }
+  boolean goal()
+  {
+    return
+        (0 == Solver.cachePLength || (1+depth) == Solver.cachePLength) &&
+        (0 == Solver.cacheQLength || (1+depth) == Solver.cacheQLength) &&
+        Solver.cacheSemiprime.equals(product) &&
+        !BigInteger.ONE.equals(p) &&
+        !BigInteger.ONE.equals(q);
+  }
 
 
   /**

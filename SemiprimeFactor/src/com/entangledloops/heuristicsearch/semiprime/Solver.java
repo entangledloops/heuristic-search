@@ -343,14 +343,19 @@ public class Solver implements Runnable, Serializable
   private static String stats(final long elapsedNanos)
   {
     final long seconds = (elapsedNanos/1000000000L);
-    return "\n\tgenerated:\t" + generated +
-        "\n\tregenerated:\t" + regenerated +
-        "\n\tignored:\t" + ignored +
-        "\n\texpanded:\t" + expanded +
-        "\n\tmaxDepth:\t" + maxDepth + ", avgDepth: " + avgDepth() +
-        (cacheDetailedStats ? "\n\topen.size():\t" + open.size() : "") +
-        (cacheDetailedStats ? "\n\tclosed.size():\t" + closed.size() : "") +
-        "\n\telapsed:\t" + (seconds/60L) + " minutes, " + (seconds%60L) + " seconds";
+    return
+        "<table border=\"1\">" +
+        "<tr>" +
+        "<th>generated</th>" + "<th>regenerated</th>" + "<th>regenerated</th>" +
+        "<th>ignored</th>" + "<th>expanded</th>" + "<th>maxDepth</th>" +
+        "</tr><tr>" +
+        "<td>" + generated + "</td>" + "<td>" + regenerated + "</td>" + "<th>" + regenerated + "</td>" +
+        "<td>" + ignored + "</td>" + "<td>" + expanded + "</td>" + "<th>" + maxDepth + "</td>" +
+        "</tr>" +
+        "</table>" +
+        (cacheDetailedStats ? "\topen.size():\t" + open.size() : "") +
+        (cacheDetailedStats ? "\tclosed.size():\t" + closed.size() : "") +
+        "elapsed:\t" + (seconds/60L) + " minutes, " + (seconds%60L) + " seconds";
   }
 
   public static void callback(Consumer<Node> callback) { Solver.callback.set(callback); }
@@ -451,20 +456,23 @@ public class Solver implements Runnable, Serializable
     if (n.depth >= cacheMaxDepth) return true;
 
     // generate all node combinations
+    final boolean identicalFactors = n.p.equals(n.q);
     for (int i = 0; i < cacheInternalBase; ++i)
     {
       for (int j = 0; j < cacheInternalBase; ++j)
       {
+        if (identicalFactors && i > j) continue;
+        
         final Node generated = close(new Node(n, i, j));
         if (null != generated && generated.validFactors())
         {
           Solver.generated.addAndGet(1);
-          if (printAllNodes()) Log.o("generated: " + generated);
+          if (cachePrintAllNodes) Log.o("generated: " + generated);
           if (!push(generated)) return false;
         }
         else
         {
-          ignored.addAndGet(1);
+          Solver.ignored.addAndGet(1);
           if (cachePrintAllNodes) Log.o("ignored: " + generated);
         }
       }
