@@ -66,20 +66,6 @@ public class ClientGui extends JFrame implements DocumentListener
       "077870774981712577246796292638635\n6373289912154831438167899885040445364023527" +
       "381951378636564391212010397122822\n120720357";
 
-  //////////////////////////////////////////////////////////////////////////////
-  // globals
-
-  private static final String ICON_NODE_SMALL  = "node16x16.png";
-  private static final String ICON_NODE        = "node32x32.png";
-  private static final String ICON_CPU         = "cpu32x32.png";
-  private static final String ICON_NET         = "net32x32.png";
-  private static final String ICON_SETTINGS    = "settings32x32.png";
-  private static final String ABOUT_URL        = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
-  private static final String NO_MATH_URL      = ABOUT_URL + "---%22I-don't-math%22-edition";
-  private static final String SOURCE_URL       = "https://github.com/entangledloops/heuristicSearch/tree/master";
-  private static final String HOMEPAGE_URL     = "http://www.entangledloops.com";
-  private static final String OS               = System.getProperty("os.name");
-
 
   //////////////////////////////////////////////////////////////////////////////
   // user prefs
@@ -159,11 +145,27 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final int H_GAP = 10;
   private static final int V_GAP = 10;
 
+  // icons
+  private static final String ICON_NODE_SMALL = "node16x16.png";
+  private static final String ICON_NODE_MEDIUM = "node24x24.png";
+  private static final String ICON_NODE       = "node32x32.png";
+  private static final String ICON_CPU        = "cpu32x32.png";
+  private static final String ICON_NET_MEDIUM = "net24x24.png";
+  private static final String ICON_NET        = "net32x32.png";
+  private static final String ICON_SETTINGS   = "settings32x32.png";
+
+  // help / about menu
+  private static final String ABOUT_URL    = "https://github.com/entangledloops/heuristicSearch/wiki/Semiprime-Factorization";
+  private static final String NO_MATH_URL  = ABOUT_URL + "---%22I-don't-math%22-edition";
+  private static final String SOURCE_URL   = "https://github.com/entangledloops/heuristicSearch/tree/master";
+  private static final String HOMEPAGE_URL = "http://www.entangledloops.com";
+  private static final String OS           = System.getProperty("os.name");
+
   // global
   private JTabbedPane pneMain;
-  private ImageIcon   icnNode, icnNodeSmall, icnCpu, icnNet, icnMisc;
-  private SystemTray systemTray;
-  private TrayIcon   trayIcon;
+  private ImageIcon   icnNodeSmall, icnNodeMedium, icnNode, icnCpu, icnNetMedium, icnNet, icnMisc;
+  private SystemTray  systemTray;
+  private TrayIcon    trayIcon;
 
   // connect tab
   private JTextField txtUsername;
@@ -188,7 +190,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private JButton     btnSearch;
   private JTextArea   txtSemiprime;
   private JTextField  txtSemiprimeBase, txtInternalBase, txtP1Len, txtP2Len;
-  private JPanel pnlSemiprimeFooter;
+  private JPanel pnlSearchFooter;
 
   // cpu tab
   private JSlider sldProcessors, sldProcessorCap, sldMemoryCap, sldIdle;
@@ -265,8 +267,10 @@ public class ClientGui extends JFrame implements DocumentListener
     {
       final boolean jar = Utils.jar();
       icnNodeSmall = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NODE_SMALL))) : new ImageIcon(Utils.getResource(ICON_NODE_SMALL));
+      icnNodeMedium = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NODE_MEDIUM))) : new ImageIcon(Utils.getResource(ICON_NODE_MEDIUM));
       icnNode = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NODE))) : new ImageIcon(Utils.getResource(ICON_NODE));
       icnCpu = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_CPU))) : new ImageIcon(Utils.getResource(ICON_CPU));
+      icnNetMedium = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NET_MEDIUM))) : new ImageIcon(Utils.getResource(ICON_NET_MEDIUM));
       icnNet = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_NET))) : new ImageIcon(Utils.getResource(ICON_NET));
       icnMisc = jar ? new ImageIcon(ImageIO.read(Utils.getResourceFromJar(ICON_SETTINGS))) : new ImageIcon(Utils.getResource(ICON_SETTINGS));
       setIconImage(icnNode.getImage());
@@ -438,6 +442,7 @@ public class ClientGui extends JFrame implements DocumentListener
     final JLabel lblConnectNow = getLabel("Click update if you change your username or email after connecting:");
 
     btnConnect = getButton("Connect Now");
+    btnConnect.setIcon(icnNetMedium);
     btnConnect.addActionListener(e -> { if (isConnecting.compareAndSet(false, true)) connect(); });
 
     btnUpdate = getButton("Update");
@@ -653,6 +658,7 @@ public class ClientGui extends JFrame implements DocumentListener
     /////////////////////////////////////
 
     btnSearch = getButton("Start Local Search");
+    btnSearch.setIcon(icnNodeMedium);
     btnSearch.addActionListener(e ->
     {
       try
@@ -715,7 +721,9 @@ public class ClientGui extends JFrame implements DocumentListener
         if (internalBase < 2) { Log.e("internal base cannot be < 2, defaulting to " + DEFAULT_INTERNAL_BASE); txtInternalBase.setText(""+DEFAULT_INTERNAL_BASE); return; }
 
         // create a new solver based upon user request and launch it
-        solver( Solver.get(clean(txtSemiprime.getText()), spBase) );
+        final String sp = clean(txtSemiprime.getText());
+        if (null == sp || "".equals(sp)) { Log.e("you must provide a semiprime to factor"); return; }
+        solver( Solver.get(sp, spBase) );
 
         // ensure gui values reflect underlying state
         updateSettings();
@@ -730,7 +738,7 @@ public class ClientGui extends JFrame implements DocumentListener
       finally
       {
         final Thread thread = solver();
-        if (null != thread) thread.start(); else isSearching.set(false);
+        if (null != thread) thread.start(); else { isSearching.set(false); btnSearch.setText("Start Local Search"); }
         btnSearch.setEnabled(true);
       }
     });
@@ -763,11 +771,11 @@ public class ClientGui extends JFrame implements DocumentListener
             TitledBorder.TOP
     ));
 
-    final JPanel pnlHeader = new JPanel(new GridLayout(2,1,H_GAP,V_GAP));
-    pnlHeader.add(pnlSearchOptions);
-    pnlHeader.add(pnlHeuristics);
+    final JPanel pnlSearchHeader = new JPanel(new GridLayout(2,1,H_GAP,V_GAP));
+    pnlSearchHeader.add(pnlSearchOptions);
+    pnlSearchHeader.add(pnlHeuristics);
 
-    final JPanel pnlSemiprimeOptions = new JPanel(new GridLayout(4,2));
+    final JPanel pnlSemiprimeOptions = new JPanel(new GridLayout(4,3));
     pnlSemiprimeOptions.add(lblSemiprimeBase);
     pnlSemiprimeOptions.add(txtSemiprimeBase);
     pnlSemiprimeOptions.add(lblInternalBase);
@@ -791,10 +799,13 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlButtons1.add(pnlButtons0);
     pnlButtons1.add(pnlLengths);
 
-    final JPanel pnlButtons2 = new JPanel(new GridLayout(1,1));
+    final JPanel pnlButtons2 = new JPanel(new GridLayout(1,3));
+    pnlButtons2.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEmptyBorder(), "", TitledBorder.CENTER, TitledBorder.TOP));
+    pnlButtons2.add( Box.createHorizontalBox() ); // placeholder
     pnlButtons2.add(btnSearch);
+    pnlButtons2.add( Box.createHorizontalBox() ); // placeholder
 
-    final JPanel pnlButtons = new JPanel(new GridLayout(2,1,H_GAP,V_GAP/2));
+    final JPanel pnlButtons = new JPanel(new GridLayout(2,1,H_GAP,V_GAP));
     pnlButtons.add(pnlButtons1);
     pnlButtons.add(pnlButtons2);
 
@@ -802,19 +813,19 @@ public class ClientGui extends JFrame implements DocumentListener
     pnlSemiprime.add(pnlSemiprimeOptions);
     pnlSemiprime.add(pnlButtons);
 
-    pnlSemiprimeFooter = new JPanel(new GridLayout(2,1));
-    pnlSemiprimeFooter.add(pneSemiprime);
-    pnlSemiprimeFooter.add(pnlSemiprime);
-    pnlSemiprimeFooter.setBorder(BorderFactory.createTitledBorder(
+    pnlSearchFooter = new JPanel(new GridLayout(2,1));
+    pnlSearchFooter.add(pneSemiprime);
+    pnlSearchFooter.add(pnlSemiprime);
+    pnlSearchFooter.setBorder(BorderFactory.createTitledBorder(
             BorderFactory.createEmptyBorder(),
             "<html><center>Semiprime Target<h5>(enter a value to factor)</h5></center></html>",
             TitledBorder.CENTER,
             TitledBorder.TOP
     ));
 
-    final JPanel pnlSearch = new JPanel(new GridLayout(2,1, H_GAP, V_GAP));
-    pnlSearch.add(pnlHeader);
-    pnlSearch.add(pnlSemiprimeFooter);
+    final JPanel pnlSearch = new JPanel(new GridLayout(2,1, H_GAP/2, V_GAP/2));
+    pnlSearch.add(pnlSearchHeader);
+    pnlSearch.add(pnlSearchFooter);
 
     ////////////////////////////////////////////////////////////////////////////
     // cpu tab
@@ -1075,8 +1086,8 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private void updateSemiprimeInfo()
   {
-    TitledBorder.class.cast(pnlSemiprimeFooter.getBorder()).setTitle("<html><center>Semiprime Target<h5>base<sub>" + txtSemiprimeBase.getText() + "</sub> len: " + clean(txtSemiprime.getText()).length() + " digits&nbsp;&nbsp;/&nbsp;&nbsp;base<sub>" + txtInternalBase.getText() + "</sub> len: " + getSemiprimeLen() + " digits</h5></center></html>");
-    pnlSemiprimeFooter.repaint();
+    TitledBorder.class.cast(pnlSearchFooter.getBorder()).setTitle("<html><center>Semiprime Target<h5>base<sub>" + txtSemiprimeBase.getText() + "</sub> len: " + clean(txtSemiprime.getText()).length() + " digits&nbsp;&nbsp;/&nbsp;&nbsp;base<sub>" + txtInternalBase.getText() + "</sub> len: " + getSemiprimeLen() + " digits</h5></center></html>");
+    pnlSearchFooter.repaint();
   }
 
   private void loadBenchmark(String benchmark)

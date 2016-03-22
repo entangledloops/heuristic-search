@@ -122,22 +122,22 @@ public class Solver implements Runnable, Serializable
 
   @Override public String toString()
   {
-    return "\nparameters:" +
-        "\n\tlength (base 10): " + cacheSemiprimeLen10 +
-        "\n\ttarget (base 10): " + cacheSemiprimeString10 +
-        "\n\n\tlength (base " + cacheInternalBase + "): " + cacheSemiprimeLenInternal +
-        "\n\ttarget (base " + cacheInternalBase + "): " + cacheSemiprimeStringInternal +
-        "\n\n\theuristics: " + (cacheHeuristics.length > 0 ? Stream.of(cacheHeuristics).skip(1).map(Object::toString).reduce(cacheHeuristics[0].toString(), (h1, h2) -> h1 + ", " + h2) : "(none)") +
-        "\n\tp length (base " + cacheInternalBase + "): " + (0 != cachePLength ? cachePLength : "any") +
-        "\n\tq length (base " + cacheInternalBase + "): " + (0 != cacheQLength ? cacheQLength : "any") +
-        "\n\tbackground: " + background() +
-        "\n\tprocessors: " + cacheProcessors +
-        "\n\tprocessorCap: " + processorCap() +
-        "\n\tfavorPerformance: " + favorPerformance +
-        "\n\tcompressMemory: " + compressMemory +
-        "\n\topen.size(): " + open.size() +
-        "\n\tclosed.size(): " + closed.size() +
-        "\n\tthreads.size(): " + threads.size() +
+    return "\n********** parameters **********\n" +
+        "\nlength (base 10): " + cacheSemiprimeLen10 +
+        "\ntarget (base 10): " + cacheSemiprimeString10 +
+        "\n\nlength (base " + cacheInternalBase + "): " + cacheSemiprimeLenInternal +
+        "\ntarget (base " + cacheInternalBase + "): " + cacheSemiprimeStringInternal +
+        "\n\nheuristics: " + (cacheHeuristics.length > 0 ? Stream.of(cacheHeuristics).skip(1).map(Object::toString).reduce(cacheHeuristics[0].toString(), (h1, h2) -> h1 + ", " + h2) : "(none)") +
+        "\np length (base " + cacheInternalBase + "): " + (0 != cachePLength ? cachePLength : "any") +
+        "\nq length (base " + cacheInternalBase + "): " + (0 != cacheQLength ? cacheQLength : "any") +
+        "\nbackground: " + background() +
+        "\nprocessors: " + cacheProcessors +
+        "\nprocessorCap: " + processorCap() +
+        "\nfavorPerformance: " + favorPerformance +
+        "\ncompressMemory: " + compressMemory +
+        "\nopen.size(): " + open.size() +
+        "\nclosed.size(): " + closed.size() +
+        "\nthreads.size(): " + threads.size() +
         "\n";
   }
 
