@@ -22,7 +22,7 @@ import static java.lang.System.nanoTime;
  */
 public class Solver implements Runnable, Serializable
 {
-  public static final String VERSION = "0.4.5a";
+  public static final String VERSION = "0.4.6a";
 
   // ensures singleton behavior is maintained
   private static final AtomicReference<Solver> instance = new AtomicReference<>();
@@ -246,7 +246,7 @@ public class Solver implements Runnable, Serializable
         final Timer timer = new Timer();
         if (!statsTimer.compareAndSet(null, timer)) { Log.e("overlapping search request"); return; }
         startTime.set(nanoTime());
-        timer.schedule(new TimerTask() { @Override public void run() { Log.o("progress:" + stats((nanoTime() - startTime.get()))); } }, statsPeriodMillis, statsPeriodMillis);
+        timer.schedule(new TimerTask() { @Override public void run() { if (cachePaused) return; Log.o("progress:" + stats((nanoTime() - startTime.get()))); } }, statsPeriodMillis, statsPeriodMillis);
       }
 
 
