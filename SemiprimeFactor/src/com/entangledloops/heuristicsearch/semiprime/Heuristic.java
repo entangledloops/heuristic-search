@@ -35,7 +35,7 @@ public enum Heuristic
 
   HAMMING("Hamming Distance",
       "<a href=\"https://en.wikipedia.org/wiki/Hamming_distance\">Hamming distance</a> to goal.\nfor each bit i in target:\n\tsum( n.product[i] != target[i] )",
-      (n) -> (double)Solver.semiprime().and(n.product).bitCount()
+      (n) -> (double)Solver.semiprime().xor(n.product).bitCount()
   ),
   ;
 
