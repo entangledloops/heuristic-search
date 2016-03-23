@@ -5,7 +5,10 @@ import com.entangledloops.heuristicsearch.semiprime.client.Client;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -106,18 +109,17 @@ public class Solver implements Runnable, Serializable
   static boolean        cacheDetailedStats;
   static boolean        cachePrintAllNodes;
 
-  private Solver(final String semiprime, final int semiprimeBase)
+  private Solver(final BigInteger semiprime)
   {
     // check for invalid params
-    if (null == semiprime || "".equals(semiprime) || semiprimeBase < 2) throw new NullPointerException("invalid target or base");
+    if (null == semiprime) throw new NullPointerException("invalid target or base");
 
-    // set and validate + basic checks
-    final BigInteger sp = new BigInteger(semiprime, semiprimeBase);
-    if (!sp.testBit(0)) throw new NullPointerException("input is even");
-    if (sp.compareTo(BigInteger.valueOf(9)) < 0) throw new NullPointerException("input is not a semiprime number");
+    // basic checks
+    if (!semiprime.testBit(0)) throw new NullPointerException("input is even");
+    if (semiprime.compareTo(BigInteger.valueOf(9)) < 0) throw new NullPointerException("input is not a semiprime number");
 
-    // store the provided value
-    Solver.semiprime.set(sp);
+    // store copy of value (adding to zero is no-op copy)
+    Solver.semiprime.set( BigInteger.ZERO.add(semiprime) );
   }
 
   @Override public String toString()
@@ -179,7 +181,7 @@ public class Solver implements Runnable, Serializable
         Solver.cacheQLength = qLength();
         Solver.cacheProcessors = Math.max(0, Math.min(Runtime.getRuntime().availableProcessors(), processors()));
         Solver.cacheSemiprimeBitCountOverBitLen = (double) cacheSemiprimeBitCount / (double) cacheSemiprimeBitLen;
-        Solver.cacheMaxDepth = (0 < cachePLength || 0 < cacheQLength ? Math.max(cachePLength, cacheQLength) : cacheSemiprimeBitLen) - 2;  // -1 converts len -> depth, -1 again b/c this is used for children
+        Solver.cacheMaxDepth = (0 < cachePLength || 0 < cacheQLength ? Math.max(cachePLength, cacheQLength) : cacheSemiprimeBitLen) - 1;  // -1 converts len -> depth
         Solver.cachePaused = paused();
         Solver.cacheNetworkSearch = networkSearch();
         Solver.cacheNetworkHost = networkHost();
@@ -456,12 +458,11 @@ public class Solver implements Runnable, Serializable
     if (n.depth >= cacheMaxDepth) return true;
 
     // generate all node combinations
-    final boolean identicalFactors = n.p.equals(n.q);
     for (int i = 0; i < cacheInternalBase; ++i)
     {
       for (int j = 0; j < cacheInternalBase; ++j)
       {
-        if (identicalFactors && i > j) continue;
+        if (i > j && n.identicalFactors()) continue;
         
         final Node generated = close(new Node(n, i, j));
         if (null != generated && generated.validFactors())
@@ -530,10 +531,16 @@ public class Solver implements Runnable, Serializable
     {
       Solver solver = instance.getAndSet(null);
       if (null != solver && Solver.solving()) return null;
-      solver = new Solver(semiprime, semiprimeBase);
+      solver = new Solver(new BigInteger(semiprime, semiprimeBase));
       if (!instance.compareAndSet(null, solver)) return null;
       return new Thread(solver);
     }
+    catch (Throwable t) { Log.e(t); return null; }
+  }
+
+  public static Thread get(final BigInteger semiprime)
+  {
+    try { return new Thread(new Solver(semiprime)); }
     catch (Throwable t) { Log.e(t); return null; }
   }
 }

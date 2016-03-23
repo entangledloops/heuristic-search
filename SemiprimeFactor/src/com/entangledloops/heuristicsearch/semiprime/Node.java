@@ -9,6 +9,7 @@ import java.math.BigInteger;
  */
 public class Node implements Serializable, Comparable
 {
+  private final boolean   identicalFactors;
   private final int       hashCode;
   final        int        depth;
   public final BigInteger p, q; ///< the candidate factors
@@ -24,9 +25,10 @@ public class Node implements Serializable, Comparable
     final BigInteger f1 = null != parent ? (0 != pBit ? parent.p.setBit(depth) : parent.p) : BigInteger.valueOf(pBit);
     final BigInteger f2 = null != parent ? (0 != qBit ? parent.q.setBit(depth) : parent.q) : BigInteger.valueOf(qBit);
 
-    boolean larger = f1.compareTo(f2) < 0;
-    this.p = larger ? f1 : f2;
-    this.q = larger ? f2 : f1;
+    final int compare = f1.compareTo(f2);
+    this.identicalFactors = compare == 0;
+    this.p = compare < 0 ? f1 : f2;
+    this.q = compare < 0 ? f2 : f1;
 
     this.product = p.multiply(q);
 
@@ -42,6 +44,8 @@ public class Node implements Serializable, Comparable
   @Override public int compareTo(Object o) { return Double.compare(h(), ((Node) o).h()); }
   @Override public int hashCode() { if (++hashcount > 1) Log.o(hashcount + " : " + toString()); return hashCode; }
 
+  boolean identicalFactors() { return identicalFactors; }
+
   /**
    * This function ensures that the current partial product resembles the target semiprime
    * in the currently fixed digit positions.
@@ -51,8 +55,6 @@ public class Node implements Serializable, Comparable
   {
     return
         product.testBit(depth) == Solver.cacheSemiprime.testBit(depth) &&
-        (0 == Solver.cachePLength || (1+depth) <= Solver.cachePLength) &&
-        (0 == Solver.cacheQLength || (1+depth) <= Solver.cacheQLength) &&
         product.bitLength() <= Solver.cacheSemiprimeBitLen;
   }
 
