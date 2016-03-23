@@ -348,11 +348,12 @@ public class Solver implements Runnable, Serializable
     return
         "<table border=\"1\">" +
         "<tr>" +
-        "<th>generated</th>" + "<th>regenerated</th>" + "<th>regenerated</th>" +
-        "<th>ignored</th>" + "<th>expanded</th>" + "<th>maxDepth</th>" +
-        "</tr><tr>" +
-        "<td>" + generated + "</td>" + "<td>" + regenerated + "</td>" + "<th>" + regenerated + "</td>" +
-        "<td>" + ignored + "</td>" + "<td>" + expanded + "</td>" + "<th>" + maxDepth + "</td>" +
+        "<th>generated</th>" + "<th>regenerated</th>" + "<th>ignored</th>" +
+        "<th>expanded</th>" + "<th>maxDepth</th>" + "<th>avgDepth</th>" +
+        "</tr>" +
+        "<tr>" +
+        "<td>" + generated + "</td>" + "<td>" + regenerated + "</td>" + "<td>" + ignored + "</td>" +
+        "<td>" + expanded + "</td>" + "<td>" + maxDepth + "</td>" + "<td>" + avgDepth() + "</td>" +
         "</tr>" +
         "</table>" +
         (cacheDetailedStats ? "\topen.size():\t" + open.size() : "") +

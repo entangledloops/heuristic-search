@@ -419,7 +419,7 @@ public class ClientGui extends JFrame implements DocumentListener
       catch (Throwable ignored) {} // don't care what went wrong with gui update, it's been logged anyway
     });
 
-    Log.o("<pre>(Thank you)<sup>2048</sup> for helping my research!</pre>" +
+    Log.o("<center><pre>(Thank you)<sup>2048</sup> for helping my research!</pre></center>" +
         "<br>If you're computer cracks a target number, you will be credited in the publication (assuming you provided an email I can reach you at)." +
         "<br>If you're interested in learning exactly what this software does and why, checkout the \"About\" menu.");
 
