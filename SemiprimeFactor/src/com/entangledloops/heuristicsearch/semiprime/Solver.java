@@ -181,7 +181,7 @@ public class Solver implements Runnable, Serializable
         Solver.cacheQLength = qLength();
         Solver.cacheProcessors = Math.max(0, Math.min(Runtime.getRuntime().availableProcessors(), processors()));
         Solver.cacheSemiprimeBitCountOverBitLen = (double) cacheSemiprimeBitCount / (double) cacheSemiprimeBitLen;
-        Solver.cacheMaxDepth = (0 < cachePLength || 0 < cacheQLength ? Math.max(cachePLength, cacheQLength) : cacheSemiprimeBitLen) - 1;  // -1 converts len -> depth
+        Solver.cacheMaxDepth = (0 < cachePLength || 0 < cacheQLength ? Math.max(cachePLength, cacheQLength) : (cacheSemiprimeBitLen-1)) - 1;  // -1 converts len -> depth, second -1 on spLen is multiplication logic
         Solver.cachePaused = paused();
         Solver.cacheNetworkSearch = networkSearch();
         Solver.cacheNetworkHost = networkHost();
@@ -189,7 +189,12 @@ public class Solver implements Runnable, Serializable
         Solver.cacheDetailedStats = detailedStats();
         Solver.cachePrintAllNodes = printAllNodes();
         Solver.cacheHeuristics = new Heuristic[ heuristics().size() ];
-        for (int i = 0; i < cacheHeuristics.length; ++i) cacheHeuristics[i] = heuristics().get(i);
+        int i = -1;
+        for (Heuristic heuristic : heuristics())
+        {
+          if (i >= cacheHeuristics.length) { Log.e("heuristics changed during prep"); return; }
+          else cacheHeuristics[++i] = heuristic;
+        }
       }
       catch (Throwable t) { Log.e("cache preparation failure", t); return; }
 
