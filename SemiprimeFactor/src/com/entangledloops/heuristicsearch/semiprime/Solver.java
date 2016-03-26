@@ -5,10 +5,7 @@ import com.entangledloops.heuristicsearch.semiprime.client.Client;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.PriorityBlockingQueue;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -27,52 +24,32 @@ public class Solver implements Runnable, Serializable
 {
   public static final String VERSION = "0.4.6a";
 
-  // ensures singleton behavior is maintained
-  private static final AtomicReference<Solver> instance = new AtomicReference<>();
+  /// list containing all instantiated solvers
+  private static final ConcurrentLinkedQueue solvers = new ConcurrentLinkedQueue();
 
   // state vars
-  private static final AtomicBoolean solving          = new AtomicBoolean(false); ///< true if and only if a search is running
-  private static final AtomicBoolean paused           = new AtomicBoolean(false); ///< true if and only if a search is running
-  private static final AtomicBoolean networkSearch    = new AtomicBoolean(false); ///< true if and only if a search is running
-  private static final AtomicBoolean networkHost      = new AtomicBoolean(false); ///< true if and only if a search is running
-  private static final AtomicBoolean stats            = new AtomicBoolean(true); ///< timer prints stats according to user preferences
-  private static final AtomicBoolean detailedStats    = new AtomicBoolean(false); ///< if true---and at great expense---detailed stats will be recorded during search (debug)
-  private static final AtomicBoolean favorPerformance = new AtomicBoolean(true); ///< if true, will take additional steps to trade memory for more CPU;
-  private static final AtomicBoolean compressMemory   = new AtomicBoolean(false); ///< if true, will take additional steps to trade CPU for more memory
-  private static final AtomicBoolean restrictDisk     = new AtomicBoolean(true); ///< should we allow disk i/o during search to cache nodes?
-  private static final AtomicBoolean restrictNetwork  = new AtomicBoolean(false); ///< allow frequent network comm. during search?
-  private static final AtomicBoolean background       = new AtomicBoolean(false); ///< must wait until machine is idle before working
-  private static final AtomicBoolean printAllNodes    = new AtomicBoolean(false); ///< if false, fewer sanity checks are performed on values
-  private static final AtomicBoolean writeCsv         = new AtomicBoolean(false); ///< controls outputting csv-formatted node info during search
-  private static final AtomicInteger processors       = new AtomicInteger(1); ///< num cores allowed
-  private static final AtomicInteger processorCap     = new AtomicInteger(100); ///< percentage use allowed
-  private static final AtomicInteger memoryCap        = new AtomicInteger(100); ///< percentage use allowed
-
-  // search state
-  private static final List<Thread>                    threads    = Collections.synchronizedList(new ArrayList<>()); ///< worker threads
-  private static final List<Heuristic>                 heuristics = new CopyOnWriteArrayList<>(); ///< the list of heuristics to use for this search
-  private static final PriorityBlockingQueue<Node>     open       = new PriorityBlockingQueue<>(); ///< unbounded queue backed by heap for fast pop() behavior w/o sorting
-  private static final ConcurrentHashMap<Node, Node>   closed     = new ConcurrentHashMap<>(); ///< closed hash table
-  private static final AtomicReference<Node>           goal       = new AtomicReference<>(); ///< set if/when goal is found; if set, search will end
-  private static final AtomicReference<Consumer<Node>> callback   = new AtomicReference<>(); ///< a function to receive the goal node (or null) upon completion
-
-  // some stats tracking
-  private static final AtomicReference<Timer> statsTimer  = new AtomicReference<>(); ///< periodic reporting on search
-  private static final AtomicLong             generated   = new AtomicLong();
-  private static final AtomicLong             regenerated = new AtomicLong();
-  private static final AtomicLong             ignored     = new AtomicLong();
-  private static final AtomicLong             expanded    = new AtomicLong();
-  private static final AtomicLong             startTime   = new AtomicLong(); ///< nanoseconds
-  private static final AtomicLong             endTime     = new AtomicLong(); ///< nanoseconds
-  private static final AtomicLong             totalDepth  = new AtomicLong(); ///< nanoseconds
-  private static final AtomicInteger          maxDepth    = new AtomicInteger(0);
+  private static final AtomicBoolean           networkSearch    = new AtomicBoolean(false); ///< true if and only if this search is hosted remotely
+  private static final AtomicBoolean           networkHost      = new AtomicBoolean(false); ///< true if and only if this is the search host
+  private static final AtomicBoolean           stats            = new AtomicBoolean(true); ///< timer prints stats according to user preferences
+  private static final AtomicBoolean           detailedStats    = new AtomicBoolean(false); ///< if true---and at great expense---detailed stats will be recorded during search (debug)
+  private static final AtomicBoolean           favorPerformance = new AtomicBoolean(true); ///< if true, will take additional steps to trade memory for more CPU;
+  private static final AtomicBoolean           compressMemory   = new AtomicBoolean(false); ///< if true, will take additional steps to trade CPU for more memory
+  private static final AtomicBoolean           restrictDisk     = new AtomicBoolean(true); ///< should we allow disk i/o during search to cache nodes?
+  private static final AtomicBoolean           restrictNetwork  = new AtomicBoolean(false); ///< allow frequent network comm. during search?
+  private static final AtomicBoolean           background       = new AtomicBoolean(false); ///< must wait until machine is idle before working
+  private static final AtomicBoolean           printAllNodes    = new AtomicBoolean(false); ///< if false, fewer sanity checks are performed on values
+  private static final AtomicBoolean           writeCsv         = new AtomicBoolean(false); ///< controls outputting csv-formatted node info during search
+  private static final AtomicInteger           processors       = new AtomicInteger(1); ///< num cores allowed
+  private static final AtomicInteger           processorCap     = new AtomicInteger(100); ///< percentage use allowed
+  private static final AtomicInteger           memoryCap        = new AtomicInteger(100); ///< percentage use allowed
+  private static final AtomicReference<String> csvPath          = new AtomicReference<>(null); ///< path to csv file that will be written if writeCsv is set
 
   // target info
-  private static final AtomicReference<BigInteger> semiprime    = new AtomicReference<>(BigInteger.ZERO); ///< the target semiprime value
-  private static final AtomicInteger               pLength      = new AtomicInteger(0); ///< optional: if set, only primes w/this len will be searched for
-  private static final AtomicInteger               qLength      = new AtomicInteger(0); ///< using 0 searches for all length possibilities
-  private static final AtomicInteger               internalBase = new AtomicInteger(2); ///< the base that will be used internally for the search representation
-
+  private static final AtomicInteger                   pLength      = new AtomicInteger(0); ///< optional: if set, only primes w/this len will be searched for
+  private static final AtomicInteger                   qLength      = new AtomicInteger(0); ///< using 0 searches for all length possibilities
+  private static final AtomicInteger                   internalBase = new AtomicInteger(2); ///< the base that will be used internally for the search representation
+  private static final AtomicReference<Consumer<Node>> callback     = new AtomicReference<>(); ///< a function to receive the goal node (or null) upon completion
+  private static final List<Heuristic>                 heuristics   = new CopyOnWriteArrayList<>(); ///< the list of heuristics to use for this search
   // wait-for-work timeout
   private static final long     statsPeriodMillis    = 10000L;
   private static final long     checkForWorkTimeout  = 10000L;
@@ -82,34 +59,58 @@ public class Solver implements Runnable, Serializable
   private static final AtomicReference<Client> client = new AtomicReference<>(); ///< worker threads
 
   // vars cached for performance
-  private static String cacheSemiprimeString10; ///< cached base 10
-  private static String cacheSemiprimeString2; ///< cached base 2
-  private static String cacheSemiprimeStringInternal; ///< cached internal base
-  private static int    cacheSemiprimeLen10; ///< cached base 10
-  private static int    cacheSemiprimeLen2; ///< cached bit len
-  private static int    cacheSemiprimeLenInternal; ///< cached internal len
+
+  // this instance's search state
+  private final List<Thread>                  threads = Collections.synchronizedList(new ArrayList<>()); ///< worker threads
+  private final PriorityBlockingQueue<Node>   open    = new PriorityBlockingQueue<>(); ///< unbounded queue backed by heap for fast pop() behavior w/o sorting
+  private final ConcurrentHashMap<Node, Node> closed  = new ConcurrentHashMap<>(); ///< closed hash table
+  private final AtomicReference<Node>         goal    = new AtomicReference<>(); ///< set if/when goal is found; if set, search will end
+  private final AtomicBoolean                 solving = new AtomicBoolean(false);
+
+  // some stats tracking
+  private final AtomicReference<Timer> statsTimer  = new AtomicReference<>(); ///< periodic reporting on search
+  private final AtomicLong             generated   = new AtomicLong();
+  private final AtomicLong             regenerated = new AtomicLong();
+  private final AtomicLong             ignored     = new AtomicLong();
+  private final AtomicLong             expanded    = new AtomicLong();
+  private final AtomicLong             startTime   = new AtomicLong(); ///< nanoseconds
+  private final AtomicLong             endTime     = new AtomicLong(); ///< nanoseconds
+  private final AtomicLong             totalDepth  = new AtomicLong(); ///< nanoseconds
+  private final AtomicInteger          maxDepth    = new AtomicInteger(0);
 
   // search cache
-  static Client         cacheClient;
-  static Consumer<Node> cacheCallback;
-  static Heuristic[]    cacheHeuristics;
-  static BigInteger     cacheSemiprime;
-  static int            cacheInternalBase;
-  static int            cacheSemiprimeBitLen; ///< cached internal len
-  static int            cacheSemiprimeBitCount; ///< cached internal len
-  static int            cachePLength;
-  static int            cacheQLength;
-  static int            cacheMaxDepth; ///< max(pLength, qLength)
-  static int            cacheProcessors;
-  static double         cacheSemiprimeBitCountOverBitLen; ///< cached internal len
-  static boolean        cachePaused;
-  static boolean        cacheNetworkSearch;
-  static boolean        cacheNetworkHost;
-  static boolean        cacheStats;
-  static boolean        cacheDetailedStats;
-  static boolean        cachePrintAllNodes;
+  protected final BigInteger cacheSemiprime;
+  protected final String     cacheSemiprimeString10; ///< cached base 10
+  protected final String     cacheSemiprimeString2; ///< cached base 2
+  protected final String     cacheSemiprimeStringInternal; ///< cached internal base
+  protected final int        cacheSemiprimeLen10; ///< cached base 10
+  protected final int        cacheSemiprimeLen2; ///< cached bit len
+  protected final int        cacheSemiprimeLenInternal; ///< cached internal len
+  protected final int        cacheInternalBase;
+  protected final int        cacheSemiprimeBitLen; ///< cached internal len
+  protected final int        cacheSemiprimeBitCount; ///< cached internal len
+  protected final double         cacheSemiprimeBitCountOverBitLen; ///< cached internal len
 
-  private Solver(final BigInteger semiprime)
+  private final long           cacheStatsPeriodMillis;
+  private final long           cacheCheckForWorkTimeout;
+  private final TimeUnit       cacheCheckForWorkTimeUnit;
+  private final Thread         cacheThread;
+  private final Consumer<Node> cacheCallback;
+  private final Heuristic[]    cacheHeuristics;
+  private final int            cachePLength;
+  private final int            cacheQLength;
+  private final int            cacheMaxDepth; ///< max(pLength, qLength)
+  private final int            cacheProcessors;
+  private final boolean        cacheNetworkSearch;
+  private final boolean        cacheNetworkHost;
+  private final boolean        cacheStats;
+
+  private boolean cachePrintAllNodes;
+  private boolean cacheDetailedStats;
+  private boolean cachePaused;
+  private Client  cacheClient;
+
+  public Solver(final BigInteger semiprime)
   {
     // check for invalid params
     if (null == semiprime) throw new NullPointerException("invalid target or base");
@@ -118,8 +119,92 @@ public class Solver implements Runnable, Serializable
     if (!semiprime.testBit(0)) throw new NullPointerException("input is even");
     if (semiprime.compareTo(BigInteger.valueOf(9)) < 0) throw new NullPointerException("input is not a semiprime number");
 
-    // store copy of value (adding to zero is no-op copy)
-    Solver.semiprime.set( BigInteger.ZERO.add(semiprime) );
+    cacheThread = new Thread(this);
+
+    // cache search settings for consistency and speed
+    Log.o("\n********** building search cache **********\n");
+    try
+    {
+      // cache all variables
+      cacheStatsPeriodMillis = statsPeriodMillis;
+      cacheCheckForWorkTimeout = checkForWorkTimeout;
+      cacheCheckForWorkTimeUnit = checkForWorkTimeUnit;
+      cacheCallback = callback(); if (null == cacheCallback) throw new NullPointerException("no callback provided for search completion");
+      cacheInternalBase = internalBase();
+      cacheSemiprime = BigInteger.ZERO.add(semiprime);
+      cacheSemiprimeString10 = cacheSemiprime.toString(10);
+      cacheSemiprimeString2 = cacheSemiprime.toString(2);
+      cacheSemiprimeStringInternal = cacheSemiprime.toString(cacheInternalBase);
+      cacheSemiprimeLen10 = cacheSemiprimeString10.length();
+      cacheSemiprimeLen2 = cacheSemiprimeString2.length();
+      cacheSemiprimeLenInternal = cacheSemiprimeStringInternal.length();
+      cacheSemiprimeBitLen = cacheSemiprime.bitLength();
+      cacheSemiprimeBitCount = cacheSemiprime.bitCount();
+      cachePLength = pLength();
+      cacheQLength = qLength();
+      cacheProcessors = Math.max(0, Math.min(Runtime.getRuntime().availableProcessors(), processors()));
+      cacheSemiprimeBitCountOverBitLen = (double) cacheSemiprimeBitCount / (double) cacheSemiprimeBitLen;
+      cacheMaxDepth = (0 < cachePLength || 0 < cacheQLength ? Math.max(cachePLength, cacheQLength) : (cacheSemiprimeBitLen-1)) - 1;  // -1 converts len -> depth, second -1 on spLen is multiplication logic
+      cachePaused = paused();
+      cacheNetworkSearch = networkSearch();
+      cacheNetworkHost = networkHost();
+      cacheStats = stats();
+      cacheDetailedStats = detailedStats();
+      cachePrintAllNodes = printAllNodes();
+
+      // cache selected heuristics for this run
+      cacheHeuristics = new Heuristic[ heuristics().size() ];
+      int i = -1;
+      for (Heuristic heuristic : heuristics())
+      {
+        if (i >= cacheHeuristics.length) throw new NullPointerException("heuristics changed during prep");
+        else cacheHeuristics[++i] = heuristic;
+      }
+    }
+    catch (Throwable t) { Log.e(t); throw new NullPointerException("cache preparation failure"); }
+
+    // build worker threads to search until goal is found or no nodes left
+    if (cacheNetworkHost)
+    {
+      Log.o("preparing network host thread...");
+      threads.add(new Thread(() -> { try { while (null == goal() && solving() && !Thread.interrupted()) Thread.sleep(1000); } catch (Throwable ignored) {} }));
+    }
+    else
+    {
+      Log.o("preparing " + (cacheNetworkSearch ? "network" : "local") + " worker threads...");
+      IntStream.range(1, cacheProcessors+1).forEach((i) -> threads.add(new Thread(() ->
+      {
+        try
+        {
+          Log.o("thread " + i + ": started");
+          while (expand( pop() )) { while (cachePaused) Thread.sleep(1); }
+          Log.o("thread " + i + ": finished");
+        }
+        catch (Throwable ignored) {}
+      })));
+
+      // if networked search, prepare special network sync thread
+      if (cacheNetworkSearch)
+      {
+        threads.add(new Thread(() ->
+        {
+          try
+          {
+            while (solving() && null == goal() && !Thread.interrupted())
+            {
+              if (null != cacheClient)
+              {
+                if (cacheClient.disconnected()) cacheClient = client();
+                else cacheClient.write(Packet.Type.UPDATE, open, closed);
+              }
+              else cacheClient = client();
+              Thread.sleep(1000);
+            }
+          }
+          catch (Throwable ignored) {}
+       }));
+      }
+    }
   }
 
   @Override public String toString()
@@ -149,97 +234,13 @@ public class Solver implements Runnable, Serializable
   {
     try
     {
-      Log.o("\n********** preparing for new search **********\n");
-
       // atomically cancel and clear any previous search
-      if (!solving.compareAndSet(false, true))
-      {
-        interruptAndJoin();
-        if (!solving.compareAndSet(false, true)) { Log.e("failed to launch solver"); return; }
-        startTime.set( System.nanoTime() );
-      }
+      if (!solving.compareAndSet(false, true)) { Log.e("a solver is already running or this solver was not started properly"); return; }
 
-      // ensure any leftover threads are now wiped
-      threads.clear();
+      // store this thread so we can be cancelled later
 
-      // cache search settings for consistency and speed
-      Log.o("building cache...");
-      try
-      {
-        Solver.cacheCallback = callback(); if (null == cacheCallback) cacheCallback = (n) -> Log.o(null != n ? "\nsolution found:\n\n\t" + n : "solution not found");
-        Solver.cacheInternalBase = internalBase();
-        Solver.cacheSemiprime = BigInteger.ZERO.add( semiprime() );
-        Solver.cacheSemiprimeString10 = cacheSemiprime.toString(10);
-        Solver.cacheSemiprimeString2 = cacheSemiprime.toString(2);
-        Solver.cacheSemiprimeStringInternal = cacheSemiprime.toString(cacheInternalBase);
-        Solver.cacheSemiprimeLen10 = Solver.cacheSemiprimeString10.length();
-        Solver.cacheSemiprimeLen2 = cacheSemiprimeString2.length();
-        Solver.cacheSemiprimeLenInternal = cacheSemiprimeStringInternal.length();
-        Solver.cacheSemiprimeBitLen = cacheSemiprime.bitLength();
-        Solver.cacheSemiprimeBitCount = cacheSemiprime.bitCount();
-        Solver.cachePLength = pLength();
-        Solver.cacheQLength = qLength();
-        Solver.cacheProcessors = Math.max(0, Math.min(Runtime.getRuntime().availableProcessors(), processors()));
-        Solver.cacheSemiprimeBitCountOverBitLen = (double) cacheSemiprimeBitCount / (double) cacheSemiprimeBitLen;
-        Solver.cacheMaxDepth = (0 < cachePLength || 0 < cacheQLength ? Math.max(cachePLength, cacheQLength) : (cacheSemiprimeBitLen-1)) - 1;  // -1 converts len -> depth, second -1 on spLen is multiplication logic
-        Solver.cachePaused = paused();
-        Solver.cacheNetworkSearch = networkSearch();
-        Solver.cacheNetworkHost = networkHost();
-        Solver.cacheStats = stats();
-        Solver.cacheDetailedStats = detailedStats();
-        Solver.cachePrintAllNodes = printAllNodes();
-        Solver.cacheHeuristics = new Heuristic[ heuristics().size() ];
-        int i = -1;
-        for (Heuristic heuristic : heuristics())
-        {
-          if (i >= cacheHeuristics.length) { Log.e("heuristics changed during prep"); return; }
-          else cacheHeuristics[++i] = heuristic;
-        }
-      }
-      catch (Throwable t) { Log.e("cache preparation failure", t); return; }
-
-      // build worker threads to search until goal is found or no nodes left
-      if (cacheNetworkHost)
-      {
-        Log.o("preparing network host thread...");
-        threads.add(new Thread(() -> { try { while (null == goal() && solving() && !Thread.interrupted()) Thread.sleep(1000); } catch (Throwable ignored) {} }));
-      }
-      else
-      {
-        Log.o("preparing " + (cacheNetworkSearch ? "network" : "local") + " worker threads...");
-        IntStream.range(1, cacheProcessors+1).forEach((i) -> threads.add(new Thread(() ->
-        {
-          try
-          {
-            Log.o("thread " + i + ": started");
-            while (expand( pop() )) { while (cachePaused) Thread.sleep(1); }
-            Log.o("thread " + i + ": finished");
-          }
-          catch (Throwable ignored) {}
-        })));
-
-        // if networked search, prepare special network sync thread
-        if (cacheNetworkSearch)
-        {
-          threads.add(new Thread(() ->
-          {
-            try
-            {
-              while (solving() && null == goal() && !Thread.interrupted())
-              {
-                if (null != cacheClient)
-                {
-                  if (cacheClient.disconnected()) cacheClient = client();
-                  else cacheClient.write(Packet.Type.UPDATE, open, closed);
-                }
-                else cacheClient = client();
-                Thread.sleep(1000);
-              }
-            }
-            catch (Throwable ignored) {}
-          }));
-        }
-      }
+      // record the start time
+      startTime.set( System.nanoTime() );
 
       // push a new root node if open list is empty
       if (open.isEmpty()) push(new Node());
@@ -256,10 +257,9 @@ public class Solver implements Runnable, Serializable
         timer.schedule(new TimerTask() { @Override public void run() { if (cachePaused) return; Log.o("progress:" + stats((nanoTime() - startTime.get()))); } }, statsPeriodMillis, statsPeriodMillis);
       }
 
-
       // launch all worker threads and wait for completion
-      threads.stream().forEach(Thread::start);
-      try { threads.stream().forEach((thread) -> { try { thread.join(); } catch (Throwable t) { Log.e("solving get interrupted", t); } }); } catch (Throwable ignored) {}
+      try { threads.stream().forEach(Thread::start); try { threads.stream().forEach((thread) -> { try { thread.join(); } catch (Throwable t) { Log.e("solving start interrupted", t); } }); } catch (Throwable ignored) {} } catch (Throwable t) { Log.e(t); }
+      try { threads.stream().forEach((thread) -> { try { thread.interrupt(); } catch (Throwable ignored) {} }); } catch (Throwable ignored) {}
       threads.clear();
 
       // cancel the stats timer and record end time
@@ -270,9 +270,9 @@ public class Solver implements Runnable, Serializable
       }
 
       // print full final stats after all work is done
-      final boolean detail = detailedStats.getAndSet(true);
+      final boolean prevDetailedStats = cacheDetailedStats; cacheDetailedStats = true;
       Log.o("\nfinal stats:" + stats(elapsed()));
-      detailedStats.set(detail);
+      cacheDetailedStats = prevDetailedStats;
 
       // notify waiters that we've completed factoring
       cacheCallback.accept( goal() );
@@ -281,11 +281,166 @@ public class Solver implements Runnable, Serializable
     finally { Log.o("\n********** search finished **********\n"); solving.set(false); }
   }
 
-  public static boolean solving() { return solving.get(); }
+  public boolean start() { if (solving()) return false; try { cacheThread.start(); return true; } catch (Throwable t) { Log.e(t); return false; } }
+  public void interrupt() { final Thread thread = cacheThread; if (null != thread) thread.interrupt(); }
+  public void join() { try { final Thread thread = cacheThread; if (null != thread) thread.join(); } catch (Throwable ignored) {} }
+  public void interruptAndJoin() { interrupt(); join(); }
 
-  public static boolean paused() { return paused.get(); }
-  public static boolean pause() { Log.o("search paused"); cachePaused = true; return paused.getAndSet(true); }
-  public static boolean resume() { Log.o("search resumed"); cachePaused = false; return paused.getAndSet(false); }
+  /**
+   * if this node is newly closed, ensure we update the counter in a start-safe manner
+   * @param n
+   * @return the input node (to assist w/function chaining)
+   */
+  private Node close(Node n)
+  {
+    final Node prev = closed.put(n, n);
+    if (null != prev) regenerated.addAndGet(1);
+    return n;
+  }
+
+  /**
+   * tests if goal node
+   * @param n a node to attempt adding
+   * @return false on goal or fatal exception, true indicates successful push
+   */
+  private boolean push(Node n)
+  {
+    if (goal(n)) return false;
+    if (!open.offer(n)) { regenerated.addAndGet(1); return false; }
+    return true;
+  }
+
+  /**
+   * pop available node of opened
+   * @return the next available node or null if goal was found or error occurred
+   */
+  @SuppressWarnings("StatementWithEmptyBody")
+  private Node pop()
+  {
+    Node node;
+    try { while (null == (node = open.poll(cacheCheckForWorkTimeout, cacheCheckForWorkTimeUnit))) if (null != goal()) return null; } catch (Throwable t) { return null; }
+    return node;
+  }
+
+  /**
+   * expands the current node, pushing any generated children
+   * @param n
+   * @return true continues the search, false indicates completion
+   */
+  private boolean expand(final Node n)
+  {
+    // stats
+    if (cachePrintAllNodes) Log.o("expanding: " + n);
+    if (cacheStats)
+    {
+      expanded.addAndGet(1);
+      maxDepth.set(Math.max(maxDepth.get(), n.depth));
+      totalDepth.addAndGet(n.depth);
+    }
+
+    // early interruptAndJoin if possible
+    if (n.depth >= cacheMaxDepth) return true;
+
+    // generate all node combinations
+    for (int i = 0; i < cacheInternalBase; ++i)
+    {
+      for (int j = 0; j < cacheInternalBase; ++j)
+      {
+        if (i > j && n.identicalFactors()) continue;
+        
+        final Node node = close(new Node(n, i, j));
+        if (null != node && node.validFactors())
+        {
+          generated.addAndGet(1);
+          if (cachePrintAllNodes) Log.o("generated: " + node);
+          if (!push(node)) return false;
+        }
+        else
+        {
+          ignored.addAndGet(1);
+          if (cachePrintAllNodes) Log.o("ignored: " + node);
+        }
+      }
+    }
+
+    return true;
+  }
+
+  // resets the search
+  public static void reset()
+  {
+    Log.o("resetting solver...");
+
+    internalBase(2);
+    pLength(0);
+    qLength(0);
+
+    client(null);
+    callback(null);
+    heuristics.clear();
+
+    Log.o("solver reset");
+  }
+
+  public boolean solving() { return solving.get(); }
+  public boolean paused() { return cachePaused; }
+  public void pause() { Log.o("search paused"); cachePaused = true; }
+  public void resume() { Log.o("search resumed"); cachePaused = false; }
+
+  private String stats(final long elapsedNanos)
+  {
+    final long seconds = (elapsedNanos/1000000000L);
+    return
+        "<table border=\"1\">" +
+        "<tr>" +
+        "<th>generated</th>" + "<th>regenerated</th>" + "<th>ignored</th>" +
+        "<th>expanded</th>" + "<th>maxDepth</th>" + "<th>avgDepth</th>" +
+        "</tr>" +
+        "<tr>" +
+        "<td>" + generated + "</td>" + "<td>" + regenerated + "</td>" + "<td>" + ignored + "</td>" +
+        "<td>" + expanded + "</td>" + "<td>" + maxDepth + "</td>" + "<td>" + avgDepth() + "</td>" +
+        "</tr>" +
+        "</table>" +
+        (cacheDetailedStats ? "\topen.size():\t" + open.size() : "") +
+        (cacheDetailedStats ? "\tclosed.size():\t" + closed.size() : "") +
+        "elapsed:\t" + (seconds/60L) + " minutes, " + (seconds%60L) + " seconds";
+  }
+
+
+  /**
+   * goal test w/a somewhat optimized order of comparisons
+   * if it's the goal, it will be stored
+   * @param n a node to test against the target
+   * @return true if this is the goal or a goal node has been found
+   */
+  private boolean goal(Node n) { return null == n ? null != goal() : (n.goal() && (goal.compareAndSet(null, n) || null != goal())); }
+  private Node goal() { return goal.get(); }
+
+  private long generated() { return generated.get(); }
+  private long regenerated() { return regenerated.get(); }
+  private long ignored() { return ignored.get(); }
+  private long expanded() { return expanded.get(); }
+  private long maxDepth() { return maxDepth.get(); }
+  private long totalDepth() { return totalDepth.get(); }
+  private long avgDepth()
+  {
+    final long expanded = expanded();
+    return 0 != expanded ? totalDepth() / expanded : 0;
+  }
+
+  public long startTime() { return startTime.get(); }
+  public long endTime() { return endTime.get(); }
+  public long elapsed() { return endTime.get() - startTime.get(); }
+
+  public static void pauseAll()
+  {
+
+  }
+
+  public static void resumeAll()
+  {
+
+  }
 
   public static boolean networkSearch() { return Solver.networkSearch.get(); }
   public static void networkSearch(boolean enabled) { Solver.networkSearch.set(enabled); }
@@ -294,7 +449,7 @@ public class Solver implements Runnable, Serializable
   public static void networkHost(boolean enabled) { Solver.networkHost.set(enabled); }
 
   public static Client client() { return Solver.client.get(); }
-  public static void client(Client client) { cacheClient = client; Solver.client.set(client); }
+  public static void client(Client client) { Solver.client.set(client); }
 
   public static boolean detailedStats() { return Solver.detailedStats.get(); }
   public static void detailedStats(boolean enabled) { Solver.detailedStats.set(enabled); }
@@ -330,8 +485,7 @@ public class Solver implements Runnable, Serializable
   public static int memoryCap() { return memoryCap.get(); }
 
   public static int internalBase() { return internalBase.get(); }
-  public static int length() { return cacheSemiprimeLenInternal; }
-  public static int length(int base) { return internalBase() == base ? cacheSemiprimeLenInternal : (10 == base ? cacheSemiprimeLen10 : (2 == base ? cacheSemiprimeLen2 : semiprime().toString(base).length())); }
+  public static void internalBase(int base) { internalBase.set(base); }
 
   public static int pLength() { return pLength.get(); }
   public static void pLength(int len) { if (len < 0) Log.e("invalid len: " + len); else pLength.set(len); }
@@ -341,30 +495,8 @@ public class Solver implements Runnable, Serializable
 
   public static boolean primeLengthsFixed() { return 0 != pLength() && 0 != qLength(); }
 
-  public static long startTime() { return startTime.get(); }
-  public static long endTime() { return endTime.get(); }
-  public static long elapsed() { return endTime.get() - startTime.get(); }
-
   public static boolean stats() { return Solver.stats.get(); }
   public static void stats(boolean enabled) { Solver.stats.set(enabled); }
-  private static String stats(final long elapsedNanos)
-  {
-    final long seconds = (elapsedNanos/1000000000L);
-    return
-        "<table border=\"1\">" +
-        "<tr>" +
-        "<th>generated</th>" + "<th>regenerated</th>" + "<th>ignored</th>" +
-        "<th>expanded</th>" + "<th>maxDepth</th>" + "<th>avgDepth</th>" +
-        "</tr>" +
-        "<tr>" +
-        "<td>" + generated + "</td>" + "<td>" + regenerated + "</td>" + "<td>" + ignored + "</td>" +
-        "<td>" + expanded + "</td>" + "<td>" + maxDepth + "</td>" + "<td>" + avgDepth() + "</td>" +
-        "</tr>" +
-        "</table>" +
-        (cacheDetailedStats ? "\topen.size():\t" + open.size() : "") +
-        (cacheDetailedStats ? "\tclosed.size():\t" + closed.size() : "") +
-        "elapsed:\t" + (seconds/60L) + " minutes, " + (seconds%60L) + " seconds";
-  }
 
   public static void callback(Consumer<Node> callback) { Solver.callback.set(callback); }
   public static Consumer<Node> callback() { return callback.get(); }
@@ -385,168 +517,86 @@ public class Solver implements Runnable, Serializable
     }
   }
 
-  public static BigInteger semiprime() { return semiprime.get(); }
-
   /**
-   * goal test w/a somewhat optimized order of comparisons
-   * if it's the goal, it will be stored
-   * @param n a node to test against the target
-   * @return true if this is the goal or a goal node has been found
+   * @author Stephen Dunn
+   * @since October 31, 2015
    */
-  private static boolean goal(Node n) { return null == n ? null != goal() : (n.goal() && (goal.compareAndSet(null, n) || null != goal())); }
-  private static Node goal() { return goal.get(); }
-
-  private static long generated() { return generated.get(); }
-  private static long regenerated() { return regenerated.get(); }
-  private static long ignored() { return ignored.get(); }
-  private static long expanded() { return expanded.get(); }
-  private static long maxDepth() { return maxDepth.get(); }
-  private static long totalDepth() { return totalDepth.get(); }
-  private static long avgDepth()
+  public class Node implements Serializable, Comparable
   {
-    final long expanded = expanded();
-    return 0 != expanded ? totalDepth() / expanded : 0;
-  }
+    private final boolean   identicalFactors;
+    private final int       hashCode;
+    final        int        depth;
+    public final BigInteger p, q; ///< the candidate factors
+    public final BigInteger product; ///< the partial factors for this node
+    private      double     h; ///< the heuristic search factors for this node
 
-  /**
-   * if this node is newly closed, ensure we update the counter in a get-safe manner
-   * @param n
-   * @return the input node (to assist w/function chaining)
-   */
-  private static Node close(Node n)
-  {
-    final Node prev = closed.put(n, n);
-    if (null != prev) regenerated.addAndGet(1);
-    return n;
-  }
-
-  /**
-   * tests if goal node
-   * @param n a node to attempt adding
-   * @return false on goal or fatal exception, true indicates successful push
-   */
-  private static boolean push(Node n)
-  {
-    if (goal(n)) return false;
-    if (!open.offer(n)) { regenerated.addAndGet(1); return false; }
-    return true;
-  }
-
-  /**
-   * pop available node of opened
-   * @return the next available node or null if goal was found or error occurred
-   */
-  @SuppressWarnings("StatementWithEmptyBody")
-  private static Node pop()
-  {
-    Node node;
-    try { while (null == (node = open.poll(checkForWorkTimeout, checkForWorkTimeUnit))) if (null != goal()) return null; } catch (Throwable t) { return null; }
-    return node;
-  }
-
-  /**
-   * expands the current node, pushing any generated children
-   * @param n
-   * @return true continues the search, false indicates completion
-   */
-  private static boolean expand(final Node n)
-  {
-    // stats
-    if (cachePrintAllNodes) Log.o("expanding: " + n);
-    if (cacheStats)
+    int hashcount=0;
+    Node() { this(null, 1, 1); }
+    Node(final Node parent, int pBit, int qBit)
     {
-      expanded.addAndGet(1);
-      maxDepth.set(Math.max(maxDepth.get(), n.depth));
-      totalDepth.addAndGet(n.depth);
+      this.depth = null != parent ? parent.depth+1 : 0;
+
+      final BigInteger f1 = null != parent ? (0 != pBit ? parent.p.setBit(depth) : parent.p) : BigInteger.valueOf(pBit);
+      final BigInteger f2 = null != parent ? (0 != qBit ? parent.q.setBit(depth) : parent.q) : BigInteger.valueOf(qBit);
+
+      final int compare = f1.compareTo(f2);
+      this.identicalFactors = compare == 0;
+      this.p = compare < 0 ? f1 : f2;
+      this.q = compare < 0 ? f2 : f1;
+
+      this.product = p.multiply(q);
+
+      // cache the hash for performance during table lookups
+      int hash = 37 * depth + product.hashCode();
+      hash = 37 * hash + p.hashCode();
+      hash = 37 * hash + q.hashCode();
+      hashCode = hash;
     }
 
-    // early interruptAndJoin if possible
-    if (n.depth >= cacheMaxDepth) return true;
+    @Override public String toString() { return product + "<sub>10</sub>:" + product.toString(cacheInternalBase) + "<sub>" + cacheInternalBase + "</sub>:" + depth + ":depth:" + p + ":p:" + q + ":q:" + h  + ":h:" + hashCode + ":hash"; }
+    @Override public boolean equals(Object o) { return o instanceof Node && ((Node) o).depth == depth && p.equals(((Node) o).p) && q.equals(((Node) o).q); }
+    @Override public int compareTo(Object o) { return Double.compare(h(), ((Node) o).h()); }
+    @Override public int hashCode() { if (++hashcount > 1) Log.o(hashcount + " : " + toString()); return hashCode; }
 
-    // generate all node combinations
-    for (int i = 0; i < cacheInternalBase; ++i)
+    boolean identicalFactors() { return identicalFactors; }
+
+    /**
+     * This function ensures that the current partial product resembles the target semiprime
+     * in the currently fixed digit positions.
+     * @return true if everything looks okay
+     */
+    boolean validFactors()
     {
-      for (int j = 0; j < cacheInternalBase; ++j)
-      {
-        if (i > j && n.identicalFactors()) continue;
-        
-        final Node generated = close(new Node(n, i, j));
-        if (null != generated && generated.validFactors())
-        {
-          Solver.generated.addAndGet(1);
-          if (cachePrintAllNodes) Log.o("generated: " + generated);
-          if (!push(generated)) return false;
-        }
-        else
-        {
-          Solver.ignored.addAndGet(1);
-          if (cachePrintAllNodes) Log.o("ignored: " + generated);
-        }
-      }
+      return
+          product.testBit(depth) == cacheSemiprime.testBit(depth) &&
+          product.bitLength() <= cacheSemiprimeBitLen;
     }
 
-    return true;
-  }
-
-  // resets the search
-  public static void reset()
-  {
-    Log.o("resetting solver...");
-
-    if (solving()) interruptAndJoin();
-    instance.set(null);
-
-    generated.set(0);
-    regenerated.set(0);
-    ignored.set(0);
-    expanded.set(0);
-    maxDepth.set(0);
-    totalDepth.set(0);
-    startTime.set(0);
-    endTime.set(0);
-
-    pLength(0);
-    qLength(0);
-
-    goal.set(null);
-    callback.set(null);
-
-    heuristics.clear();
-    open.clear();
-    closed.clear();
-
-    solving.set(false);
-    paused.set(false);
-
-    Log.o("solver reset");
-  }
-
-  public static void interrupt() { threads.stream().forEach(Thread::interrupt); }
-  public static void join() { threads.stream().forEach(t -> { try { t.join(); } catch (Throwable ignored) {} }); }
-  public static void interruptAndJoin() { try { interrupt(); join(); } catch (Throwable ignored) {} }
-
-  /**
-   * Ensures a single instance is launched.
-   * @param semiprime number to solve
-   * @return an un-launched thread configured for the target
-   */
-  public static Thread get(final String semiprime) { return get(semiprime, 10); }
-  public static Thread get(final String semiprime, int semiprimeBase)
-  {
-    try
+    /**
+     * Ensure that none of the factors is trivial.
+     * @return true if this node is the goal
+     */
+    boolean goal()
     {
-      Solver solver = instance.getAndSet(null);
-      if (null != solver && Solver.solving()) return null;
-      solver = new Solver(new BigInteger(semiprime, semiprimeBase));
-      if (!instance.compareAndSet(null, solver)) return null;
-      return new Thread(solver);
+      return
+          (0 == cachePLength || (1+depth) == cachePLength) &&
+          (0 == cacheQLength || (1+depth) == cacheQLength) &&
+          cacheSemiprime.equals(product) &&
+          !BigInteger.ONE.equals(p) &&
+          !BigInteger.ONE.equals(q);
     }
-    catch (Throwable t) { Log.e(t); return null; }
-  }
 
-  public static Thread get(final BigInteger semiprime)
-  {
-    try { return new Thread(new Solver(semiprime)); }
-    catch (Throwable t) { Log.e(t); return null; }
+
+    /**
+     * Sums all desired heuristic functions.
+     * @return an estimate of this node's distance to goal, where 0 = goal
+     */
+    private double h()
+    {
+      if (0 != h) return h;
+      for (Heuristic heuristic : cacheHeuristics) h += heuristic.apply(Solver.this, this);
+      return h;
+    }
+
   }
 }

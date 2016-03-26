@@ -52,7 +52,7 @@ public class Server
 
     try
     {
-      Log.o("launching new socket server..."); // 'launched' msg printed in new get
+      Log.o("launching new socket server..."); // 'launched' msg printed in new start
       socket = new ServerSocket(port, Integer.MAX_VALUE);
       serverThread.set(new Thread(new ServerThread()));
       serverThread.get().start();
@@ -103,7 +103,7 @@ public class Server
   {
     @Override public void run()
     {
-      if (!ready.compareAndSet(false, true) || exiting()) { Log.e("duplicate server get launch?"); return; }
+      if (!ready.compareAndSet(false, true) || exiting()) { Log.e("duplicate server start launch?"); return; }
 
       try
       {
@@ -135,7 +135,7 @@ public class Server
     Solver.networkHost(true);
     for (final String semiprime : semiprimes)
     {
-      Solver.get(semiprime.trim().replace("\n","")).start();
+      Solver.start(semiprime.trim().replace("\n","")).start();
       try { Thread.sleep(250); } catch (Throwable ignored) {}
       Solver.join();
     }

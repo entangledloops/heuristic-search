@@ -83,7 +83,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final String HOST_NAME              = "server";
   private static final String PORT_NAME              = "port";
   private static final String IDLE_MINUTES_NAME      = "idle minutes";
-  private static final String AUTOSTART_NAME         = "get search immediately";
+  private static final String AUTOSTART_NAME         = "start search immediately";
   private static final String SEMIPRIME_NAME         = "semiprime";
   private static final String PERIODIC_STATS_NAME    = "periodic stats";
   private static final String DETAILED_STATS_NAME    = "detailed stats";
@@ -201,7 +201,7 @@ public class ClientGui extends JFrame implements DocumentListener
   //////////////////////////////////////////////////////////////////////////////
   // state
 
-  private final AtomicReference<Thread> solver          = new AtomicReference<>();
+  private final AtomicReference<Solver> solver          = new AtomicReference<>();
   private final AtomicReference<Client> client          = new AtomicReference<>(null);
   private final AtomicBoolean           isConnecting    = new AtomicBoolean(false);
   private final AtomicBoolean           isUpdatePending = new AtomicBoolean(false);
@@ -539,8 +539,8 @@ public class ClientGui extends JFrame implements DocumentListener
     final JButton btnResume = getButton("Resume");
     btnResume.setEnabled(false);
 
-    btnPause.addActionListener((e) -> { btnPause.setEnabled(false); Solver.pause(); btnResume.setEnabled(true); });
-    btnResume.addActionListener((e) -> { btnResume.setEnabled(false); Solver.resume(); btnPause.setEnabled(true); });
+    btnPause.addActionListener((e) -> { btnPause.setEnabled(false); solver().pause(); btnResume.setEnabled(true); });
+    btnResume.addActionListener((e) -> { btnResume.setEnabled(false); solver().resume(); btnPause.setEnabled(true); });
 
     /////////////////////////////////////
 
@@ -687,18 +687,18 @@ public class ClientGui extends JFrame implements DocumentListener
         // interrupt any previous solver and wait for termination
         if (!isSearching.compareAndSet(false, true))
         {
-          final Thread thread = solver(null);
-          btnPause.setEnabled(false); btnResume.setEnabled(false);
-          if (Solver.solving()) { Log.o("interrupting search..."); Solver.interruptAndJoin(); }
-          try { thread.join(); } catch (Throwable ignored) {}
+          final Solver solver = solver();
+          if (null != solver)
+          {
+            btnPause.setEnabled(false); btnResume.setEnabled(false);
+            if (solver.solving()) { Log.o("interrupting search..."); solver.interruptAndJoin(); }
+            try { solver.join(); } catch (Throwable ignored) {}
+          }
           return;
         }
 
         // move to main screen to view search progress or init errors
         btnSearch.setText("Preparing search...");
-
-        // reset the solver for a new search
-        Solver.reset();
 
         // set the solver according to user prefs
         Solver.heuristics(Stream.of(chkHeuristics).filter(JCheckBox::isSelected).map(c -> Heuristic.fromFormattedName(c.getText())).toArray(Heuristic[]::new));
@@ -726,8 +726,8 @@ public class ClientGui extends JFrame implements DocumentListener
         });
 
         // try to parse any fixed prime lengths
-        try { Solver.pLength(Integer.parseInt(clean(txtP1Len.getText()))); } catch (Throwable t) { Log.e("prime 1 len invalid"); return; }
-        try { Solver.qLength(Integer.parseInt(clean(txtP2Len.getText()))); } catch (Throwable t) { Log.e("prime 2 len invalid"); return; }
+        try { Solver.pLength(Integer.parseInt(clean(txtP1Len.getText()))); } catch (Throwable t) { throw new NullPointerException("prime 1 len invalid"); }
+        try { Solver.qLength(Integer.parseInt(clean(txtP2Len.getText()))); } catch (Throwable t) { throw new NullPointerException("prime 2 len invalid"); }
 
         // grab the semiprime options
         int spBase = DEFAULT_SEMIPRIME_BASE;
@@ -741,8 +741,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
         // create a new solver based upon user request and launch it
         final String sp = clean(txtSemiprime.getText());
-        if (null == sp || "".equals(sp)) { Log.e("you must provide a semiprime to factor"); return; }
-        solver( Solver.get(sp, spBase) );
+        if (null == sp || "".equals(sp)) throw new NullPointerException("you must provide a semiprime to factor");
 
         // ensure gui values reflect underlying state
         updateSettings();
@@ -752,12 +751,14 @@ public class ClientGui extends JFrame implements DocumentListener
 
         // prevent multiple searches
         btnSearch.setText("Cancel Search");
+
+        // try to start solving
+        solver( new Solver(new BigInteger(sp, spBase)) );
       }
-      catch (Throwable t) { Log.e(t.getMessage()); }
+      catch (Throwable t) { Log.e(t.getLocalizedMessage()); }
       finally
       {
-        final Thread thread = solver();
-        if (null != thread) { thread.start(); btnPause.setEnabled(true); btnResume.setEnabled(false); pneMain.setSelectedIndex(TAB_CONNECT); }
+        if (solver().solving()) { btnPause.setEnabled(true); btnResume.setEnabled(false); pneMain.setSelectedIndex(TAB_CONNECT); }
         else { isSearching.set(false); btnPause.setEnabled(false); btnResume.setEnabled(false); btnSearch.setText("Start Local Search"); }
         btnSearch.setEnabled(true);
       }
@@ -938,8 +939,8 @@ public class ClientGui extends JFrame implements DocumentListener
     // setup the right-side:
     final JPanel pnlCpuRight = new JPanel(new GridLayout(7, 1, H_GAP, V_GAP));
 
-    // auto get with system?
-    chkAutoStart = getCheckBox("auto-get with system", prefs.getBoolean(AUTOSTART_NAME, DEFAULT_AUTOSTART));
+    // auto start with system?
+    chkAutoStart = getCheckBox("auto-start with system", prefs.getBoolean(AUTOSTART_NAME, DEFAULT_AUTOSTART));
     chkAutoStart.addActionListener(l -> Log.o("autostart: " + (chkAutoStart.isSelected() ? "yes" : "no")));
 
     final JPanel pnlChkBoxes = new JPanel(new GridLayout(1, 1, H_GAP, V_GAP));
@@ -1130,8 +1131,8 @@ public class ClientGui extends JFrame implements DocumentListener
     updateSemiprimeInfo();
   }
 
-  private Thread solver(Thread solver) { return this.solver.getAndSet(solver); }
-  private Thread solver() { return solver.get(); }
+  private Solver solver(Solver solver) { return this.solver.getAndSet(solver); }
+  private Solver solver() { return solver.get(); }
 
   private Client client(Client client) { this.client.set(client); return this.client.get(); }
   private Client client() { return client.get(); }
@@ -1244,7 +1245,7 @@ public class ClientGui extends JFrame implements DocumentListener
     final Client client = client();
     if (null == client || !client.connected()) { Log.e("you need to be connected before updating"); return; }
 
-    // ensure we aren't overlapping w/another get
+    // ensure we aren't overlapping w/another start
     if (!isUpdatePending.compareAndSet(false, true)) { Log.e("already working on an update, hang tight..."); return; }
     btnUpdate.setEnabled(false);
     txtUsername.setEnabled(false);

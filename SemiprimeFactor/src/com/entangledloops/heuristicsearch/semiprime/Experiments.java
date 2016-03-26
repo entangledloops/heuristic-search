@@ -22,12 +22,12 @@ public class Experiments
       final BigInteger pq = p.multiply(q);
 
       Solver.reset();
-      final Thread solver1 = Solver.get(pq);
-      if (null != solver1) { try { solver1.start(); solver1.join(); } catch (Throwable t) { Log.e(t); } }
+      final Solver solver1 = new Solver(pq);
+      solver1.start(); solver1.join();
 
-      Solver.reset(); Solver.pLength(i); Solver.qLength(i);
-      final Thread solver2 = Solver.get(pq);
-      if (null != solver2) { try { solver2.start(); solver2.join(); } catch (Throwable t) { Log.e(t); } }
+      Solver.pLength(i); Solver.qLength(i);
+      final Solver solver2 = new Solver(pq);
+      solver2.start(); solver2.join();
     }
   }
 }
