@@ -122,7 +122,7 @@ public class Solver implements Runnable, Serializable
     cacheThread = new Thread(this);
 
     // cache search settings for consistency and speed
-    Log.o("\n********** building search cache **********\n");
+    Log.o("\n********** building search cache **********");
     try
     {
       // cache all variables
@@ -166,12 +166,10 @@ public class Solver implements Runnable, Serializable
     // build worker threads to search until goal is found or no nodes left
     if (cacheNetworkHost)
     {
-      Log.o("preparing network host thread...");
       threads.add(new Thread(() -> { try { while (null == goal() && solving() && !Thread.interrupted()) Thread.sleep(1000); } catch (Throwable ignored) {} }));
     }
     else
     {
-      Log.o("preparing " + (cacheNetworkSearch ? "network" : "local") + " worker threads...");
       IntStream.range(1, cacheProcessors+1).forEach((i) -> threads.add(new Thread(() ->
       {
         try
@@ -209,7 +207,7 @@ public class Solver implements Runnable, Serializable
 
   @Override public String toString()
   {
-    return "\n********** parameters **********\n" +
+    return "\n" +
         "\nlength (base 10): " + cacheSemiprimeLen10 +
         "\ntarget (base 10): " + cacheSemiprimeString10 +
         "\n\nlength (base " + cacheInternalBase + "): " + cacheSemiprimeLenInternal +
@@ -271,7 +269,7 @@ public class Solver implements Runnable, Serializable
 
       // print full final stats after all work is done
       final boolean prevDetailedStats = cacheDetailedStats; cacheDetailedStats = true;
-      Log.o("\nfinal stats:" + stats(elapsed()));
+      Log.o(stats( elapsed() ));
       cacheDetailedStats = prevDetailedStats;
 
       // notify waiters that we've completed factoring
@@ -432,16 +430,6 @@ public class Solver implements Runnable, Serializable
   public long endTime() { return endTime.get(); }
   public long elapsed() { return endTime.get() - startTime.get(); }
 
-  public static void pauseAll()
-  {
-
-  }
-
-  public static void resumeAll()
-  {
-
-  }
-
   public static boolean networkSearch() { return Solver.networkSearch.get(); }
   public static void networkSearch(boolean enabled) { Solver.networkSearch.set(enabled); }
 
@@ -530,7 +518,6 @@ public class Solver implements Runnable, Serializable
     public final BigInteger product; ///< the partial factors for this node
     private      double     h; ///< the heuristic search factors for this node
 
-    int hashcount=0;
     Node() { this(null, 1, 1); }
     Node(final Node parent, int pBit, int qBit)
     {
@@ -556,6 +543,8 @@ public class Solver implements Runnable, Serializable
     @Override public String toString() { return product + "<sub>10</sub>:" + product.toString(cacheInternalBase) + "<sub>" + cacheInternalBase + "</sub>:" + depth + ":depth:" + p + ":p:" + q + ":q:" + h  + ":h:" + hashCode + ":hash"; }
     @Override public boolean equals(Object o) { return o instanceof Node && ((Node) o).depth == depth && p.equals(((Node) o).p) && q.equals(((Node) o).q); }
     @Override public int compareTo(Object o) { return Double.compare(h(), ((Node) o).h()); }
+
+    int hashcount=0;
     @Override public int hashCode() { if (++hashcount > 1) Log.o(hashcount + " : " + toString()); return hashCode; }
 
     boolean identicalFactors() { return identicalFactors; }
@@ -593,7 +582,7 @@ public class Solver implements Runnable, Serializable
      */
     private double h()
     {
-      if (0 != h) return h;
+      if (h >= 0) return h;
       for (Heuristic heuristic : cacheHeuristics) h += heuristic.apply(Solver.this, this);
       return h;
     }

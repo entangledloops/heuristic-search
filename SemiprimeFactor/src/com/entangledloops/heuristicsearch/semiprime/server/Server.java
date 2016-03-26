@@ -6,6 +6,7 @@ import com.entangledloops.heuristicsearch.semiprime.Solver;
 import com.entangledloops.heuristicsearch.semiprime.client.Client;
 import com.entangledloops.heuristicsearch.semiprime.client.ClientGui;
 
+import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -135,9 +136,8 @@ public class Server
     Solver.networkHost(true);
     for (final String semiprime : semiprimes)
     {
-      Solver.start(semiprime.trim().replace("\n","")).start();
-      try { Thread.sleep(250); } catch (Throwable ignored) {}
-      Solver.join();
+      final Solver solver = new Solver(new BigInteger(semiprime.trim().replace("\n","")));
+      solver.start(); solver.join();
     }
   }
 }
