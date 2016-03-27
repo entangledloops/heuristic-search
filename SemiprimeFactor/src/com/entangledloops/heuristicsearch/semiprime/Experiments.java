@@ -18,21 +18,26 @@ public class Experiments
     final Random random = new Random(1);
     final Consumer<Solver.Node> callback = (n) -> Log.o(n.toString());
 
-    for (int i = 10; i < 100; ++i)
+    for (int i = 10; i < 11; ++i)
     {
-      Solver.reset(); Solver.callback(callback);
+      for (Heuristic heuristic : Heuristic.values())
+      {
+        Solver.reset();
+        Solver.callback(callback);
+        Solver.heuristics(heuristic);
 
-      final BigInteger p = BigInteger.probablePrime(i, random);
-      final BigInteger q = BigInteger.probablePrime(i, random);
-      final BigInteger pq = p.multiply(q);
+        final BigInteger p = BigInteger.probablePrime(i, random);
+        final BigInteger q = BigInteger.probablePrime(i, random);
+        final BigInteger pq = p.multiply(q);
 
-      final Solver solver1 = new Solver(pq);
-      solver1.start(); solver1.join();
+        final Solver solver1 = new Solver(pq);
+        solver1.start(); solver1.join();
 
-      Solver.pLength(i); Solver.qLength(i);
+        Solver.pLength(pq.bitLength()/2); Solver.qLength(pq.bitLength()/2);
 
-      final Solver solver2 = new Solver(pq);
-      solver2.start(); solver2.join();
+        final Solver solver2 = new Solver(pq);
+        solver2.start(); solver2.join();
+      }
     }
   }
 }
