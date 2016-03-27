@@ -235,16 +235,14 @@ public class Solver implements Runnable, Serializable
       // atomically cancel and clear any previous search
       if (!solving.compareAndSet(false, true)) { Log.e("a solver is already running or this solver was not started properly"); return; }
 
-      // store this thread so we can be cancelled later
+      // inform user of cache- and contract-bound search parameters
+      Log.o(toString() + "\n********** search starting **********\n");
 
       // record the start time
       startTime.set( System.nanoTime() );
 
       // push a new root node if open list is empty
       if (open.isEmpty()) push(new Node());
-
-      // inform user of cache- and contract-bound search parameters
-      Log.o(toString() + "\n********** search starting **********\n");
 
       // properly schedule a new timer if stats were requested
       if (cacheStats)
