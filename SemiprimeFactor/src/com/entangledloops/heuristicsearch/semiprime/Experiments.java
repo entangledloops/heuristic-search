@@ -16,7 +16,9 @@ public class Experiments
     new ClientGui();
 
     final Random random = new Random(1);
-    final Consumer<Solver.Node> callback = (n) -> Log.o(n.toString());
+    final Consumer<Solver.Node> callback = (n) -> Log.o(null != n ? n.toString() : "no goal found");
+
+    Solver.callback(callback);
 
     for (int i = 10; i < 50; ++i)
     {
@@ -24,15 +26,14 @@ public class Experiments
       final BigInteger q = BigInteger.probablePrime(i, random);
       final BigInteger pq = p.multiply(q);
 
+      Solver.heuristics().clear();
+
       for (Heuristic heuristic : Heuristic.values())
       {
-        Solver.reset();
-        Solver.callback(callback);
         Solver.heuristics(heuristic);
 
         final Solver solver1 = new Solver(pq);
-        solver1.start();
-        solver1.join();
+        solver1.start(); solver1.join();
       }
     }
   }
