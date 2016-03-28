@@ -8,6 +8,7 @@ sourceSets.main.resources.srcDirs = [ 'res' ]
 
 project.ext.clientClass = 'com.entangledloops.heuristicsearch.semiprime.client.Client'
 project.ext.serverClass = 'com.entangledloops.heuristicsearch.semiprime.server.Server'
+project.ext.experimentsClass = 'com.entangledloops.heuristicsearch.semiprime.Experiments'
 
 task createWrapper(type: Wrapper) {
     gradleVersion = "2.11"
@@ -62,3 +63,16 @@ task distServer(dependsOn:classes, type:Jar) {
     destinationDir file('.')
     archiveName 'SemiprimeServer.jar'
 }
+
+task experiments(dependsOn:classes, type:JavaExec) {
+    compileJava {
+        options.encoding = 'UTF-8'
+        options.fork (memoryMaximumSize: ''+Runtime.getRuntime().maxMemory())
+    }
+    main = project.experimentsClass
+    classpath = sourceSets.main.runtimeClasspath
+    standardInput = System.in
+    workingDir = sourceSets.main.output.resourcesDir
+    ignoreExitValue = false
+}
+

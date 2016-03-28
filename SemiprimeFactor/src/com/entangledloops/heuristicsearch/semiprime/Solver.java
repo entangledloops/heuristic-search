@@ -14,8 +14,6 @@ import java.util.function.Consumer;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static java.lang.System.nanoTime;
-
 /**
  * @author Stephen Dunn
  * @since November 2, 2015
@@ -68,15 +66,15 @@ public class Solver implements Runnable, Serializable
   private final AtomicBoolean                 solving = new AtomicBoolean(false);
 
   // some stats tracking
-  private final AtomicReference<Timer> statsTimer  = new AtomicReference<>(); ///< periodic reporting on search
-  private final AtomicLong             generated   = new AtomicLong();
-  private final AtomicLong             regenerated = new AtomicLong();
-  private final AtomicLong             ignored     = new AtomicLong();
-  private final AtomicLong             expanded    = new AtomicLong();
-  private final AtomicLong             startTime   = new AtomicLong(); ///< nanoseconds
-  private final AtomicLong             endTime     = new AtomicLong(); ///< nanoseconds
-  private final AtomicLong             totalDepth  = new AtomicLong(); ///< nanoseconds
-  private final AtomicInteger          maxDepth    = new AtomicInteger(0);
+  private final AtomicReference<Timer> statsTimer    = new AtomicReference<>(); ///< periodic reporting on search
+  private final AtomicLong             generated     = new AtomicLong();
+  private final AtomicLong             regenerated   = new AtomicLong();
+  private final AtomicLong             ignored       = new AtomicLong();
+  private final AtomicLong             expanded      = new AtomicLong();
+  private final AtomicLong             totalDepth    = new AtomicLong(); ///< nanoseconds
+  private final AtomicInteger          maxDepthSoFar = new AtomicInteger(0);
+  private long startTime; ///< nanoseconds
+  private long endTime; ///< nanoseconds
 
   // search cache
   protected final BigInteger cacheSemiprime;
@@ -153,12 +151,11 @@ public class Solver implements Runnable, Serializable
       cachePrintAllNodes = printAllNodes();
 
       // cache selected heuristics for this run
-      cacheHeuristics = new Heuristic[ heuristics().size() ];
-      int i = -1;
-      for (Heuristic heuristic : heuristics())
+      cacheHeuristics = new Heuristic[ Solver.heuristics.size() ]; int i = -1;
+      for (final Heuristic heuristic : Solver.heuristics)
       {
-        if (i >= cacheHeuristics.length) throw new NullPointerException("heuristics changed during prep");
-        else cacheHeuristics[++i] = heuristic;
+        if (++i >= cacheHeuristics.length) throw new NullPointerException("heuristics changed during prep");
+        else cacheHeuristics[i] = heuristic;
       }
     }
     catch (Throwable t) { Log.e(t); throw new NullPointerException("cache preparation failure"); }
@@ -207,12 +204,12 @@ public class Solver implements Runnable, Serializable
 
   @Override public String toString()
   {
-    return "\n" +
+    return null != generated ? "\n" +
         "\nlength (base 10): " + cacheSemiprimeLen10 +
         "\ntarget (base 10): " + cacheSemiprimeString10 +
         "\n\nlength (base " + cacheInternalBase + "): " + cacheSemiprimeLenInternal +
         "\ntarget (base " + cacheInternalBase + "): " + cacheSemiprimeStringInternal +
-        "\n\nheuristics: " + (cacheHeuristics.length > 0 ? Stream.of(cacheHeuristics).skip(1).map(Object::toString).reduce(cacheHeuristics[0].toString(), (h1, h2) -> h1 + ", " + h2) : "(none)") +
+        "\n\nheuristics: " + (null != cacheHeuristics && cacheHeuristics.length > 0 ? Stream.of(cacheHeuristics).skip(1).map(Object::toString).reduce(cacheHeuristics[0].toString(), (h1, h2) -> h1 + ", " + h2) : "(none)") +
         "\np length (base " + cacheInternalBase + "): " + (0 != cachePLength ? cachePLength : "any") +
         "\nq length (base " + cacheInternalBase + "): " + (0 != cacheQLength ? cacheQLength : "any") +
         "\nbackground: " + background() +
@@ -220,11 +217,11 @@ public class Solver implements Runnable, Serializable
         "\nprocessorCap: " + processorCap() +
         "\nfavorPerformance: " + favorPerformance +
         "\ncompressMemory: " + compressMemory +
-        "\nmaxDepth: " + cacheMaxDepth +
+        "\nmaxDepthSoFar: " + cacheMaxDepth +
         "\nopen.size(): " + open.size() +
         "\nclosed.size(): " + closed.size() +
         "\nthreads.size(): " + threads.size() +
-        "\n";
+        "\n" : "";
   }
 
   @SuppressWarnings("StatementWithEmptyBody")
@@ -239,7 +236,7 @@ public class Solver implements Runnable, Serializable
       Log.o(toString() + "\n********** search starting **********\n");
 
       // record the start time
-      startTime.set( System.nanoTime() );
+      startTime =  System.nanoTime();
 
       // push a new root node if open list is empty
       if (open.isEmpty()) push(new Node());
@@ -249,8 +246,8 @@ public class Solver implements Runnable, Serializable
       {
         final Timer timer = new Timer();
         if (!statsTimer.compareAndSet(null, timer)) { Log.e("overlapping search request"); return; }
-        startTime.set(nanoTime());
-        timer.schedule(new TimerTask() { @Override public void run() { if (cachePaused) return; Log.o("progress:" + stats((nanoTime() - startTime.get()))); } }, statsPeriodMillis, statsPeriodMillis);
+        startTime = System.nanoTime();
+        timer.schedule(new TimerTask() { @Override public void run() { if (cachePaused) return; Log.o("progress:" + statsToString(cacheDetailedStats)); } }, statsPeriodMillis, statsPeriodMillis);
       }
 
       // launch all worker threads and wait for completion
@@ -262,13 +259,11 @@ public class Solver implements Runnable, Serializable
       if (cacheStats)
       {
         final Timer timer = statsTimer.getAndSet(null);
-        if (null != timer) { timer.cancel(); endTime.set(System.nanoTime()); }
+        if (null != timer) { timer.cancel(); endTime = System.nanoTime(); }
       }
 
       // print full final stats after all work is done
-      final boolean prevDetailedStats = cacheDetailedStats; cacheDetailedStats = true;
-      Log.o(stats( elapsed() ));
-      cacheDetailedStats = prevDetailedStats;
+      Log.o( statsToString(true) );
 
       // notify waiters that we've completed factoring
       cacheCallback.accept( goal() );
@@ -277,10 +272,10 @@ public class Solver implements Runnable, Serializable
     finally { Log.o("\n********** search finished **********\n"); solving.set(false); }
   }
 
-  public boolean start() { if (solving()) return false; try { cacheThread.start(); return true; } catch (Throwable t) { Log.e(t); return false; } }
-  public void interrupt() { final Thread thread = cacheThread; if (null != thread) thread.interrupt(); }
-  public void join() { try { final Thread thread = cacheThread; if (null != thread) thread.join(); } catch (Throwable ignored) {} }
-  public void interruptAndJoin() { interrupt(); join(); }
+  public Solver start() { try { if (!solving()) cacheThread.start(); } catch (Throwable t) { Log.e(t); } return this; }
+  public Solver interrupt() { final Thread thread = cacheThread; if (null != thread) thread.interrupt(); return this; }
+  public Solver join() { try { final Thread thread = cacheThread; if (null != thread) thread.join(); } catch (Throwable ignored) {} return this; }
+  public Solver interruptAndJoin() { return interrupt().join(); }
 
   /**
    * if this node is newly closed, ensure we update the counter in a start-safe manner
@@ -329,8 +324,7 @@ public class Solver implements Runnable, Serializable
     if (cachePrintAllNodes) Log.o("expanding: " + n);
     if (cacheStats)
     {
-      expanded.addAndGet(1);
-      maxDepth.set(Math.max(maxDepth.get(), n.depth));
+      maxDepthSoFar.set(Math.max(maxDepthSoFar.get(), n.depth));
       totalDepth.addAndGet(n.depth);
     }
 
@@ -378,27 +372,32 @@ public class Solver implements Runnable, Serializable
     Log.o("solver reset");
   }
 
+  public boolean solved() { return goal() != null; }
   public boolean solving() { return solving.get(); }
   public boolean paused() { return cachePaused; }
   public void pause() { Log.o("search paused"); cachePaused = true; }
   public void resume() { Log.o("search resumed"); cachePaused = false; }
 
-  private String stats(final long elapsedNanos)
+  public BigInteger semiprime() { return cacheSemiprime; }
+  public Heuristic[] heuristics() { return cacheHeuristics; }
+
+  private String statsToString(boolean detailed)
   {
+    final long elapsedNanos = System.nanoTime() - startTime;
     final long seconds = (elapsedNanos/1000000000L);
     return
         "<table border=\"1\">" +
         "<tr>" +
         "<th>generated</th>" + "<th>regenerated</th>" + "<th>ignored</th>" +
-        "<th>expanded</th>" + "<th>maxDepth</th>" + "<th>avgDepth</th>" +
+        "<th>expanded</th>" + "<th>maxDepthSoFar</th>" + "<th>avgDepth</th>" +
         "</tr>" +
         "<tr>" +
         "<td>" + generated + "</td>" + "<td>" + regenerated + "</td>" + "<td>" + ignored + "</td>" +
-        "<td>" + expanded + "</td>" + "<td>" + maxDepth + "</td>" + "<td>" + avgDepth() + "</td>" +
+        "<td>" + expanded + "</td>" + "<td>" + maxDepthSoFar + "</td>" + "<td>" + avgDepth() + "</td>" +
         "</tr>" +
         "</table>" +
-        (cacheDetailedStats ? "\topen.size():\t" + open.size() : "") +
-        (cacheDetailedStats ? "\tclosed.size():\t" + closed.size() : "") +
+        (detailed ? "\topen.size():\t" + open.size() : "") +
+        (detailed ? "\tclosed.size():\t" + closed.size() : "") +
         "elapsed:\t" + (seconds/60L) + " minutes, " + (seconds%60L) + " seconds";
   }
 
@@ -416,7 +415,7 @@ public class Solver implements Runnable, Serializable
   private long regenerated() { return regenerated.get(); }
   private long ignored() { return ignored.get(); }
   private long expanded() { return expanded.get(); }
-  private long maxDepth() { return maxDepth.get(); }
+  private long maxDepth() { return maxDepthSoFar.get(); }
   private long totalDepth() { return totalDepth.get(); }
   private long avgDepth()
   {
@@ -424,9 +423,9 @@ public class Solver implements Runnable, Serializable
     return 0 != expanded ? totalDepth() / expanded : 0;
   }
 
-  public long startTime() { return startTime.get(); }
-  public long endTime() { return endTime.get(); }
-  public long elapsed() { return endTime.get() - startTime.get(); }
+  public long startTime() { return startTime; }
+  public long endTime() { return endTime; }
+  public long elapsed() { return endTime - startTime; }
 
   public static boolean networkSearch() { return Solver.networkSearch.get(); }
   public static void networkSearch(boolean enabled) { Solver.networkSearch.set(enabled); }
@@ -487,20 +486,11 @@ public class Solver implements Runnable, Serializable
   public static void callback(Consumer<Node> callback) { Solver.callback.set(callback); }
   public static Consumer<Node> callback() { return callback.get(); }
 
-  public static List<Heuristic> heuristics() { return heuristics; }
   public static void heuristics(Heuristic... heuristics)
   {
+    Solver.heuristics.clear();
     if (null == heuristics || 0 == heuristics.length) return;
-    for (Heuristic in : heuristics)
-    {
-      boolean skip = false;
-      for (Heuristic existing : Solver.heuristics) if (existing.name().equals(in.name()))
-      {
-        skip = true;
-        break;
-      }
-      if (!skip) Solver.heuristics.add(in);
-    }
+    Solver.heuristics.addAll(Arrays.asList(heuristics));
   }
 
   /**
@@ -538,12 +528,15 @@ public class Solver implements Runnable, Serializable
       hashCode = hash;
     }
 
-    @Override public String toString() { return product + "<sub>10</sub>:" + product.toString(cacheInternalBase) + "<sub>" + cacheInternalBase + "</sub>:" + depth + ":depth:" + p + ":p:" + q + ":q:" + h  + ":h:" + hashCode + ":hash"; }
+    @Override public String toString() { return product + "<sub>10</sub>:" + product.toString(cacheInternalBase) + "<sub>" + cacheInternalBase + "</sub>:" + p + ":p:" + q + ":q:" + depth + ":depth:" + h  + ":h:" + hashCode + ":hash"; }
     @Override public boolean equals(Object o) { return o instanceof Node && ((Node) o).depth == depth && p.equals(((Node) o).p) && q.equals(((Node) o).q); }
     @Override public int compareTo(Object o) { return Double.compare(h(), ((Node) o).h()); }
 
     int hashcount=0;
     @Override public int hashCode() { if (++hashcount > 1) Log.o(hashcount + " : " + toString()); return hashCode; }
+
+    public String toCsv() { return generated + "," + ignored + "," + expanded + "," + open.size() + "," + closed.size() + "," + maxDepth() + "," + avgDepth() + "," + depth + "," + h + "," + hashCode + "," + product + "," + p + "," + q; }
+    public Solver solver() { return Solver.this; }
 
     boolean identicalFactors() { return identicalFactors; }
 
