@@ -11,52 +11,46 @@ import java.util.Random;
  */
 public class Experiments
 {
+  private final static int              seed   = 1;
+  private final static Random           random = new Random(seed);
+  private final static SimpleDateFormat format = new SimpleDateFormat("MM-dd-yyyy");
+  private final static String           prefix = "experiments." + format.format(new Date());
+  private final static String           log    = prefix + ".log";
+  private final static String           csv    = prefix + ".csv";
+
   public static void main(String[] args)
   {
-    final SimpleDateFormat format = new SimpleDateFormat("MM-dd-yyyy");
-    final String prefix = "experiments." + format.format( new Date() );
-
-    try (final PrintWriter out = new PrintWriter(prefix + ".csv");
-         final PrintWriter log = new PrintWriter(prefix + ".log"))
+    try (final PrintWriter log = new PrintWriter(Experiments.log);
+         final PrintWriter csv = new PrintWriter(Experiments.csv))
     {
-      final int seed = 1;
-      final Random random = new Random(seed);
+      // init
+      Log.init(log::write); Solver.init(csv); Solver.callback((n) -> {});
+      Log.o("log: " + Experiments.log + "\ncsv: " + Experiments.csv + "\nseed: " + seed);
 
-      Log.init(log::write);
-      Log.o("using seed: " + seed);
-
-      // write csv header
-      out.write("Heuristic(s),p*q,p,q,generated,ignored,expanded,open.size(),closed.size(),maxDepth,avgDepth,depth,h,hashCode,product,p,q\n");
-
-      // execute all tests
-      for (int i = 10; i < 30; ++i)
+      // run all experiments
+      for (int i = 10; i < 15; ++i)
       {
+        // prepare a new target
         final BigInteger p = BigInteger.probablePrime(i, random);
         final BigInteger q = BigInteger.probablePrime(i, random);
-        final BigInteger pq = p.multiply(q);
+        final BigInteger s = p.multiply(q);
+        Log.o(s + " = " + p + " * " + q);
 
+        // run all desired searches against target
         for (Heuristic heuristic : Heuristic.values())
         {
-          out.write(heuristic.toString() + "," + pq + "," + p + "," + q + ",");
-
-          // prepare the solver for a new search
-          Solver.reset();
-          Solver.callback((n) -> out.write((null != n ? n.toCsv() : "no goal found") + "\n"));
-          Solver.heuristics(heuristic);
-
-          // execute search
-          new Solver(pq).start().join();
-
-          out.flush();
+          Solver.heuristics(heuristic); // set search heuristics
+          new Solver(s).start().join(); // execute search
         }
       }
 
-      Log.o("all test completed, exiting");
+      // cleanup
+      Solver.shutdown(); Log.o("all test completed, exiting");
       System.exit(0);
     }
     catch (Throwable t)
     {
-      System.err.println(t.getMessage()); t.printStackTrace();
+      System.err.println( t.getMessage() ); t.printStackTrace();
       System.exit(1);
     }
   }

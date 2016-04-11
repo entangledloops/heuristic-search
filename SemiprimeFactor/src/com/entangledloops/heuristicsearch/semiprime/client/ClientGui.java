@@ -12,6 +12,7 @@ import javax.swing.text.html.HTMLDocument;
 import javax.swing.text.html.HTMLEditorKit;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.PrintWriter;
 import java.math.BigInteger;
 import java.net.URI;
 import java.text.DecimalFormat;
@@ -113,8 +114,8 @@ public class ClientGui extends JFrame implements DocumentListener
 
   private static final int DEFAULT_SEMIPRIME_BASE = 10;
   private static final int DEFAULT_INTERNAL_BASE  = Solver.internalBase();
-  private static final int DEFAULT_P1_LEN         = Solver.pLength();
-  private static final int DEFAULT_P2_LEN         = Solver.qLength();
+  private static final int DEFAULT_P1_LEN         = Solver.pLen2();
+  private static final int DEFAULT_P2_LEN         = Solver.qLen2();
   private static final int DEFAULT_PROCESSORS     = Solver.processors();
   private static final int DEFAULT_PROCESSOR_CAP  = Solver.processorCap();
   private static final int DEFAULT_MEMORY_CAP     = Solver.memoryCap();
@@ -132,7 +133,7 @@ public class ClientGui extends JFrame implements DocumentListener
   private static final boolean DEFAULT_RESTRICT_NETWORK  = Solver.restrictNetwork();
   private static final boolean DEFAULT_BACKGROUND        = Solver.background();
   private static final boolean DEFAULT_PRINT_ALL_NODES   = Solver.printAllNodes();
-  private static final boolean DEFAULT_WRITE_CSV         = Solver.writeCsv();
+  private static final boolean DEFAULT_WRITE_CSV         = null != Solver.csv();
 
   //////////////////////////////////////////////////////////////////////////////
   // gui
@@ -515,7 +516,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
     chkWriteCsv = getCheckBox(WRITE_CSV_NAME, DEFAULT_WRITE_CSV);
     chkWriteCsv.setToolTipText("<html>All nodes generated will be written to disk in CSV format in order of occurrence.<br>This may bring search speed to a halt and/or fill your disk!</html>");
-    chkWriteCsv.addActionListener((e) -> Solver.writeCsv(chkWriteCsv.isSelected()));
+    chkWriteCsv.addActionListener((e) -> { try { Solver.csv(chkWriteCsv.isSelected() ? new PrintWriter("search-results.csv") : null); } catch (Throwable t) { Log.e(t); } });
 
     chkBackground = getCheckBox("work in background", prefs.getBoolean(BACKGROUND_NAME, DEFAULT_BACKGROUND));
     chkBackground.setToolTipText("Only run when system is idle.");
@@ -629,8 +630,8 @@ public class ClientGui extends JFrame implements DocumentListener
           final int len1 = Integer.parseInt(txtP1Len.getText().trim());
           if (len1 >= 0)
           {
-            Solver.pLength(len1); Solver.qLength(0 != len1 ? getSemiprimeLen() - len1 : 0);
-            txtP2Len.setText(""+Solver.qLength());
+            Solver.pLength(len1); Solver.qLen2(0 != len1 ? getSemiprimeLen() - len1 : 0);
+            txtP2Len.setText(""+Solver.qLen2());
           }
         }
         catch (Throwable ignored) {}
@@ -639,7 +640,7 @@ public class ClientGui extends JFrame implements DocumentListener
 
     txtP2Len = getNumberTextField("0");
     txtP2Len.setToolTipText(primeLengthHelp);
-    txtP2Len.addActionListener((e) -> { try { Solver.qLength(Integer.parseInt(txtP2Len.getText().trim())); } catch (Throwable ignored) {} });
+    txtP2Len.addActionListener((e) -> { try { Solver.qLen2(Integer.parseInt(txtP2Len.getText().trim())); } catch (Throwable ignored) {} });
 
     final JButton btnReset = getButton("Reset to Defaults");
     btnReset.setToolTipText("This will reset the search settings to defaults (w/o clearing the current semiprime value).");
@@ -701,33 +702,37 @@ public class ClientGui extends JFrame implements DocumentListener
         btnSearch.setText("Preparing search...");
 
         // set the solver according to user prefs
-        Solver.heuristics(Stream.of(chkHeuristics).filter(JCheckBox::isSelected).map(c -> Heuristic.fromFormattedName(c.getText())).toArray(Heuristic[]::new));
-        Solver.stats(chkPeriodicStats.isSelected());
-        Solver.detailedStats(chkDetailedStats.isSelected());
-        Solver.favorPerformance(chkFavorPerformance.isSelected());
-        Solver.compressMemory(chkCompressMemory.isSelected());
-        Solver.restrictDisk(chkRestrictDisk.isSelected());
-        Solver.restrictNetwork(chkRestrictNetwork.isSelected());
-        Solver.background(chkBackground.isSelected());
-        Solver.printAllNodes(chkPrintAllNodes.isSelected());
-        Solver.writeCsv(chkWriteCsv.isSelected());
-        Solver.processors(sldProcessors.getValue());
-        Solver.processorCap(sldProcessorCap.getValue());
-        Solver.memoryCap(sldMemoryCap.getValue());
-        Solver.networkHost(false);
-        Solver.networkSearch(false);
+        try
+        {
+          Solver.heuristics(Stream.of(chkHeuristics).filter(JCheckBox::isSelected).map(c -> Heuristic.fromFormattedName(c.getText())).toArray(Heuristic[]::new));
+          Solver.stats(chkPeriodicStats.isSelected());
+          Solver.detailedStats(chkDetailedStats.isSelected());
+          Solver.favorPerformance(chkFavorPerformance.isSelected());
+          Solver.compressMemory(chkCompressMemory.isSelected());
+          Solver.restrictDisk(chkRestrictDisk.isSelected());
+          Solver.restrictNetwork(chkRestrictNetwork.isSelected());
+          Solver.background(chkBackground.isSelected());
+          Solver.printAllNodes(chkPrintAllNodes.isSelected());
+          Solver.processors(sldProcessors.getValue());
+          Solver.processorCap(sldProcessorCap.getValue());
+          Solver.memoryCap(sldMemoryCap.getValue());
+          Solver.networkHost(false);
+          Solver.networkSearch(false);
+          Solver.csv(chkWriteCsv.isSelected() ? new PrintWriter("search-results.csv") : null);
+        }
+        catch (Throwable t) { Log.e(t); throw new NullPointerException(); }
 
         // set the default callback for search completion (null = solver() -> search was cancelled before completion)
         Solver.callback(n ->
         {
-          if (null != n) { pneMain.setSelectedIndex(TAB_CONNECT); Log.o("\n********** results **********\n\n\ts:\t" + n.product + "\n\tp:\t" + n.p + "\n\tq:\t" + n.q); }
+          if (null != n) { pneMain.setSelectedIndex(TAB_CONNECT); Log.o("\n********** results **********\n\n\ts:\t" + n.s + "\n\tp:\t" + n.p + "\n\tq:\t" + n.q); }
           else if (null != solver()) { pneMain.setSelectedIndex(TAB_CONNECT); Log.e("\n********** results **********\n\n\tno factors could be found, are you sure the input is semiprime" + (Solver.primeLengthsFixed() ? " and the factors are the specified lengths?" : "?")); }
           isSearching.set(false); btnSearch.setText("Start Local Search");
         });
 
         // try to parse any fixed prime lengths
         try { Solver.pLength(Integer.parseInt(clean(txtP1Len.getText()))); } catch (Throwable t) { throw new NullPointerException("prime 1 len invalid"); }
-        try { Solver.qLength(Integer.parseInt(clean(txtP2Len.getText()))); } catch (Throwable t) { throw new NullPointerException("prime 2 len invalid"); }
+        try { Solver.qLen2(Integer.parseInt(clean(txtP2Len.getText()))); } catch (Throwable t) { throw new NullPointerException("prime 2 len invalid"); }
 
         // grab the semiprime options
         int spBase = DEFAULT_SEMIPRIME_BASE;
@@ -1423,11 +1428,11 @@ public class ClientGui extends JFrame implements DocumentListener
     chkCompressMemory.setSelected(Solver.compressMemory());
     chkRestrictDisk.setSelected(Solver.restrictDisk());
     chkPrintAllNodes.setSelected(Solver.printAllNodes());
-    chkWriteCsv.setSelected(Solver.writeCsv());
+    chkWriteCsv.setSelected(null != Solver.csv());
 
     txtInternalBase.setText(""+Solver.internalBase());
-    txtP1Len.setText(""+Solver.pLength());
-    txtP2Len.setText(""+Solver.qLength());
+    txtP1Len.setText(""+Solver.pLen2());
+    txtP2Len.setText(""+Solver.qLen2());
   }
 
   private void updateSettings()

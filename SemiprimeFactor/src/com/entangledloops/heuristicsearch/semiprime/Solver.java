@@ -2,6 +2,7 @@ package com.entangledloops.heuristicsearch.semiprime;
 
 import com.entangledloops.heuristicsearch.semiprime.client.Client;
 
+import java.io.PrintWriter;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.*;
@@ -22,91 +23,115 @@ public class Solver implements Runnable, Serializable
 {
   public static final String VERSION = "0.4.6a";
 
-  /// list containing all instantiated solvers
-  private static final ConcurrentLinkedQueue solvers = new ConcurrentLinkedQueue();
+  /// queue of all instantiated solvers
+  private static final ConcurrentLinkedQueue<Solver> solvers = new ConcurrentLinkedQueue<>();
 
   // state vars
-  private static final AtomicBoolean           networkSearch    = new AtomicBoolean(false); ///< true if and only if this search is hosted remotely
-  private static final AtomicBoolean           networkHost      = new AtomicBoolean(false); ///< true if and only if this is the search host
-  private static final AtomicBoolean           stats            = new AtomicBoolean(true); ///< timer prints stats according to user preferences
-  private static final AtomicBoolean           detailedStats    = new AtomicBoolean(false); ///< if true---and at great expense---detailed stats will be recorded during search (debug)
-  private static final AtomicBoolean           favorPerformance = new AtomicBoolean(true); ///< if true, will take additional steps to trade memory for more CPU;
-  private static final AtomicBoolean           compressMemory   = new AtomicBoolean(false); ///< if true, will take additional steps to trade CPU for more memory
-  private static final AtomicBoolean           restrictDisk     = new AtomicBoolean(true); ///< should we allow disk i/o during search to cache nodes?
-  private static final AtomicBoolean           restrictNetwork  = new AtomicBoolean(false); ///< allow frequent network comm. during search?
-  private static final AtomicBoolean           background       = new AtomicBoolean(false); ///< must wait until machine is idle before working
-  private static final AtomicBoolean           printAllNodes    = new AtomicBoolean(false); ///< if false, fewer sanity checks are performed on values
-  private static final AtomicBoolean           writeCsv         = new AtomicBoolean(false); ///< controls outputting csv-formatted node info during search
-  private static final AtomicInteger           processors       = new AtomicInteger(1); ///< num cores allowed
-  private static final AtomicInteger           processorCap     = new AtomicInteger(100); ///< percentage use allowed
-  private static final AtomicInteger           memoryCap        = new AtomicInteger(100); ///< percentage use allowed
-  private static final AtomicReference<String> csvPath          = new AtomicReference<>(null); ///< path to csv file that will be written if writeCsv is set
+  private static final AtomicBoolean networkSearch    = new AtomicBoolean(false); ///< true if and only if this search is hosted remotely
+  private static final AtomicBoolean networkHost      = new AtomicBoolean(false); ///< true if and only if this is the search host
+  private static final AtomicBoolean detailedStats    = new AtomicBoolean(false); ///< if true---and at great expense---detailed stats will be recorded during search (debug)
+  private static final AtomicBoolean compressMemory   = new AtomicBoolean(false); ///< if true, will take additional steps to trade CPU for more memory
+  private static final AtomicBoolean background       = new AtomicBoolean(false); ///< must wait until machine is idle before working
+  private static final AtomicBoolean printAllNodes    = new AtomicBoolean(false); ///< if false, fewer sanity checks are performed on values
+  private static final AtomicBoolean restrictNetwork  = new AtomicBoolean(false); ///< allow frequent network comm. during search?
+  private static final AtomicBoolean restrictDisk     = new AtomicBoolean(true); ///< should we allow disk i/o during search to cache nodes?
+  private static final AtomicBoolean favorPerformance = new AtomicBoolean(true); ///< if true, will take additional steps to trade memory for more CPU;
+  private static final AtomicBoolean stats            = new AtomicBoolean(true); ///< timer prints stats according to user preferences
+  private static final AtomicInteger processors       = new AtomicInteger(1); ///< num cores allowed
+  private static final AtomicInteger processorCap     = new AtomicInteger(100); ///< percentage use allowed
+  private static final AtomicInteger memoryCap        = new AtomicInteger(100); ///< percentage use allowed
 
   // target info
-  private static final AtomicInteger                   pLength      = new AtomicInteger(0); ///< optional: if set, only primes w/this len will be searched for
-  private static final AtomicInteger                   qLength      = new AtomicInteger(0); ///< using 0 searches for all length possibilities
-  private static final AtomicInteger                   internalBase = new AtomicInteger(2); ///< the base that will be used internally for the search representation
-  private static final AtomicReference<Consumer<Node>> callback     = new AtomicReference<>(); ///< a function to receive the goal node (or null) upon completion
-  private static final List<Heuristic>                 heuristics   = new CopyOnWriteArrayList<>(); ///< the list of heuristics to use for this search
-  // wait-for-work timeout
+  private static final AtomicInteger pLen         = new AtomicInteger(0); ///< optional: if set, only primes w/this len will be searched for
+  private static final AtomicInteger qLen         = new AtomicInteger(0); ///< using 0 searches for all length possibilities
+  private static final AtomicInteger internalBase = new AtomicInteger(2); ///< the base that will be used internally for the search representation
+
+  // optional singleton values
+  private static final AtomicReference<Consumer<Node>> callback   = new AtomicReference<>(null); ///< a function to receive the goal node (or null) upon completion
+  private static final List<Heuristic>                 heuristics = new CopyOnWriteArrayList<>(); ///< the list of heuristics to use for this search
+  private static final AtomicReference<PrintWriter>    csv        = new AtomicReference<>(null); ///< path to csv file that will be written if set
+
+  // global stats
+  private static final AtomicLong lifetimeGenerated   = new AtomicLong(0);
+  private static final AtomicLong lifetimeRegenerated = new AtomicLong(0);
+  private static final AtomicLong lifetimeIgnored     = new AtomicLong(0);
+  private static final AtomicLong lifetimeExpanded    = new AtomicLong(0);
+  private static final AtomicLong lifetimeTotalDepth  = new AtomicLong(0); ///< nanoseconds
+  private static final AtomicLong lifetimeMaxDepth    = new AtomicLong(0);
+
+  // wait-for-work timeouts
   private static final long     statsPeriodMillis    = 10000L;
-  private static final long     checkForWorkTimeout  = 10000L;
+  private static final long     checkForWorkMaxFails = 60L;
+  private static final long     checkForWorkTimeout  = 1000L;
   private static final TimeUnit checkForWorkTimeUnit = TimeUnit.NANOSECONDS;
 
   // networking
-  private static final AtomicReference<Client> client = new AtomicReference<>(); ///< worker threads
+  private static final AtomicReference<Client> client = new AtomicReference<>(null); ///< worker threads
 
-  // vars cached for performance
+  //////////////////////////////////////////////////////////////////////////////
+  // instance vars
 
   // this instance's search state
   private final List<Thread>                  threads = Collections.synchronizedList(new ArrayList<>()); ///< worker threads
   private final PriorityBlockingQueue<Node>   open    = new PriorityBlockingQueue<>(); ///< unbounded queue backed by heap for fast pop() behavior w/o sorting
   private final ConcurrentHashMap<Node, Node> closed  = new ConcurrentHashMap<>(); ///< closed hash table
-  private final AtomicReference<Node>         goal    = new AtomicReference<>(); ///< set if/when goal is found; if set, search will end
+  private final AtomicReference<Node>         goal    = new AtomicReference<>(null); ///< set if/when goal is found; if set, search will end
   private final AtomicBoolean                 solving = new AtomicBoolean(false);
 
   // some stats tracking
-  private final AtomicReference<Timer> statsTimer    = new AtomicReference<>(); ///< periodic reporting on search
-  private final AtomicLong             generated     = new AtomicLong();
-  private final AtomicLong             regenerated   = new AtomicLong();
-  private final AtomicLong             ignored       = new AtomicLong();
-  private final AtomicLong             expanded      = new AtomicLong();
-  private final AtomicLong             totalDepth    = new AtomicLong(); ///< nanoseconds
+  private final AtomicReference<Timer> statsTimer    = new AtomicReference<>(null); ///< periodic reporting on search
+  private final AtomicLong             generated     = new AtomicLong(0);
+  private final AtomicLong             regenerated   = new AtomicLong(0);
+  private final AtomicLong             ignored       = new AtomicLong(0);
+  private final AtomicLong             expanded      = new AtomicLong(0);
+  private final AtomicLong             totalDepth    = new AtomicLong(0); ///< nanoseconds
   private final AtomicInteger          maxDepthSoFar = new AtomicInteger(0);
-  private long startTime; ///< nanoseconds
-  private long endTime; ///< nanoseconds
 
-  // search cache
-  protected final BigInteger cacheSemiprime;
-  protected final String     cacheSemiprimeString10; ///< cached base 10
-  protected final String     cacheSemiprimeString2; ///< cached base 2
-  protected final String     cacheSemiprimeStringInternal; ///< cached internal base
-  protected final int        cacheSemiprimeLen10; ///< cached base 10
-  protected final int        cacheSemiprimeLen2; ///< cached bit len
-  protected final int        cacheSemiprimeLenInternal; ///< cached internal len
-  protected final int        cacheInternalBase;
-  protected final int        cacheSemiprimeBitLen; ///< cached internal len
-  protected final int        cacheSemiprimeBitCount; ///< cached internal len
-  protected final double         cacheSemiprimeBitCountOverBitLen; ///< cached internal len
+  private long startTime = 0; ///< nanoseconds
+  private long endTime = 0; ///< nanoseconds
 
-  private final long           cacheStatsPeriodMillis;
-  private final long           cacheCheckForWorkTimeout;
-  private final TimeUnit       cacheCheckForWorkTimeUnit;
+  //////////////////////////////////////////////////////////////////////////////
+  // per-search cache
+
+  // shared cache vars
+  final BigInteger cacheS;
+  final double     cacheSSetBitsOverLen2; ///< cached internal len
+
+  // mutable state cache
+  private Client  cacheClient        = null;
+  private boolean cachePaused        = false;
+  private boolean cachePrintAllNodes = false;
+  private boolean cacheDetailedStats = false;
+
+  // initial state cache
   private final Thread         cacheThread;
   private final Consumer<Node> cacheCallback;
   private final Heuristic[]    cacheHeuristics;
-  private final int            cachePLength;
-  private final int            cacheQLength;
-  private final int            cacheMaxDepth; ///< max(pLength, qLength)
-  private final int            cacheProcessors;
-  private final boolean        cacheNetworkSearch;
-  private final boolean        cacheNetworkHost;
-  private final boolean        cacheStats;
+  private final PrintWriter    cacheCsv;
 
-  private boolean cachePrintAllNodes;
-  private boolean cacheDetailedStats;
-  private boolean cachePaused;
-  private Client  cacheClient;
+  // target info cache
+  private final String cacheSStringInternal; ///< cached internal base
+  private final String cacheSString2; ///< cached base 2
+  private final String cacheSString10; ///< cached base 10
+  private final int    cacheInternalBase;
+  private final int    cacheSLenInternal; ///< cached internal len
+  private final int    cacheSLen2; ///< cached bit len
+  private final int    cacheSLen10; ///< cached base 10
+  private final int    cachePLen2;
+  private final int    cacheQLen2;
+  private final int    cacheSSetBits; ///< cached internal len
+
+  // state cache
+  private final int     cacheMaxDepth; ///< max(pLen, qLen)
+  private final int     cacheProcessors;
+  private final boolean cacheNetworkSearch;
+  private final boolean cacheNetworkHost;
+  private final boolean cacheStats;
+
+  // timeout cache
+  private final long     cacheStatsPeriodMillis;
+  private final long     cacheCheckForWorkTimeout;
+  private final TimeUnit cacheCheckForWorkTimeUnit;
 
   public Solver(final BigInteger semiprime)
   {
@@ -117,42 +142,40 @@ public class Solver implements Runnable, Serializable
     if (!semiprime.testBit(0)) throw new NullPointerException("input is even");
     if (semiprime.compareTo(BigInteger.valueOf(9)) < 0) throw new NullPointerException("input is not a semiprime number");
 
-    cacheThread = new Thread(this);
-
     // cache search settings for consistency and speed
-    Log.o("\n********** building search cache **********");
+    Log.o("\n********** preparing search cache **********");
     try
     {
-      // cache all variables
-      cacheStatsPeriodMillis = statsPeriodMillis;
-      cacheCheckForWorkTimeout = checkForWorkTimeout;
-      cacheCheckForWorkTimeUnit = checkForWorkTimeUnit;
-      cacheCallback = callback(); if (null == cacheCallback) throw new NullPointerException("no callback provided for search completion");
+      cacheS = semiprime;
+      cacheThread = new Thread(this);
       cacheInternalBase = internalBase();
-      cacheSemiprime = BigInteger.ZERO.add(semiprime);
-      cacheSemiprimeString10 = cacheSemiprime.toString(10);
-      cacheSemiprimeString2 = cacheSemiprime.toString(2);
-      cacheSemiprimeStringInternal = cacheSemiprime.toString(cacheInternalBase);
-      cacheSemiprimeLen10 = cacheSemiprimeString10.length();
-      cacheSemiprimeLen2 = cacheSemiprimeString2.length();
-      cacheSemiprimeLenInternal = cacheSemiprimeStringInternal.length();
-      cacheSemiprimeBitLen = cacheSemiprime.bitLength();
-      cacheSemiprimeBitCount = cacheSemiprime.bitCount();
-      cachePLength = pLength();
-      cacheQLength = qLength();
+      cacheSStringInternal = cacheS.toString(cacheInternalBase);
+      cacheSString2 = cacheS.toString(2);
+      cacheSString10 = cacheS.toString(10);
+      cacheSLenInternal = cacheSStringInternal.length();
+      cacheSLen2 = cacheS.bitLength();
+      cacheSLen10 = cacheSString10.length();
+      cacheSSetBits = cacheS.bitCount();
+      cachePLen2 = pLen2();
+      cacheQLen2 = qLen2();
       cacheProcessors = Math.max(0, Math.min(Runtime.getRuntime().availableProcessors(), processors()));
-      cacheSemiprimeBitCountOverBitLen = (double) cacheSemiprimeBitCount / (double) cacheSemiprimeBitLen;
-      cacheMaxDepth = (0 < cachePLength || 0 < cacheQLength ? Math.max(cachePLength, cacheQLength) : (cacheSemiprimeBitLen-1)) - 1;  // -1 converts len -> depth, second -1 on spLen is multiplication logic
+      cacheSSetBitsOverLen2 = (double) cacheSSetBits / (double) cacheSLen2;
+      cacheMaxDepth = (0 < cachePLen2 || 0 < cacheQLen2 ? Math.max(cachePLen2, cacheQLen2) : (cacheSLen2 -1)) - 1;  // -1 converts len -> depth, second -1 on spLen is multiplication logic
       cachePaused = paused();
       cacheNetworkSearch = networkSearch();
       cacheNetworkHost = networkHost();
       cacheStats = stats();
       cacheDetailedStats = detailedStats();
       cachePrintAllNodes = printAllNodes();
+      cacheCsv = csv();
+      cacheStatsPeriodMillis = statsPeriodMillis;
+      cacheCheckForWorkTimeout = checkForWorkTimeout;
+      cacheCheckForWorkTimeUnit = checkForWorkTimeUnit;
+      cacheCallback = callback(); if (null == cacheCallback) throw new NullPointerException("no callback provided for search completion");
 
       // cache selected heuristics for this run
       cacheHeuristics = new Heuristic[ Solver.heuristics.size() ]; int i = -1;
-      for (final Heuristic heuristic : Solver.heuristics)
+      for (Heuristic heuristic : Solver.heuristics)
       {
         if (++i >= cacheHeuristics.length) throw new NullPointerException("heuristics changed during prep");
         else cacheHeuristics[i] = heuristic;
@@ -172,7 +195,7 @@ public class Solver implements Runnable, Serializable
         try
         {
           Log.o("thread " + i + ": started");
-          while (expand( pop() )) { while (cachePaused) Thread.sleep(1); }
+          while (expand( pop() )) { while (cachePaused) Thread.sleep(100); }
           Log.o("thread " + i + ": finished");
         }
         catch (Throwable ignored) {}
@@ -200,24 +223,27 @@ public class Solver implements Runnable, Serializable
        }));
       }
     }
+
+    if (!solvers.offer(this)) throw new NullPointerException("failed to queue new solver");
   }
 
   @Override public String toString()
   {
     return null != generated ? "\n" +
-        "\nlength (base 10): " + cacheSemiprimeLen10 +
-        "\ntarget (base 10): " + cacheSemiprimeString10 +
-        "\n\nlength (base " + cacheInternalBase + "): " + cacheSemiprimeLenInternal +
-        "\ntarget (base " + cacheInternalBase + "): " + cacheSemiprimeStringInternal +
+        "\nlength (base 10): " + cacheSLen10 +
+        "\ntarget (base 10): " + cacheSString10 +
+        "\n\nlength (base " + cacheInternalBase + "): " + cacheSLenInternal +
+        "\ntarget (base " + cacheInternalBase + "): " + cacheSStringInternal +
         "\n\nheuristics: " + (null != cacheHeuristics && cacheHeuristics.length > 0 ? Stream.of(cacheHeuristics).skip(1).map(Object::toString).reduce(cacheHeuristics[0].toString(), (h1, h2) -> h1 + ", " + h2) : "(none)") +
-        "\np length (base " + cacheInternalBase + "): " + (0 != cachePLength ? cachePLength : "any") +
-        "\nq length (base " + cacheInternalBase + "): " + (0 != cacheQLength ? cacheQLength : "any") +
-        "\nbackground: " + background() +
+        "\np length (base " + cacheInternalBase + "): " + (0 != cachePLen2 ? cachePLen2 : "any") +
+        "\nq length (base " + cacheInternalBase + "): " + (0 != cacheQLen2 ? cacheQLen2 : "any") +
         "\nprocessors: " + cacheProcessors +
-        "\nprocessorCap: " + processorCap() +
         "\nfavorPerformance: " + favorPerformance +
         "\ncompressMemory: " + compressMemory +
         "\nmaxDepthSoFar: " + cacheMaxDepth +
+        "\nbackground: " + background() +
+        "\nprocessorCap: " + processorCap() +
+        "\npaused: " + paused() +
         "\nopen.size(): " + open.size() +
         "\nclosed.size(): " + closed.size() +
         "\nthreads.size(): " + threads.size() +
@@ -239,7 +265,7 @@ public class Solver implements Runnable, Serializable
       startTime =  System.nanoTime();
 
       // push a new root node if open list is empty
-      if (open.isEmpty()) push(new Node());
+      if (open.isEmpty()) push( new Node() );
 
       // properly schedule a new timer if stats were requested
       if (cacheStats)
@@ -267,11 +293,31 @@ public class Solver implements Runnable, Serializable
 
       // notify waiters that we've completed factoring
       cacheCallback.accept( goal() );
+
+      // write out results to CSV
+      if (null != cacheCsv)
+      {
+        cacheCsv.write((null != goal() ? (heuristics.toString().replace("[","").replace("]","") + "," + goal().s + "," + goal().p + "," + goal().q + "," + goal().toCsv()) : "no goal found") + "\n");
+        cacheCsv.flush();
+      }
     }
     catch (Throwable t) { Log.e("an error occurred during search", t); }
-    finally { Log.o("\n********** search finished **********\n"); solving.set(false); }
+    finally
+    {
+      Log.o("\n********** search finished **********\n");
+
+      lifetimeGenerated.addAndGet( generated() );
+      lifetimeRegenerated.addAndGet( regenerated() );
+      lifetimeIgnored.addAndGet( ignored() );
+      lifetimeExpanded.addAndGet( expanded() );
+      lifetimeTotalDepth.addAndGet( totalDepth() );
+      lifetimeMaxDepth.updateAndGet(l -> l + maxDepth());
+
+      solving.set(false);
+    }
   }
 
+  public Solver cleanup() { try { if (null != cacheCsv) cacheCsv.close(); } catch (Throwable t) { Log.e(t); } return this; }
   public Solver start() { try { if (!solving()) cacheThread.start(); } catch (Throwable t) { Log.e(t); } return this; }
   public Solver interrupt() { final Thread thread = cacheThread; if (null != thread) thread.interrupt(); return this; }
   public Solver join() { try { final Thread thread = cacheThread; if (null != thread) thread.join(); } catch (Throwable ignored) {} return this; }
@@ -308,9 +354,16 @@ public class Solver implements Runnable, Serializable
   @SuppressWarnings("StatementWithEmptyBody")
   private Node pop()
   {
-    Node node;
-    try { while (null == (node = open.poll(cacheCheckForWorkTimeout, cacheCheckForWorkTimeUnit))) if (null != goal()) return null; } catch (Throwable t) { return null; }
-    return node;
+    try
+    {
+      long fails = 0; Node node;
+      while (null == (node = open.poll(cacheCheckForWorkTimeout, cacheCheckForWorkTimeUnit)))
+      {
+        if (++fails > checkForWorkMaxFails) break;
+      }
+      return null != goal() ? null : node;
+    }
+    catch (Throwable t) { return null; }
   }
 
   /**
@@ -324,6 +377,7 @@ public class Solver implements Runnable, Serializable
     if (cachePrintAllNodes) Log.o("expanding: " + n);
     if (cacheStats)
     {
+      expanded.incrementAndGet();
       maxDepthSoFar.set(Math.max(maxDepthSoFar.get(), n.depth));
       totalDepth.addAndGet(n.depth);
     }
@@ -341,13 +395,14 @@ public class Solver implements Runnable, Serializable
         final Node node = close(new Node(n, i, j));
         if (null != node && node.validFactors())
         {
-          generated.addAndGet(1);
+          generated.incrementAndGet();
+          node.h = node.h(); // defer h() calc until necessary
           if (cachePrintAllNodes) Log.o("generated: " + node);
           if (!push(node)) return false;
         }
         else
         {
-          ignored.addAndGet(1);
+          ignored.incrementAndGet();
           if (cachePrintAllNodes) Log.o("ignored: " + node);
         }
       }
@@ -356,30 +411,13 @@ public class Solver implements Runnable, Serializable
     return true;
   }
 
-  // resets the search
-  public static void reset()
-  {
-    Log.o("resetting solver...");
-
-    internalBase(2);
-    pLength(0);
-    qLength(0);
-
-    client(null);
-    callback(null);
-    heuristics.clear();
-
-    Log.o("solver reset");
-  }
-
-  public boolean solved() { return goal() != null; }
+  public boolean solved() { return null != goal(); }
   public boolean solving() { return solving.get(); }
   public boolean paused() { return cachePaused; }
   public void pause() { Log.o("search paused"); cachePaused = true; }
   public void resume() { Log.o("search resumed"); cachePaused = false; }
 
-  public BigInteger semiprime() { return cacheSemiprime; }
-  public Heuristic[] heuristics() { return cacheHeuristics; }
+  public BigInteger semiprime() { return cacheS; }
 
   private String statsToString(boolean detailed)
   {
@@ -457,8 +495,8 @@ public class Solver implements Runnable, Serializable
   public static boolean printAllNodes() { return Solver.printAllNodes.get(); }
   public static void printAllNodes(boolean enabled) { Solver.printAllNodes.set(enabled); }
 
-  public static boolean writeCsv() { return Solver.writeCsv.get(); }
-  public static void writeCsv(boolean enabled) { Solver.writeCsv.set(enabled); }
+  public static PrintWriter csv() { return Solver.csv.get(); }
+  public static void csv(PrintWriter csv) { Solver.csv.set(csv); }
 
   public static void processors(int processors) { Solver.processors.set(processors); }
   public static int processors() { return processors.get(); }
@@ -472,13 +510,13 @@ public class Solver implements Runnable, Serializable
   public static int internalBase() { return internalBase.get(); }
   public static void internalBase(int base) { internalBase.set(base); }
 
-  public static int pLength() { return pLength.get(); }
-  public static void pLength(int len) { if (len < 0) Log.e("invalid len: " + len); else pLength.set(len); }
+  public static int pLen2() { return pLen.get(); }
+  public static void pLength(int len) { if (len < 0) Log.e("invalid len: " + len); else pLen.set(len); }
 
-  public static int qLength() { return qLength.get(); }
-  public static void qLength(int len) { if (len < 0) Log.e("invalid len: " + len); else qLength.set(len); }
+  public static int qLen2() { return qLen.get(); }
+  public static void qLen2(int len) { if (len < 0) Log.e("invalid len: " + len); else qLen.set(len); }
 
-  public static boolean primeLengthsFixed() { return 0 != pLength() && 0 != qLength(); }
+  public static boolean primeLengthsFixed() { return 0 != pLen2() && 0 != qLen2(); }
 
   public static boolean stats() { return Solver.stats.get(); }
   public static void stats(boolean enabled) { Solver.stats.set(enabled); }
@@ -490,8 +528,32 @@ public class Solver implements Runnable, Serializable
   {
     Solver.heuristics.clear();
     if (null == heuristics || 0 == heuristics.length) return;
-    //for (Heuristic heuristic : heuristics) Solver.heuristics.add(heuristic);
-    Solver.heuristics.addAll(Arrays.asList(heuristics));
+    Collections.addAll(Solver.heuristics, heuristics);
+  }
+
+  public static void init() { init(null); }
+  public static void init(PrintWriter csv)
+  {
+    csv(csv);
+    if (null != csv) csv.write("Heuristic(s),p*q,p,q,generated,ignored,expanded,open.size(),closed.size(),maxDepth,avgDepth,depth,h,hashCode,s,p,q\n");
+  }
+
+  public static void shutdown()
+  {
+    while (null != solvers.peek())
+    {
+      final Solver s = solvers.poll();
+      if (s.solving()) s.interrupt().join();
+      s.cleanup();
+    }
+
+    Log.o("\nLifetime stats:" +
+        "\n\tgenerated: " + lifetimeGenerated.get() +
+        "\n\tregenerated: " + lifetimeRegenerated.get() +
+        "\n\tignored: " + lifetimeIgnored.get() +
+        "\n\texpanded: " + lifetimeExpanded.get() +
+        "\n\ttotalDepth: " + lifetimeTotalDepth.get() +
+        "\n\tmaxDepth: " + lifetimeMaxDepth.get());
   }
 
   /**
@@ -500,12 +562,13 @@ public class Solver implements Runnable, Serializable
    */
   public class Node implements Serializable, Comparable
   {
-    private final boolean   identicalFactors;
-    private final int       hashCode;
-    final        int        depth;
+    private final boolean identicalFactors;
+    private final int     hashCode;
+    private final int     depth;
+    private double h = Double.POSITIVE_INFINITY; ///< the heuristic search factors for this node
+
     public final BigInteger p, q; ///< the candidate factors
-    public final BigInteger product; ///< the partial factors for this node
-    private      double     h; ///< the heuristic search factors for this node
+    public final BigInteger s; ///< the partial factors for this node
 
     Node() { this(null, 1, 1); }
     Node(final Node parent, int pBit, int qBit)
@@ -520,37 +583,36 @@ public class Solver implements Runnable, Serializable
       this.p = compare < 0 ? f1 : f2;
       this.q = compare < 0 ? f2 : f1;
 
-      this.product = p.multiply(q);
+      this.s = p.multiply(q);
 
       // cache the hash for performance during table lookups
-      int hash = 37 * depth + product.hashCode();
+      int hash = 37 * depth + s.hashCode();
       hash = 37 * hash + p.hashCode();
       hash = 37 * hash + q.hashCode();
-      hashCode = hash;
+      this.hashCode = hash;
     }
 
-    @Override public String toString() { return product + "<sub>10</sub>:" + product.toString(cacheInternalBase) + "<sub>" + cacheInternalBase + "</sub>:" + p + ":p:" + q + ":q:" + depth + ":depth:" + h  + ":h:" + hashCode + ":hash"; }
+    @Override public String toString() { return s + "<sub>10</sub>:" + s.toString(cacheInternalBase) + "<sub>" + cacheInternalBase + "</sub>:" + p + ":p:" + q + ":q:" + depth + ":depth:" + h  + ":h:" + hashCode + ":hash"; }
     @Override public boolean equals(Object o) { return o instanceof Node && ((Node) o).depth == depth && p.equals(((Node) o).p) && q.equals(((Node) o).q); }
     @Override public int compareTo(Object o) { return Double.compare(h(), ((Node) o).h()); }
+    @Override public int hashCode() { return hashCode; }
 
-    int hashcount=0;
-    @Override public int hashCode() { if (++hashcount > 1) Log.o(hashcount + " : " + toString()); return hashCode; }
+    Solver solver() { return Solver.this; }
+    String toCsv() { return generated + "," + ignored + "," + expanded + "," + open.size() + "," + closed.size() + "," + maxDepth() + "," + avgDepth() + "," + depth + "," + h + "," + hashCode + "," + s + "," + p + "," + q; }
 
-    public String toCsv() { return generated + "," + ignored + "," + expanded + "," + open.size() + "," + closed.size() + "," + maxDepth() + "," + avgDepth() + "," + depth + "," + h + "," + hashCode + "," + product + "," + p + "," + q; }
-    public Solver solver() { return Solver.this; }
-
+    int depth() { return this.depth; }
     boolean identicalFactors() { return identicalFactors; }
 
     /**
-     * This function ensures that the current partial product resembles the target semiprime
+     * This function ensures that the current partial s resembles the target semiprime
      * in the currently fixed digit positions.
      * @return true if everything looks okay
      */
     boolean validFactors()
     {
       return
-          product.testBit(depth) == cacheSemiprime.testBit(depth) &&
-          product.bitLength() <= cacheSemiprimeBitLen;
+          s.testBit(depth) == cacheS.testBit(depth) &&
+          s.bitLength() <= cacheSLen2;
     }
 
     /**
@@ -560,9 +622,9 @@ public class Solver implements Runnable, Serializable
     boolean goal()
     {
       return
-          (0 == cachePLength || (1+depth) == cachePLength) &&
-          (0 == cacheQLength || (1+depth) == cacheQLength) &&
-          cacheSemiprime.equals(product) &&
+          (0 == cachePLen2 || (1+depth) == cachePLen2) &&
+          (0 == cacheQLen2 || (1+depth) == cacheQLen2) &&
+          cacheS.equals(s) &&
           !BigInteger.ONE.equals(p) &&
           !BigInteger.ONE.equals(q);
     }
@@ -574,8 +636,8 @@ public class Solver implements Runnable, Serializable
      */
     private double h()
     {
-      if (h >= 0) return h;
-      for (Heuristic heuristic : cacheHeuristics) h += heuristic.apply(Solver.this, this);
+      if (h != Double.POSITIVE_INFINITY) return h; h = 0;
+      for (Heuristic heuristic : cacheHeuristics) h += heuristic.apply(solver(), this);
       return h;
     }
 
