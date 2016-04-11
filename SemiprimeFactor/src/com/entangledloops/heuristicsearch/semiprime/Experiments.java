@@ -24,11 +24,12 @@ public class Experiments
          final PrintWriter csv = new PrintWriter(Experiments.csv))
     {
       // init
-      Log.init(log::write); Solver.init(csv); Solver.callback((n) -> {});
+      Log.init(s -> { log.write(s); log.flush(); });
+      Solver.init(csv); Solver.callback((n) -> {});
       Log.o("log: " + Experiments.log + "\ncsv: " + Experiments.csv + "\nseed: " + seed);
 
       // run all experiments
-      for (int i = 10; i < 15; ++i)
+      for (int i = 10; i < 25; ++i)
       {
         // prepare a new target
         final BigInteger p = BigInteger.probablePrime(i, random);
@@ -42,10 +43,13 @@ public class Experiments
           Solver.heuristics(heuristic); // set search heuristics
           new Solver(s).start().join(); // execute search
         }
+
+        Solver.release(); // release search memory, don't care about history
       }
 
       // cleanup
-      Solver.shutdown(); Log.o("all test completed, exiting");
+      Log.o("all test completed, exiting");
+      Solver.shutdown();
       System.exit(0);
     }
     catch (Throwable t)

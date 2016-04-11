@@ -538,6 +538,8 @@ public class Solver implements Runnable, Serializable
     if (null != csv) csv.write("Heuristic(s),p*q,p,q,generated,ignored,expanded,open.size(),closed.size(),maxDepth,avgDepth,depth,h,hashCode,s,p,q\n");
   }
 
+  public static void release() { solvers.clear(); }
+
   public static void shutdown()
   {
     while (null != solvers.peek())
