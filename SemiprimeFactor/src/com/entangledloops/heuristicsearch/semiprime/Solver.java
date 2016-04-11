@@ -376,7 +376,7 @@ public class Solver implements Runnable, Serializable
 
   /**
    * expands the current node, pushing any generated children
-   * @param n
+   * @param n a node to expand
    * @return true continues the search, false indicates completion
    */
   private boolean expand(final Node n)
