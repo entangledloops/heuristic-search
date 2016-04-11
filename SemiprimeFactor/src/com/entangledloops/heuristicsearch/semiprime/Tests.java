@@ -87,7 +87,7 @@ public class Tests
         final double curSet = s.bitCount();
 
         bits += curBits; setBits += curSet;
-        Log.o(curSet + ", " + (setBits/bits));
+        dist.write(curSet + ", " + (setBits/bits)); dist.flush();
       }
 
       Log.o("final avg: " + (setBits / bits));
