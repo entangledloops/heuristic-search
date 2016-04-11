@@ -21,10 +21,16 @@ import java.util.stream.Stream;
  */
 public class Solver implements Runnable, Serializable
 {
-  public static final String VERSION = "0.4.6a";
+  public static final String VERSION = "0.4.7a";
+
+  /// default handler for thread exceptions
+  private static final Thread.UncaughtExceptionHandler handler = (thread,t) -> Log.e(t);
 
   /// queue of all instantiated solvers
   private static final ConcurrentLinkedQueue<Solver> solvers = new ConcurrentLinkedQueue<>();
+
+  // networking
+  private static final AtomicReference<Client> client = new AtomicReference<>(null); ///< worker threads
 
   // state vars
   private static final AtomicBoolean networkSearch    = new AtomicBoolean(false); ///< true if and only if this search is hosted remotely
@@ -46,12 +52,8 @@ public class Solver implements Runnable, Serializable
   private static final AtomicInteger qLen         = new AtomicInteger(0); ///< using 0 searches for all length possibilities
   private static final AtomicInteger internalBase = new AtomicInteger(2); ///< the base that will be used internally for the search representation
 
-  // optional singleton values
-  private static final AtomicReference<Consumer<Node>> callback   = new AtomicReference<>(null); ///< a function to receive the goal node (or null) upon completion
-  private static final List<Heuristic>                 heuristics = new CopyOnWriteArrayList<>(); ///< the list of heuristics to use for this search
-  private static final AtomicReference<PrintWriter>    csv        = new AtomicReference<>(null); ///< path to csv file that will be written if set
-
   // global stats
+  private static final AtomicLong lifetimeSolvers     = new AtomicLong(0);
   private static final AtomicLong lifetimeGenerated   = new AtomicLong(0);
   private static final AtomicLong lifetimeRegenerated = new AtomicLong(0);
   private static final AtomicLong lifetimeIgnored     = new AtomicLong(0);
@@ -65,8 +67,10 @@ public class Solver implements Runnable, Serializable
   private static final long     checkForWorkTimeout  = 1000L;
   private static final TimeUnit checkForWorkTimeUnit = TimeUnit.NANOSECONDS;
 
-  // networking
-  private static final AtomicReference<Client> client = new AtomicReference<>(null); ///< worker threads
+  // optional
+  private static final List<Heuristic>                 heuristics = new CopyOnWriteArrayList<>(); ///< the list of heuristics to use for this search
+  private static final AtomicReference<Consumer<Node>> callback   = new AtomicReference<>(null); ///< a function to receive the goal node (or null) upon completion
+  private static final AtomicReference<PrintWriter>    csv        = new AtomicReference<>(null); ///< path to csv file that will be written if set
 
   //////////////////////////////////////////////////////////////////////////////
   // instance vars
@@ -96,6 +100,7 @@ public class Solver implements Runnable, Serializable
   // shared cache vars
   final BigInteger cacheS;
   final double     cacheSSetBitsOverLen2; ///< cached internal len
+  final int        cacheSLen2; ///< cached bit len
 
   // mutable state cache
   private Client  cacheClient        = null;
@@ -115,7 +120,6 @@ public class Solver implements Runnable, Serializable
   private final String cacheSString10; ///< cached base 10
   private final int    cacheInternalBase;
   private final int    cacheSLenInternal; ///< cached internal len
-  private final int    cacheSLen2; ///< cached bit len
   private final int    cacheSLen10; ///< cached base 10
   private final int    cachePLen2;
   private final int    cacheQLen2;
@@ -143,7 +147,7 @@ public class Solver implements Runnable, Serializable
     if (semiprime.compareTo(BigInteger.valueOf(9)) < 0) throw new NullPointerException("input is not a semiprime number");
 
     // cache search settings for consistency and speed
-    Log.o("\n********** preparing search cache **********");
+    Log.o("\n********** preparing cache **********\n");
     try
     {
       cacheS = semiprime;
@@ -225,19 +229,20 @@ public class Solver implements Runnable, Serializable
     }
 
     if (!solvers.offer(this)) throw new NullPointerException("failed to queue new solver");
+    lifetimeSolvers.incrementAndGet();
   }
 
   @Override public String toString()
   {
-    return null != generated ? "\n" +
-        "\nlength (base 10): " + cacheSLen10 +
+    return null != generated ? "solver: " + solvers() +
+        "\nheuristics: " + (null != cacheHeuristics && cacheHeuristics.length > 0 ? Stream.of(cacheHeuristics).skip(1).map(Enum::name).reduce(cacheHeuristics[0].name(), (h1, h2) -> h1 + ", " + h2) : "NONE") +
+        "\n\nlength (base 10): " + cacheSLen10 +
         "\ntarget (base 10): " + cacheSString10 +
         "\n\nlength (base " + cacheInternalBase + "): " + cacheSLenInternal +
         "\ntarget (base " + cacheInternalBase + "): " + cacheSStringInternal +
-        "\n\nheuristics: " + (null != cacheHeuristics && cacheHeuristics.length > 0 ? Stream.of(cacheHeuristics).skip(1).map(Object::toString).reduce(cacheHeuristics[0].toString(), (h1, h2) -> h1 + ", " + h2) : "(none)") +
-        "\np length (base " + cacheInternalBase + "): " + (0 != cachePLen2 ? cachePLen2 : "any") +
+        "\n\np length (base " + cacheInternalBase + "): " + (0 != cachePLen2 ? cachePLen2 : "any") +
         "\nq length (base " + cacheInternalBase + "): " + (0 != cacheQLen2 ? cacheQLen2 : "any") +
-        "\nprocessors: " + cacheProcessors +
+        "\n\nprocessors: " + cacheProcessors +
         "\nfavorPerformance: " + favorPerformance +
         "\ncompressMemory: " + compressMemory +
         "\nmaxDepthSoFar: " + cacheMaxDepth +
@@ -250,7 +255,6 @@ public class Solver implements Runnable, Serializable
         "\n" : "";
   }
 
-  @SuppressWarnings("StatementWithEmptyBody")
   @Override public void run()
   {
     try
@@ -277,9 +281,10 @@ public class Solver implements Runnable, Serializable
       }
 
       // launch all worker threads and wait for completion
+
+      threads.stream().forEach(thread -> thread.setUncaughtExceptionHandler(handler));
       try { threads.stream().forEach(Thread::start); try { threads.stream().forEach((thread) -> { try { thread.join(); } catch (Throwable t) { Log.e("solving start interrupted", t); } }); } catch (Throwable ignored) {} } catch (Throwable t) { Log.e(t); }
       try { threads.stream().forEach((thread) -> { try { thread.interrupt(); } catch (Throwable ignored) {} }); } catch (Throwable ignored) {}
-      threads.clear();
 
       // cancel the stats timer and record end time
       if (cacheStats)
@@ -287,6 +292,9 @@ public class Solver implements Runnable, Serializable
         final Timer timer = statsTimer.getAndSet(null);
         if (null != timer) { timer.cancel(); endTime = System.nanoTime(); }
       }
+
+      // clear used thread memory
+      threads.clear();
 
       // print full final stats after all work is done
       Log.o( statsToString(true) );
@@ -535,8 +543,15 @@ public class Solver implements Runnable, Serializable
   public static void init(PrintWriter csv)
   {
     csv(csv);
-    if (null != csv) csv.write("Heuristic(s),p*q,p,q,generated,ignored,expanded,open.size(),closed.size(),maxDepth,avgDepth,depth,h,hashCode,s,p,q\n");
+    if (null != csv) csv.write( csvHeader() );
   }
+
+  public static String csvHeader()
+  {
+    return "heuristic(s),s,p,q,generated,ignored,expanded,open.size,closed.size,maxDepth,avgDepth,depth,h,hashCode,goal.s,goal.p,goal.q\n";
+  }
+
+  public static long solvers() { return lifetimeSolvers.get(); }
 
   public static void release() { solvers.clear(); }
 
@@ -549,13 +564,14 @@ public class Solver implements Runnable, Serializable
       s.cleanup();
     }
 
-    Log.o("\nLifetime stats:" +
+    Log.o("\nlifetime stats:" +
         "\n\tgenerated: " + lifetimeGenerated.get() +
         "\n\tregenerated: " + lifetimeRegenerated.get() +
         "\n\tignored: " + lifetimeIgnored.get() +
         "\n\texpanded: " + lifetimeExpanded.get() +
         "\n\ttotalDepth: " + lifetimeTotalDepth.get() +
-        "\n\tmaxDepth: " + lifetimeMaxDepth.get());
+        "\n\tmaxDepth: " + lifetimeMaxDepth.get() +
+        "\n\tsolvers: " + lifetimeSolvers.get());
   }
 
   /**
@@ -639,8 +655,9 @@ public class Solver implements Runnable, Serializable
     private double h()
     {
       if (h != Double.POSITIVE_INFINITY) return h; h = 0;
+      final double numHeuristics = (double) cacheHeuristics.length;
       for (Heuristic heuristic : cacheHeuristics) h += heuristic.apply(solver(), this);
-      return h;
+      return numHeuristics > 0 ? h / numHeuristics : h;
     }
 
   }

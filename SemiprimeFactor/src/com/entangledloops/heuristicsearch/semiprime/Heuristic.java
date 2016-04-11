@@ -28,11 +28,11 @@ public enum Heuristic
 
   DIST_EXPECTED_GAUSSIAN("Expected Distribution 50% (separate)",
       "Calculate h based upon the likelihood that the current factor bit distribution reflects\nexpectations based upon a standard Gaussian distribution.",
-      (s,n) -> Math.abs(0.5 - (((double) n.p.bitCount()/(double) n.p.bitLength()) + (double) n.q.bitCount()/(double) n.q.bitLength()))),
+      (s,n) -> Math.abs((((double) n.p.bitCount()/(double) n.p.bitLength()) + (double) n.q.bitCount()/(double) n.q.bitLength()) - 0.5)),
 
   HAMMING("Hamming Distance",
       "<a href=\"https://en.wikipedia.org/wiki/Hamming_distance\">Hamming distance</a> to goal.\nfor each bit i in target:\n\tsum( n.s[i] != target[i] )",
-      (s,n) -> (double) s.cacheS.xor(n.s).bitCount()),
+      (s,n) -> (double) s.cacheS.xor(n.s).bitCount() / (double) s.cacheSLen2),
   ;
 
   private final String name, desc;
