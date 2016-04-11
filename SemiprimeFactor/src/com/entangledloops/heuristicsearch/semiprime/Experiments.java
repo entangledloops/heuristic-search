@@ -13,20 +13,23 @@ public class Experiments
 {
   public static void main(String[] args)
   {
-    Log.disable();
+    final SimpleDateFormat format = new SimpleDateFormat("MM-dd-yyyy");
+    final String prefix = "experiments." + format.format( new Date() );
 
-    final int seed = 1;
-    final String csv = "experiments." + (new SimpleDateFormat("MM-dd-yyyy").format(new Date())) + ".csv";
-
-    System.out.println("using seed: " + seed + "\nwriting csv: " + csv);
-
-    try (PrintWriter out = new PrintWriter(csv))
+    try (final PrintWriter out = new PrintWriter(prefix + ".csv");
+         final PrintWriter log = new PrintWriter(prefix + ".log"))
     {
+      final int seed = 1;
       final Random random = new Random(seed);
-      Solver.callback((n) -> out.write((null != n ? n.toCsv() : "no goal found") + "\n"));
+
+      Log.init(log::write);
+      Log.o("using seed: " + seed);
+
+      // write csv header
       out.write("Heuristic(s),p*q,p,q,generated,ignored,expanded,open.size(),closed.size(),maxDepth,avgDepth,depth,h,hashCode,product,p,q\n");
 
-      for (int i = 10; i < 20; ++i)
+      // execute all tests
+      for (int i = 10; i < 30; ++i)
       {
         final BigInteger p = BigInteger.probablePrime(i, random);
         final BigInteger q = BigInteger.probablePrime(i, random);
@@ -34,12 +37,27 @@ public class Experiments
 
         for (Heuristic heuristic : Heuristic.values())
         {
-          Solver.heuristics(heuristic);
           out.write(heuristic.toString() + "," + pq + "," + p + "," + q + ",");
+
+          // prepare the solver for a new search
+          Solver.reset();
+          Solver.callback((n) -> out.write((null != n ? n.toCsv() : "no goal found") + "\n"));
+          Solver.heuristics(heuristic);
+
+          // execute search
           new Solver(pq).start().join();
+
+          out.flush();
         }
       }
+
+      Log.o("all test completed, exiting");
+      System.exit(0);
     }
-    catch (Throwable t) { Log.e(t); System.exit(-1); }
+    catch (Throwable t)
+    {
+      System.err.println(t.getMessage()); t.printStackTrace();
+      System.exit(1);
+    }
   }
 }

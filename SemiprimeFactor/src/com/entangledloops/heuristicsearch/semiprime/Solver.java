@@ -490,6 +490,7 @@ public class Solver implements Runnable, Serializable
   {
     Solver.heuristics.clear();
     if (null == heuristics || 0 == heuristics.length) return;
+    //for (Heuristic heuristic : heuristics) Solver.heuristics.add(heuristic);
     Solver.heuristics.addAll(Arrays.asList(heuristics));
   }
 

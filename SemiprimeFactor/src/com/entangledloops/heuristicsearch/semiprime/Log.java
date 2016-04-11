@@ -28,6 +28,7 @@ public class Log
   public static void o(final String s)
   {
     if (disabled()) return;
+
     if (null != s) System.out.println(s); else e(null, null);
     if (null != outputCallback) Utils.lockAndRun(outputLock, () -> outputCallback.accept(s));
   }
@@ -37,9 +38,11 @@ public class Log
   public static void e(final String s, final Throwable t)
   {
     if (disabled()) return;
+
     final String msg = (null != s && s.trim().length() > 0 ? s.trim() : "") + (null != t ? t.getMessage() : "");
     System.err.println(!"".equals(msg) ? msg : "empty error reported");
+
     if (null != t) t.printStackTrace();
-    Utils.lockAndRun(outputLock, () -> outputCallback.accept(msg));
+    if (null != outputCallback) Utils.lockAndRun(outputLock, () -> outputCallback.accept(msg));
   }
 }
