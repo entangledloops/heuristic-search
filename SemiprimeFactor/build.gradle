@@ -6,12 +6,33 @@ targetCompatibility = JavaVersion.VERSION_1_8
 sourceSets.main.java.srcDirs = [ 'src' ]
 sourceSets.main.resources.srcDirs = [ 'res' ]
 
+sourceSets.test.java.srcDirs = [ 'src' ]
+sourceSets.test.resources.srcDirs = [ 'res' ]
+
 project.ext.clientClass = 'com.entangledloops.heuristicsearch.semiprime.client.Client'
 project.ext.serverClass = 'com.entangledloops.heuristicsearch.semiprime.server.Server'
-project.ext.experimentsClass = 'com.entangledloops.heuristicsearch.semiprime.Experiments'
+project.ext.testsClass = 'com.entangledloops.heuristicsearch.semiprime.Tests'
 
 task createWrapper(type: Wrapper) {
     gradleVersion = "2.11"
+}
+
+test {
+    testLogging {
+        showStandardStreams = true
+    }
+}
+
+task tests(dependsOn:classes, type:JavaExec) {
+    compileJava {
+        options.encoding = 'UTF-8'
+        options.fork (memoryMaximumSize: ''+Runtime.getRuntime().maxMemory())
+    }
+    main = project.testsClass
+    classpath = sourceSets.test.runtimeClasspath
+    standardInput = System.in
+    workingDir = sourceSets.test.output.resourcesDir
+    ignoreExitValue = false
 }
 
 task run(dependsOn:classes, type:JavaExec) {
@@ -64,15 +85,4 @@ task distServer(dependsOn:classes, type:Jar) {
     archiveName 'SemiprimeServer.jar'
 }
 
-task experiments(dependsOn:classes, type:JavaExec) {
-    compileJava {
-        options.encoding = 'UTF-8'
-        options.fork (memoryMaximumSize: ''+Runtime.getRuntime().maxMemory())
-    }
-    main = project.experimentsClass
-    classpath = sourceSets.main.runtimeClasspath
-    standardInput = System.in
-    workingDir = sourceSets.main.output.resourcesDir
-    ignoreExitValue = false
-}
 
