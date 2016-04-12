@@ -17,7 +17,6 @@ public class Tests
   private final static String           prefix = "tests/" + format.format(new Date()) + ".seed-" + seed;
   private final static String           log    = prefix + ".log";
   private final static String           csv    = prefix + ".csv";
-  private final static String           dist   = prefix + ".dist"; ///< semiprime distribution test
 
   public static BigInteger semiprime(int len)
   {
@@ -75,9 +74,10 @@ public class Tests
 
   public static boolean semiprimes(int len, int repeat)
   {
-    try (final PrintWriter dist = new PrintWriter(Tests.dist))
+    try (final PrintWriter log = new PrintWriter(Tests.prefix + ".sp.log");
+         final PrintWriter stats = new PrintWriter(Tests.prefix + ".sp.stats"))
     {
-      Log.init(null);
+      Log.init(s -> { log.write(s); log.flush(); });
       double bits = 0, setBits = 0;
 
       for (int i = 0; i < repeat; ++i)
@@ -87,10 +87,9 @@ public class Tests
         final double curSet = s.bitCount();
 
         bits += curBits; setBits += curSet;
-        dist.write(curSet + ", " + (setBits/bits)); dist.flush();
+        stats.write(curSet + ", " + (setBits/bits)); stats.flush();
       }
 
-      Log.o("final avg: " + (setBits / bits));
       return true;
     }
     catch (Throwable t)
