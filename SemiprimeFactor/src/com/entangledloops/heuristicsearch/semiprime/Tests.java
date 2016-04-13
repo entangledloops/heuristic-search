@@ -91,10 +91,36 @@ public class Tests
 
       csv.write("p count,p len,p count/len,q count,q len,q count/len,s count,s len, s count/len\n");
 
+      final long pRuns[] = new long[len/2]; for (int i = 0; i < pRuns.length; ++i) pRuns[i] = 0;
+      final long qRuns[] = new long[len/2]; for (int i = 0; i < qRuns.length; ++i) qRuns[i] = 0;
+      final long sRuns[] = new long[len]; for (int i = 0; i < sRuns.length; ++i) sRuns[i] = 0;
+
       for (int i = 0; i < repeat; ++i)
       {
         final Key key = key(len);
 
+        // track number of identical consecutive values in primes and their product
+        int cur = 0;
+        for (int j = 0; j < key.p.bitLength(); ++j)
+        {
+          if (key.p.testBit(j)) ++cur;
+          else if (cur > 0) { ++pRuns[cur-1]; cur = 0; }
+        }
+        if (cur != 0) ++pRuns[cur-1]; cur = 0;
+        for (int j = 0; j < key.q.bitLength(); ++j)
+        {
+          if (key.q.testBit(j)) ++cur;
+          else if (cur > 0) { ++qRuns[cur-1]; cur = 0; }
+        }
+        if (cur != 0) ++qRuns[cur-1]; cur = 0;
+        for (int j = 0; j < key.s.bitLength(); ++j)
+        {
+          if (key.s.testBit(j)) ++cur;
+          else if (cur > 0) { ++sRuns[cur-1]; cur = 0; }
+        }
+        if (cur != 0) ++sRuns[cur-1]; cur = 0;
+
+        // calculate some stats
         final double curPLen = key.p.bitLength(); pLen += curPLen;
         final double curPCount = key.p.bitCount(); pCount += curPCount;
         final double curQLen = key.q.bitLength(); qLen += curQLen;
@@ -110,6 +136,9 @@ public class Tests
       }
 
       csv.write("\navgs\n\np,q,s\n" + pCount/pLen + "," + qCount/qLen + "," + sCount/sLen + "\n");
+      csv.write("\np runs\n"); for (int i = 0; i < pRuns.length; ++i) csv.write(1+i + "," + pRuns[i] + "\n");
+      csv.write("\nq runs\n"); for (int i = 0; i < qRuns.length; ++i) csv.write(1+i + "," + qRuns[i] + "\n");
+      csv.write("\ns runs\n"); for (int i = 0; i < sRuns.length; ++i) csv.write(1+i + "," + sRuns[i] + "\n");
       csv.flush();
 
       return true;
@@ -123,7 +152,7 @@ public class Tests
 
   public static void main(String[] args)
   {
-    if (!semiprimes(2048, 500)) System.exit(1);
+    if (!semiprimes(2048, 100)) System.exit(1);
     //if (!heuristics(30, 40, 10, Heuristic.values())) System.exit(2);
   }
 }
