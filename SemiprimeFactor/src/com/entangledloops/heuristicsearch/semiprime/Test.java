@@ -82,6 +82,14 @@ public class Test
       }
   }
 
+  /**
+   * Records each run of set bits (i.e. n bits in a row) and returns
+   * the count of each occurrence. Position 0 in the array should be
+   * the sum of all set bits == bitCount().
+   *
+   * @param i a BigInteger to count the runs in
+   * @return the computed counts of runs
+   */
   private static int[] runs(BigInteger i)
   {
     final int runs[] = new int[ i.bitLength() ];
@@ -98,6 +106,16 @@ public class Test
     return runs;
   }
 
+  /**
+   * Calculates statistics on generated semiprimes and writes out a csv file with
+   * the results, as well as a log file with the corresponding source values for
+   * verification. Can't guarantee generated semiprimes will be exactly == len,
+   * but most will be and the highest error rate should +/- 1.
+   *
+   * @param len Target semiprime len to generate.
+   * @param repeat Number of semiprimes to generate.
+   * @return
+   */
   public static boolean semiprimes(int len, int repeat)
   {
     try (final PrintWriter log = new PrintWriter(Test.prefix + ".sp.log");
@@ -106,9 +124,13 @@ public class Test
       Log.init(log::write);
       double pLen = 0, pCount = 0, qLen = 0, qCount = 0, sLen = 0, sCount = 0;
 
-      for (int i = 0; i < 5; ++i) csv.write("run,p,q,s,");
-      csv.write("\n");
+      // table header in 2 rows:
 
+      // 1) 3 header columns / value
+      for (int i = 0; i < 5; ++i) csv.write(",p,q,s"); csv.write("\n");
+
+      // 2) 3 statistic columns / value
+      csv.write("run,");
       for (int i = 0; i < 3; ++i) csv.write("count,");
       for (int i = 0; i < 3; ++i) csv.write("len,");
       for (int i = 0; i < 3; ++i) csv.write("count/len,");
