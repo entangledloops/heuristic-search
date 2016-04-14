@@ -11,7 +11,7 @@ sourceSets.test.resources.srcDirs = [ 'res' ]
 
 project.ext.clientClass = 'com.entangledloops.heuristicsearch.semiprime.client.Client'
 project.ext.serverClass = 'com.entangledloops.heuristicsearch.semiprime.server.Server'
-project.ext.testsClass = 'com.entangledloops.heuristicsearch.semiprime.Tests'
+project.ext.testsClass = 'com.entangledloops.heuristicsearch.semiprime.Test'
 
 task createWrapper(type: Wrapper) {
     gradleVersion = "2.11"
@@ -31,7 +31,6 @@ task tests(dependsOn:classes, type:JavaExec) {
     main = project.testsClass
     classpath = sourceSets.test.runtimeClasspath
     standardInput = System.in
-    workingDir = sourceSets.test.output.resourcesDir
     ignoreExitValue = false
 }
 
