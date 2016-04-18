@@ -211,6 +211,6 @@ public class Test
   {
     try { new File("test").mkdir(); } catch (Throwable ignored) {}
     if (!semiprimes(4096, 100)) System.exit(1);
-    //if (!heuristics(30, 40, 10, Heuristic.values())) System.exit(2);
+    if (!heuristics(30, 40, 10, Heuristic.values())) System.exit(2);
   }
 }
