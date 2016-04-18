@@ -147,7 +147,7 @@ public class Test
       for (int i = 0; i < 5; ++i) csv.write(",p,q,s"); csv.write("\n");
 
       // 2) 3 statistic columns / value
-      csv.write("run,");
+      csv.write(",");
       for (int i = 0; i < 3; ++i) csv.write("count,");
       for (int i = 0; i < 3; ++i) csv.write("len,");
       for (int i = 0; i < 3; ++i) csv.write("count/len,");
@@ -210,7 +210,7 @@ public class Test
   public static void main(String[] args)
   {
     try { new File("test").mkdir(); } catch (Throwable ignored) {}
-    if (!semiprimes(2048, 1000)) System.exit(1);
-    if (!heuristics(30, 40, 10, Heuristic.values())) System.exit(2);
+    if (!semiprimes(4096, 100)) System.exit(1);
+    //if (!heuristics(30, 40, 10, Heuristic.values())) System.exit(2);
   }
 }
