@@ -16,7 +16,8 @@ public class Test
   private final static int              seed   = 1;
   private final static Random           random = new Random(seed);
   private final static SimpleDateFormat format = new SimpleDateFormat("MM-dd-yyyy");
-  private final static String           prefix = "test/" + format.format(new Date()) + ".seed-" + seed + ".";
+  private final static String           testDir = "test";
+  private final static String           prefix = testDir + "/" + format.format(new Date()) + ".seed-" + seed + ".";
 
   private static class Key
   {
@@ -139,12 +140,19 @@ public class Test
          final PrintWriter csv = new PrintWriter(Test.prefix + "semiprimes.len-" + len + ".repeat-" + repeat + ".csv"))
     {
       Log.init(log::write);
-      double pLen = 0, pCount = 0, qLen = 0, qCount = 0, sLen = 0, sCount = 0;
+      double pLenSum = 0, pCountSum = 0, qLenSum = 0, qCountSum = 0, sLenSum = 0, sCountSum = 0;
 
       // table header in 2 rows:
 
       // 1) 3 header columns / value
-      for (int i = 0; i < 5; ++i) csv.write(",p,q,s"); csv.write("\n");
+      for (int i = 0; i < 4; ++i) csv.write(",p,q,s,");
+      csv.write("p runs,");
+      for (int i = 0; i < (len/2)-1; ++i) csv.write(",");
+      csv.write("q runs,");
+      for (int i = 0; i < (len/2)-1; ++i) csv.write(",");
+      csv.write("s runs");
+      for (int i = 0; i < len-1; ++i) csv.write(","); // may be useful if we wish to add/change header later
+      csv.write("\n");
 
       // 2) 3 statistic columns / value
       csv.write(",");
@@ -153,15 +161,19 @@ public class Test
       for (int i = 0; i < 3; ++i) csv.write("count/len,");
       for (int i = 0; i < 3; ++i) csv.write("max run,");
       for (int i = 0; i < 3; ++i) csv.write("max run count,");
+      for (int i = 1; i < (len/2)+1; ++i) csv.write("p " + i + ",");
+      for (int i = 1; i < (len/2)+1; ++i) csv.write("q " + i +",");
+      for (int i = 1; i < len+1; ++i) csv.write("s " + i + ",");
       csv.write("\n");
 
       final long pRuns[] = new long[len/2]; for (int i = 0; i < pRuns.length; ++i) pRuns[i] = 0;
       final long qRuns[] = new long[len/2]; for (int i = 0; i < qRuns.length; ++i) qRuns[i] = 0;
       final long sRuns[] = new long[len]; for (int i = 0; i < sRuns.length; ++i) sRuns[i] = 0;
 
+      // 3) write run stats
       for (int i = 0; i < repeat; ++i)
       {
-        Log.o(i + ":\n");
+        Log.o((1+i) + ":\n");
         final Key key = key(len);
 
         // track number of identical consecutive set bits of each possible length in primes and their product
@@ -170,12 +182,12 @@ public class Test
         final int[] curSRuns = runs(key.s); int maxSRunIndex = curSRuns.length-1; for (int j = 1; j < curSRuns.length; ++j) { sRuns[j] += curSRuns[j]; if (curSRuns[j] > curSRuns[maxSRunIndex]) maxSRunIndex = j; }
 
         // calculate some stats
-        final double curPLen = key.p.bitLength(); pLen += curPLen;
-        final double curPCount = key.p.bitCount(); pCount += curPCount;
-        final double curQLen = key.q.bitLength(); qLen += curQLen;
-        final double curQCount = key.q.bitCount(); qCount += curQCount;
-        final double curSLen = key.s.bitLength(); sLen += curSLen;
-        final double curSCount = key.s.bitCount(); sCount += curSCount;
+        final double curPLen = key.p.bitLength(); pLenSum += curPLen;
+        final double curPCount = key.p.bitCount(); pCountSum += curPCount;
+        final double curQLen = key.q.bitLength(); qLenSum += curQLen;
+        final double curQCount = key.q.bitCount(); qCountSum += curQCount;
+        final double curSLen = key.s.bitLength(); sLenSum += curSLen;
+        final double curSCount = key.s.bitCount(); sCountSum += curSCount;
 
         csv.write(
             (1+i) + "," +
@@ -183,11 +195,17 @@ public class Test
             curPLen + "," + curQLen + "," + curSLen + "," +
             (curPCount/curPLen) + "," + (curQCount/curQLen) + "," + (curSCount/curSLen) + "," +
             (1+maxPRunIndex) + "," + (1+maxQRunIndex) + "," + (1+maxSRunIndex) + "," +
-            curPRuns[maxPRunIndex] + "," + curQRuns[maxQRunIndex] + "," + curSRuns[maxSRunIndex] + "\n"
+            curPRuns[maxPRunIndex] + "," + curQRuns[maxQRunIndex] + "," + curSRuns[maxSRunIndex] + ","
         );
+
+        for (int j = 0; j < curPRuns.length; ++j) csv.write(curPRuns[j] + ",");
+        for (int j = 0; j < curQRuns.length; ++j) csv.write(curQRuns[j] + ",");
+        for (int j = 0; j < curSRuns.length; ++j) csv.write(curSRuns[j] + ",");
+
+        csv.write("\n");
       }
 
-      csv.write("\n,avg\np,q,s\n" + (pCount/pLen) + "," + (qCount/qLen) + "," + (sCount/sLen) + "\n");
+      csv.write("\n,avg\np,q,s\n" + (pCountSum/pLenSum) + "," + (qCountSum/qLenSum) + "," + (sCountSum/sLenSum) + "\n");
       csv.write("\n\n,sum / run,,,total bits\nrun,p,q,s,p,q,s\n");
       for (int i = 1; i < pRuns.length; ++i)
       {
@@ -209,8 +227,8 @@ public class Test
 
   public static void main(String[] args)
   {
-    try { new File("test").mkdir(); } catch (Throwable ignored) {}
+    try { new File(testDir).mkdir(); } catch (Throwable ignored) {}
     if (!semiprimes(4096, 100)) System.exit(1);
-    if (!heuristics(30, 40, 10, Heuristic.values())) System.exit(2);
+    //if (!heuristics(20, 30, 10, Heuristic.values())) System.exit(2);
   }
 }

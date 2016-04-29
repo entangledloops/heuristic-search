@@ -531,6 +531,8 @@ public class ClientGui extends JFrame implements DocumentListener
       chkHeuristics[i].setToolTipText(Heuristic.values()[i].description());
     }
     chkHeuristics[0].setSelected(true);
+    chkHeuristics[0].addActionListener((e) -> { if (!chkHeuristics[0].isSelected()) Stream.of(chkHeuristics).skip(1).forEach(chk -> chk.setSelected(false));});
+    chkHeuristics[chkHeuristics.length-1].addActionListener((e) -> { if (!chkHeuristics[chkHeuristics.length-1].isSelected()) Stream.of(chkHeuristics).skip(1).forEach(chk -> chk.setSelected(true));});
 
     /////////////////////////////////////
 
@@ -692,7 +694,7 @@ public class ClientGui extends JFrame implements DocumentListener
           if (null != solver)
           {
             btnPause.setEnabled(false); btnResume.setEnabled(false);
-            if (solver.solving()) { Log.o("interrupting search..."); solver.interruptAndJoin(); }
+            if (solver.solving()) { Log.o("interrupting search..."); solver.interruptAndJoin(); Solver.release(); }
             try { solver.join(); } catch (Throwable ignored) {}
           }
           return;
@@ -758,12 +760,13 @@ public class ClientGui extends JFrame implements DocumentListener
         btnSearch.setText("Cancel Search");
 
         // try to start solving
-        solver( new Solver(new BigInteger(sp, spBase)) );
+        solver( new Solver(new BigInteger(sp, spBase)).start() );
       }
       catch (Throwable t) { Log.e(t.getLocalizedMessage()); }
       finally
       {
-        if (solver().solving()) { btnPause.setEnabled(true); btnResume.setEnabled(false); pneMain.setSelectedIndex(TAB_CONNECT); }
+        final Solver solver = solver();
+        if (null != solver && solver.solving()) { btnPause.setEnabled(true); btnResume.setEnabled(false); pneMain.setSelectedIndex(TAB_CONNECT); }
         else { isSearching.set(false); btnPause.setEnabled(false); btnResume.setEnabled(false); btnSearch.setText("Start Local Search"); }
         btnSearch.setEnabled(true);
       }

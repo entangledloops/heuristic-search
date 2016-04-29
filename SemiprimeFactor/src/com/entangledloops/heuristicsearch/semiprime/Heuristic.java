@@ -33,6 +33,8 @@ public enum Heuristic
   HAMMING("Hamming Distance",
       "<a href=\"https://en.wikipedia.org/wiki/Hamming_distance\">Hamming distance</a> to goal.\nfor each bit i in target:\n\tsum( n.s[i] != target[i] )",
       (s,n) -> (double) s.cacheS.xor(n.s).bitCount() / (double) s.cacheSLen2),
+
+  ALL("All", "Combines all available heuristics", (s,n) -> 0.0),
   ;
 
   private final String name, desc;
