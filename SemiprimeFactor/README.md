@@ -1,1 +1,1 @@
-#### [This repository has relocated here.](https://github.com/entangledloops/semiprime) ####
+#### [This repository has been relocated.](https://github.com/entangledloops/semiprime) ####
